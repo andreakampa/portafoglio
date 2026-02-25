@@ -3,254 +3,287 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mio Portafoglio Cloud Pro</title>
+    <title>Portfolio Analytics Pro</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; max-width: 900px; margin: 20px auto; padding: 20px; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .form-group { display: flex; gap: 10px; margin-bottom: 15px; align-items: flex-end; flex-wrap: wrap; }
-        .form-group > div { flex: 1; min-width: 120px; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:hover { opacity: 0.9; }
-        .totale-box { display: flex; justify-content: space-between; align-items: center; background: #2c3e50; color: white; padding: 25px; border-radius: 8px; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        .btn-simula { background-color: #f39c12; margin-right: 5px; }
-        .btn-elimina { background-color: #e74c3c; }
-        #simulation-panel { display: none; background-color: #e8f8f5; border-left: 5px solid #1abc9c; }
-        .result-box { background: #1abc9c; color: white; padding: 15px; border-radius: 4px; margin-top: 15px; text-align: center; font-size: 1.1em; }
+        :root { --primary: #2c3e50; --secondary: #34495e; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
         
-        /* Schermate di overlay */
-        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:1000; padding: 20px; text-align: center; }
+        /* Dashboard Header */
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1-fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--primary); color: white; padding: 20px; border-radius: 12px; position: relative; }
+        .stat-card h3 { margin: 0; font-size: 0.85em; opacity: 0.8; text-transform: uppercase; }
+        .stat-card .value { font-size: 1.6em; font-weight: bold; margin-top: 5px; }
+        .stat-card .sub-value { font-size: 0.9em; margin-top: 5px; }
+
+        /* Controls */
+        .controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+        .btn-toggle { background: var(--accent); color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        
+        /* Table Styles */
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th { background: #f8f9fa; padding: 12px; text-align: left; font-size: 0.85em; color: #666; text-transform: uppercase; border-bottom: 2px solid #eee; }
+        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.95em; }
+        .pos-gain { color: var(--success); font-weight: bold; }
+        .neg-loss { color: var(--danger); font-weight: bold; }
+
+        /* Form */
+        .form-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; align-items: flex-end; }
+        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        
+        .overlay { position: fixed; inset: 0; background: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
         .hidden { display: none !important; }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.75em; font-weight: bold; background: #eee; }
     </style>
 </head>
 <body>
 
-    <div id="setup-overlay" class="overlay hidden">
-        <h2>⚙️ Configurazione Iniziale</h2>
-        <p>Inserisci i dati del tuo database Firebase per iniziare.</p>
-        <input type="text" id="setup-db-url" placeholder="https://tuo-progetto.firebaseio.com/" style="max-width: 400px; margin-bottom: 10px;"><br>
-        <input type="password" id="setup-password" placeholder="Scegli la tua password di accesso" style="max-width: 400px; margin-bottom: 10px;"><br>
-        <button onclick="salvaConfigurazione()">Salva e Inizia</button>
+<div id="setup-overlay" class="overlay hidden">
+    <h2>⚙️ Configurazione Database</h2>
+    <input type="text" id="setup-db-url" placeholder="Link Firebase URL" style="max-width: 400px; margin-bottom: 10px;">
+    <input type="password" id="setup-password" placeholder="Tua Password scelta" style="max-width: 400px; margin-bottom: 10px;">
+    <button onclick="salvaConfigurazione()" style="background:var(--success); color:white; padding:10px 20px; border:none; border-radius:5px;">Salva Configurazione</button>
+</div>
+
+<div id="login-overlay" class="overlay hidden">
+    <h2>🔐 Accesso Portafoglio</h2>
+    <input type="password" id="login-password" placeholder="Password" style="max-width: 250px; margin-bottom: 10px;">
+    <button onclick="verificaLogin()" style="background:var(--accent); color:white; padding:10px 20px; border:none; border-radius:5px;">Entra</button>
+</div>
+
+<div id="app-content" class="container hidden">
+    <div class="controls">
+        <div id="exchange-info" class="badge">Caricamento cambio...</div>
+        <div>
+            Visualizza in: 
+            <button class="btn-toggle" onclick="toggleValutaVisualizzazione('EUR')">€ EUR</button>
+            <button class="btn-toggle" onclick="toggleValutaVisualizzazione('USD')">$ USD</button>
+        </div>
     </div>
 
-    <div id="login-overlay" class="overlay hidden">
-        <h2>🔐 Accesso Portafoglio</h2>
-        <input type="password" id="login-password" placeholder="Password" style="max-width: 200px; margin-bottom: 10px;"><br>
-        <button onclick="verificaLogin()">Entra</button>
-        <p style="font-size: 0.7em; margin-top: 20px; color: #999; cursor: pointer;" onclick="resetConfig()">Reset configurazione</p>
+    <div class="dashboard">
+        <div class="stat-card">
+            <h3>Totale Investito</h3>
+            <div id="dash-investito" class="value">0.00</div>
+        </div>
+        <div class="stat-card">
+            <h3>Controvalore Attuale</h3>
+            <div id="dash-attuale" class="value">0.00</div>
+        </div>
+        <div class="stat-card">
+            <h3>Performance Totale</h3>
+            <div id="dash-performance" class="value">0.00</div>
+            <div id="dash-perc" class="sub-value">0%</div>
+        </div>
+        <div class="stat-card" style="background:#7f8c8d">
+            <h3>Esposizione Valuta</h3>
+            <div id="dash-esposizione" class="sub-value" style="margin-top:10px">EUR: 0% | USD: 0%</div>
+        </div>
     </div>
 
-    <div id="app-content" class="hidden">
-        <div class="totale-box">
+    <div class="card">
+        <h3>➕ Aggiungi / Aggiorna Titolo</h3>
+        <div class="form-group">
+            <div><label>Titolo</label><input type="text" id="input-titolo" placeholder="Ticker"></div>
+            <div><label>Quantità</label><input type="number" id="input-qta"></div>
+            <div><label>PMC</label><input type="number" id="input-pmc" step="0.01"></div>
+            <div><label>Prezzo Mercato</label><input type="number" id="input-prezzo-attuale" step="0.01"></div>
             <div>
-                <span style="font-size: 0.9em; opacity: 0.8;">Valore Totale Investito (in €)</span>
-                <div id="valore-totale" style="font-size: 2em; font-weight: bold;">€ 0,00</div>
+                <label>Valuta</label>
+                <select id="input-valuta"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option></select>
             </div>
-            <div style="text-align: right;">
-                <label style="font-size: 0.8em;">Cambio EUR/USD:</label><br>
-                <input type="number" id="cambio-valuta" value="1.08" step="0.001" oninput="aggiornaTabella()" style="width: 85px; background: rgba(255,255,255,0.1); color: white; border: 1px solid white; margin-top:5px;">
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>➕ Aggiungi Titolo</h2>
-            <div class="form-group">
-                <div><label>Titolo</label><input type="text" id="input-titolo" placeholder="es. Ferrari"></div>
-                <div><label>Quantità</label><input type="number" id="input-qta" placeholder="0"></div>
-                <div><label>PMC</label><input type="number" id="input-pmc" step="0.01" placeholder="0.00"></div>
-                <div>
-                    <label>Valuta</label>
-                    <select id="input-valuta">
-                        <option value="EUR">Euro (€)</option>
-                        <option value="USD">Dollaro ($)</option>
-                    </select>
-                </div>
-                <button onclick="aggiungiTitolo()">Aggiungi</button>
-            </div>
-        </div>
-
-        <div class="card">
-            <h2>📊 I miei Titoli</h2>
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Titolo</th>
-                            <th>Quantità</th>
-                            <th>PMC</th>
-                            <th>Valuta</th>
-                            <th>Tot. (€)</th>
-                            <th>Azioni</th>
-                        </tr>
-                    </thead>
-                    <tbody id="corpo-tabella"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="simulation-panel" class="card">
-            <h2 id="sim-titolo">Simula per: <span></span></h2>
-            <div class="form-group">
-                <div><label>Nuova Q.tà</label><input type="number" id="sim-qta" oninput="calcolaNuovoPmc()"></div>
-                <div><label id="label-sim-prezzo">Prezzo</label><input type="number" id="sim-prezzo" step="0.01" oninput="calcolaNuovoPmc()"></div>
-            </div>
-            <div class="result-box" id="sim-risultato">Inserisci i dati per la simulazione...</div>
-            <br><button onclick="chiudiSimulazione()" style="background-color:#7f8c8d">Chiudi</button>
+            <button onclick="aggiungiTitolo()" style="background:var(--success)">Salva</button>
         </div>
     </div>
 
-    <script>
-        let CONFIG = { dbUrl: '', password: '' };
-        let portafoglio = {};
-        let idAttualeSimulazione = null;
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Titolo</th>
+                        <th>Q.tà</th>
+                        <th>PMC</th>
+                        <th>Prezzo</th>
+                        <th>Controvalore</th>
+                        <th>P&L</th>
+                        <th>%</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="corpo-tabella"></tbody>
+            </table>
+        </div>
+    </div>
 
-        // --- GESTIONE AVVIO ---
-        window.onload = function() {
-            const savedConfig = localStorage.getItem('portfolio_config');
-            if (!savedConfig) {
-                document.getElementById('setup-overlay').classList.remove('hidden');
-            } else {
-                CONFIG = JSON.parse(savedConfig);
-                document.getElementById('login-overlay').classList.remove('hidden');
-            }
+    <div id="simulation-panel" class="card hidden" style="border-left: 5px solid var(--warning);">
+        <h3 id="sim-titolo">Simula Acquisto: <span></span></h3>
+        <div class="form-group">
+            <div><label>Nuova Q.tà</label><input type="number" id="sim-qta" oninput="calcolaNuovoPmc()"></div>
+            <div><label id="label-sim-prezzo">Prezzo</label><input type="number" id="sim-prezzo" step="0.01" oninput="calcolaNuovoPmc()"></div>
+            <div id="sim-risultato" class="result-box" style="grid-column: span 2; margin-top:0;">Dati...</div>
+            <button onclick="chiudiSimulazione()" style="background:#7f8c8d">Chiudi</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let CONFIG = { dbUrl: '', password: '' };
+    let portafoglio = {};
+    let cambioEURUSD = 1.08; 
+    let visualizzaIn = 'EUR'; 
+
+    window.onload = async function() {
+        await aggiornaCambio();
+        const savedConfig = localStorage.getItem('portfolio_config');
+        if (!savedConfig) document.getElementById('setup-overlay').classList.remove('hidden');
+        else {
+            CONFIG = JSON.parse(savedConfig);
+            document.getElementById('login-overlay').classList.remove('hidden');
         }
+    }
 
-        function salvaConfigurazione() {
-            let url = document.getElementById('setup-db-url').value.trim();
-            const pass = document.getElementById('setup-password').value.trim();
-            if(!url || !pass) return alert("Compila entrambi i campi");
-            if(!url.endsWith('/')) url += '/';
-            
-            CONFIG = { dbUrl: url, password: pass };
-            localStorage.setItem('portfolio_config', JSON.stringify(CONFIG));
-            location.reload();
-        }
+    async function aggiornaCambio() {
+        try {
+            const res = await fetch('https://open.er-api.com/v6/latest/EUR');
+            const data = await res.json();
+            cambioEURUSD = data.rates.USD;
+            document.getElementById('exchange-info').innerText = `Cambio Real-time: 1 EUR = ${cambioEURUSD.toFixed(4)} USD`;
+        } catch (e) { console.error("Errore cambio"); }
+    }
 
-        function verificaLogin() {
-            const pass = document.getElementById('login-password').value;
-            if (pass === CONFIG.password) {
-                document.getElementById('login-overlay').classList.add('hidden');
-                document.getElementById('app-content').classList.remove('hidden');
-                caricaDati();
-            } else { alert("Password errata!"); }
-        }
+    function salvaConfigurazione() {
+        let url = document.getElementById('setup-db-url').value.trim();
+        const pass = document.getElementById('setup-password').value.trim();
+        if(!url || !pass) return;
+        if(!url.endsWith('/')) url += '/';
+        localStorage.setItem('portfolio_config', JSON.stringify({ dbUrl: url, password: pass }));
+        location.reload();
+    }
 
-        function resetConfig() {
-            if(confirm("Vuoi davvero cancellare la configurazione?")) {
-                localStorage.removeItem('portfolio_config');
-                location.reload();
-            }
-        }
+    function verificaLogin() {
+        if (document.getElementById('login-password').value === CONFIG.password) {
+            document.getElementById('login-overlay').classList.add('hidden');
+            document.getElementById('app-content').classList.remove('hidden');
+            caricaDati();
+        } else alert("Password errata!");
+    }
 
-        // --- LOGICA DATABASE ---
-        async function caricaDati() {
-            try {
-                const res = await fetch(CONFIG.dbUrl + "portafoglio.json");
-                const data = await res.json();
-                portafoglio = data || {};
-                aggiornaTabella();
-            } catch (e) { alert("Errore di connessione al database!"); }
-        }
+    async function caricaDati() {
+        const res = await fetch(CONFIG.dbUrl + "portafoglio.json");
+        portafoglio = await res.json() || {};
+        aggiornaTabella();
+    }
 
-        async function salvaDati() {
-            await fetch(CONFIG.dbUrl + "portafoglio.json", {
-                method: 'PUT',
-                body: JSON.stringify(portafoglio)
-            });
-            aggiornaTabella();
-        }
+    async function salvaDati() {
+        await fetch(CONFIG.dbUrl + "portafoglio.json", { method: 'PUT', body: JSON.stringify(portafoglio) });
+        aggiornaTabella();
+    }
 
-        // --- LOGICA APPLICATIVA ---
-        function aggiornaTabella() {
-            const tbody = document.getElementById('corpo-tabella');
-            const cambio = parseFloat(document.getElementById('cambio-valuta').value) || 1;
-            tbody.innerHTML = '';
-            let totaleEuro = 0;
+    function toggleValutaVisualizzazione(val) {
+        visualizzaIn = val;
+        aggiornaTabella();
+    }
 
-            for (let id in portafoglio) {
-                const t = portafoglio[id];
-                if (!t.valuta) t.valuta = 'EUR';
+    function converti(valore, da, a) {
+        if (da === a) return valore;
+        return (da === 'EUR') ? valore * cambioEURUSD : valore / cambioEURUSD;
+    }
 
-                let investitoEuro = t.qta * t.pmc;
-                if (t.valuta === 'USD') investitoEuro = (t.qta * t.pmc) / cambio;
-                totaleEuro += investitoEuro;
+    function aggiornaTabella() {
+        const tbody = document.getElementById('corpo-tabella');
+        tbody.innerHTML = '';
+        let totInvestito = 0, totAttuale = 0, espEUR = 0, espUSD = 0;
+        const simbolo = visualizzaIn === 'EUR' ? '€' : '$';
 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><strong>${t.nome}</strong></td>
-                    <td>${t.qta}</td>
-                    <td>${t.pmc.toFixed(2)}</td>
-                    <td>
-                        <select onchange="cambiaValuta('${id}', this.value)" style="width:70px; padding:2px;">
-                            <option value="EUR" ${t.valuta === 'EUR' ? 'selected' : ''}>€</option>
-                            <option value="USD" ${t.valuta === 'USD' ? 'selected' : ''}>$</option>
-                        </select>
-                    </td>
-                    <td>€ ${investitoEuro.toFixed(2)}</td>
-                    <td>
-                        <button class="btn-simula" onclick="apriSimulazione('${id}')">S</button>
-                        <button class="btn-elimina" onclick="eliminaTitolo('${id}')">X</button>
-                    </td>`;
-                tbody.appendChild(tr);
-            }
-            document.getElementById('valore-totale').innerText = "€ " + totaleEuro.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        }
-
-        async function cambiaValuta(id, nuovaValuta) {
-            portafoglio[id].valuta = nuovaValuta;
-            await salvaDati();
-        }
-
-        async function aggiungiTitolo() {
-            const nome = document.getElementById('input-titolo').value;
-            const qta = parseFloat(document.getElementById('input-qta').value);
-            const pmc = parseFloat(document.getElementById('input-pmc').value);
-            const valuta = document.getElementById('input-valuta').value;
-
-            if (!nome || isNaN(qta) || isNaN(pmc)) return alert("Inserisci dati validi");
-
-            const id = "ID" + Date.now();
-            portafoglio[id] = { nome, qta, pmc, valuta };
-            await salvaDati();
-            
-            document.getElementById('input-titolo').value = '';
-            document.getElementById('input-qta').value = '';
-            document.getElementById('input-pmc').value = '';
-        }
-
-        async function eliminaTitolo(id) {
-            if (confirm("Eliminare il titolo?")) {
-                delete portafoglio[id];
-                await salvaDati();
-                if (idAttualeSimulazione === id) chiudiSimulazione();
-            }
-        }
-
-        function apriSimulazione(id) {
-            idAttualeSimulazione = id;
+        for (let id in portafoglio) {
             const t = portafoglio[id];
-            document.querySelector('#sim-titolo span').innerText = t.nome + " (" + t.valuta + ")";
-            document.getElementById('label-sim-prezzo').innerText = "Prezzo (" + t.valuta + ")";
-            document.getElementById('simulation-panel').style.display = 'block';
-            document.getElementById('sim-qta').value = '';
-            document.getElementById('sim-prezzo').value = '';
-            document.getElementById('sim-risultato').innerText = 'Inserisci i dati...';
+            const valOriginale = t.valuta || 'EUR';
+            
+            // Calcoli base in valuta originale del titolo
+            const investitoOrig = t.qta * t.pmc;
+            const attualeOrig = t.qta * (t.prezzoAttuale || t.pmc);
+            const pnlOrig = attualeOrig - investitoOrig;
+            const pnlPerc = investitoOrig > 0 ? (pnlOrig / investitoOrig) * 100 : 0;
+
+            // Conversione per esposizione
+            if(valOriginale === 'EUR') espEUR += investitoOrig;
+            else espUSD += investitoOrig / cambioEURUSD;
+
+            // Conversione per Dashboard (basata su visualizzaIn)
+            totInvestito += converti(investitoOrig, valOriginale, visualizzaIn);
+            totAttuale += converti(attualeOrig, valOriginale, visualizzaIn);
+
+            // Righe tabella
+            const tr = document.createElement('tr');
+            const cVal = converti(attualeOrig, valOriginale, visualizzaIn);
+            const cPnl = converti(pnlOrig, valOriginale, visualizzaIn);
+
+            tr.innerHTML = `
+                <td><strong>${t.nome}</strong> <span class="badge">${valOriginale}</span></td>
+                <td>${t.qta}</td>
+                <td>${t.pmc.toFixed(2)}</td>
+                <td>${(t.prezzoAttuale || 0).toFixed(2)}</td>
+                <td>${simbolo} ${cVal.toFixed(2)}</td>
+                <td class="${cPnl >= 0 ? 'pos-gain' : 'neg-loss'}">${simbolo} ${cPnl.toFixed(2)}</td>
+                <td class="${pnlPerc >= 0 ? 'pos-gain' : 'neg-loss'}">${pnlPerc.toFixed(2)}%</td>
+                <td>
+                    <button class="btn-toggle" style="background:var(--warning); padding:3px 8px;" onclick="apriSimulazione('${id}')">S</button>
+                    <button class="btn-toggle" style="background:var(--danger); padding:3px 8px;" onclick="eliminaTitolo('${id}')">X</button>
+                </td>`;
+            tbody.appendChild(tr);
         }
 
-        function calcolaNuovoPmc() {
-            const t = portafoglio[idAttualeSimulazione];
-            const qtaN = parseFloat(document.getElementById('sim-qta').value);
-            const prezN = parseFloat(document.getElementById('sim-prezzo').value);
-            if (isNaN(qtaN) || isNaN(prezN)) return;
+        // Update Dashboard
+        document.getElementById('dash-investito').innerText = `${simbolo} ${totInvestito.toFixed(2)}`;
+        document.getElementById('dash-attuale').innerText = `${simbolo} ${totAttuale.toFixed(2)}`;
+        const totPnl = totAttuale - totInvestito;
+        const totPnlPerc = totInvestito > 0 ? (totPnl / totInvestito) * 100 : 0;
+        document.getElementById('dash-performance').innerText = `${simbolo} ${totPnl.toFixed(2)}`;
+        document.getElementById('dash-performance').className = 'value ' + (totPnl >= 0 ? 'pos-gain' : 'neg-loss');
+        document.getElementById('dash-perc').innerText = `${totPnlPerc.toFixed(2)}%`;
+        
+        const percEUR = (espEUR / (espEUR + espUSD)) * 100 || 0;
+        document.getElementById('dash-esposizione').innerText = `EUR: ${percEUR.toFixed(1)}% | USD: ${(100 - percEUR).toFixed(1)}%`;
+    }
 
-            const nuovoPmc = ((t.qta * t.pmc) + (qtaN * prezN)) / (t.qta + qtaN);
-            const valSimbolo = t.valuta === 'EUR' ? '€' : '$';
-            document.getElementById('sim-risultato').innerHTML = `Nuovo PMC: <strong>${valSimbolo} ${nuovoPmc.toFixed(2)}</strong><br>Azioni totali: ${t.qta + qtaN}`;
-        }
+    async function aggiungiTitolo() {
+        const nome = document.getElementById('input-titolo').value;
+        const qta = parseFloat(document.getElementById('input-qta').value);
+        const pmc = parseFloat(document.getElementById('input-pmc').value);
+        const pAtt = parseFloat(document.getElementById('input-prezzo-attuale').value);
+        const valuta = document.getElementById('input-valuta').value;
 
-        function chiudiSimulazione() { document.getElementById('simulation-panel').style.display = 'none'; }
-    </script>
+        if (!nome || isNaN(qta)) return;
+        const id = "ID" + Date.now();
+        portafoglio[id] = { nome, qta, pmc, prezzoAttuale: pAtt || pmc, valuta };
+        await salvaDati();
+    }
+
+    async function eliminaTitolo(id) {
+        if (confirm("Eliminare?")) { delete portafoglio[id]; await salvaDati(); }
+    }
+
+    function apriSimulazione(id) {
+        idAttualeSimulazione = id;
+        const t = portafoglio[id];
+        document.querySelector('#sim-titolo span').innerText = t.nome;
+        document.getElementById('label-sim-prezzo').innerText = `Prezzo (${t.valuta})`;
+        document.getElementById('simulation-panel').classList.remove('hidden');
+    }
+
+    function calcolaNuovoPmc() {
+        const t = portafoglio[idAttualeSimulazione];
+        const qtaN = parseFloat(document.getElementById('sim-qta').value);
+        const prezN = parseFloat(document.getElementById('sim-prezzo').value);
+        if (isNaN(qtaN) || isNaN(prezN)) return;
+        const nuovoPmc = ((t.qta * t.pmc) + (qtaN * prezN)) / (t.qta + qtaN);
+        document.getElementById('sim-risultato').innerHTML = `Nuovo PMC: <strong>${t.valuta} ${nuovoPmc.toFixed(2)}</strong>`;
+    }
+
+    function chiudiSimulazione() { document.getElementById('simulation-panel').classList.add('hidden'); }
+</script>
 </body>
 </html>
