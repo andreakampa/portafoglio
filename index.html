@@ -3,130 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mio Portafoglio Pro</title>
+    <title>Mio Portafoglio Cloud Pro</title>
     <style>
-        /* Stili identici a prima per brevità */
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; max-width: 850px; margin: 20px auto; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; max-width: 900px; margin: 20px auto; padding: 20px; }
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .form-group { display: flex; gap: 10px; margin-bottom: 15px; align-items: flex-end; flex-wrap: wrap; }
-        .form-group > div { flex: 1; min-width: 150px; }
-        input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .form-group > div { flex: 1; min-width: 120px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         button { background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        .totale-box { display: flex; justify-content: space-between; align-items: center; background: #2c3e50; color: white; padding: 25px; border-radius: 8px; margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         .btn-simula { background-color: #f39c12; margin-right: 5px; }
         .btn-elimina { background-color: #e74c3c; }
         #simulation-panel { display: none; background-color: #e8f8f5; border-left: 5px solid #1abc9c; }
         .result-box { background: #1abc9c; color: white; padding: 15px; border-radius: 4px; margin-top: 15px; text-align: center; font-size: 1.1em; }
-        .status { font-size: 0.8em; color: #7f8c8d; text-align: right; }
-        #auth-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
+        
+        /* Schermate di overlay */
+        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:1000; padding: 20px; text-align: center; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div id="auth-overlay">
-        <h2>Inserisci la tua Password</h2>
-        <input type="password" id="pass-input" style="width:200px; margin-bottom:10px;">
-        <button onclick="verificaAccesso()">Entra nel Portafoglio</button>
+    <div id="setup-overlay" class="overlay hidden">
+        <h2>⚙️ Configurazione Iniziale</h2>
+        <p>Inserisci i dati del tuo database Firebase per iniziare.</p>
+        <input type="text" id="setup-db-url" placeholder="https://tuo-progetto.firebaseio.com/" style="max-width: 400px; margin-bottom: 10px;"><br>
+        <input type="password" id="setup-password" placeholder="Scegli la tua password di accesso" style="max-width: 400px; margin-bottom: 10px;"><br>
+        <button onclick="salvaConfigurazione()">Salva e Inizia</button>
     </div>
 
-    <div id="app-content" style="display:none;">
-        <div class="status" id="status">Sincronizzazione...</div>
-        <h1>📈 Portafoglio Cloud Sync</h1>
+    <div id="login-overlay" class="overlay hidden">
+        <h2>🔐 Accesso Portafoglio</h2>
+        <input type="password" id="login-password" placeholder="Password" style="max-width: 200px; margin-bottom: 10px;"><br>
+        <button onclick="verificaLogin()">Entra</button>
+        <p style="font-size: 0.7em; margin-top: 20px; color: #999; cursor: pointer;" onclick="resetConfig()">Reset configurazione</p>
+    </div>
 
-        <div class="card">
-            <h2>Aggiungi Titolo</h2>
-            <div class="form-group">
-                <div><label>Titolo</label><input type="text" id="input-titolo"></div>
-                <div><label>Quantità</label><input type="number" id="input-qta"></div>
-                <div><label>PMC (€)</label><input type="number" id="input-pmc" step="0.01"></div>
-                <button onclick="aggiungiTitolo()">Salva nel Cloud</button>
+    <div id="app-content" class="hidden">
+        <div class="totale-box">
+            <div>
+                <span style="font-size: 0.9em; opacity: 0.8;">Valore Totale Investito (in €)</span>
+                <div id="valore-totale" style="font-size: 2em; font-weight: bold;">€ 0,00</div>
+            </div>
+            <div style="text-align: right;">
+                <label style="font-size: 0.8em;">Cambio EUR/USD:</label><br>
+                <input type="number" id="cambio-valuta" value="1.08" step="0.001" oninput="aggiornaTabella()" style="width: 85px; background: rgba(255,255,255,0.1); color: white; border: 1px solid white; margin-top:5px;">
             </div>
         </div>
 
         <div class="card">
-            <h2>I miei Titoli</h2>
-            <table>
-                <thead><tr><th>Titolo</th><th>Quantità</th><th>PMC (€)</th><th>Azioni</th></tr></thead>
-                <tbody id="corpo-tabella"></tbody>
-            </table>
+            <h2>➕ Aggiungi Titolo</h2>
+            <div class="form-group">
+                <div><label>Titolo</label><input type="text" id="input-titolo" placeholder="es. Ferrari"></div>
+                <div><label>Quantità</label><input type="number" id="input-qta" placeholder="0"></div>
+                <div><label>PMC</label><input type="number" id="input-pmc" step="0.01" placeholder="0.00"></div>
+                <div>
+                    <label>Valuta</label>
+                    <select id="input-valuta">
+                        <option value="EUR">Euro (€)</option>
+                        <option value="USD">Dollaro ($)</option>
+                    </select>
+                </div>
+                <button onclick="aggiungiTitolo()">Aggiungi</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 I miei Titoli</h2>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Titolo</th>
+                            <th>Quantità</th>
+                            <th>PMC</th>
+                            <th>Valuta</th>
+                            <th>Tot. (€)</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-tabella"></tbody>
+                </table>
+            </div>
         </div>
 
         <div id="simulation-panel" class="card">
-            <h2 id="sim-titolo">Simulazione per: <span></span></h2>
+            <h2 id="sim-titolo">Simula per: <span></span></h2>
             <div class="form-group">
-                <div><label>Nuova Quantità</label><input type="number" id="sim-qta" oninput="calcolaNuovoPmc()"></div>
-                <div><label>Prezzo Acquisto (€)</label><input type="number" id="sim-prezzo" step="0.01" oninput="calcolaNuovoPmc()"></div>
+                <div><label>Nuova Q.tà</label><input type="number" id="sim-qta" oninput="calcolaNuovoPmc()"></div>
+                <div><label id="label-sim-prezzo">Prezzo</label><input type="number" id="sim-prezzo" step="0.01" oninput="calcolaNuovoPmc()"></div>
             </div>
-            <div class="result-box" id="sim-risultato">Inserisci i dati...</div>
+            <div class="result-box" id="sim-risultato">Inserisci i dati per la simulazione...</div>
             <br><button onclick="chiudiSimulazione()" style="background-color:#7f8c8d">Chiudi</button>
         </div>
     </div>
 
     <script>
-        // --- CONFIGURAZIONE ---
-        const DB_URL = "https://calcolo-pmc-default-rtdb.europe-west1.firebasedatabase.app/"; // Assicurati che finisca con /
-        const DATA_URL = DB_URL + "/portafoglio.json";
-        const MIA_PASSWORD = "0vaffanculo"; // <--- CAMBIA QUESTA!
-
+        let CONFIG = { dbUrl: '', password: '' };
         let portafoglio = {};
         let idAttualeSimulazione = null;
 
-        function verificaAccesso() {
-            const inserita = document.getElementById('pass-input').value;
-            if (inserita === MIA_PASSWORD) {
-                document.getElementById('auth-overlay').style.display = 'none';
-                document.getElementById('app-content').style.display = 'block';
-                caricaDati();
+        // --- GESTIONE AVVIO ---
+        window.onload = function() {
+            const savedConfig = localStorage.getItem('portfolio_config');
+            if (!savedConfig) {
+                document.getElementById('setup-overlay').classList.remove('hidden');
             } else {
-                alert("Password errata!");
+                CONFIG = JSON.parse(savedConfig);
+                document.getElementById('login-overlay').classList.remove('hidden');
             }
         }
 
+        function salvaConfigurazione() {
+            let url = document.getElementById('setup-db-url').value.trim();
+            const pass = document.getElementById('setup-password').value.trim();
+            if(!url || !pass) return alert("Compila entrambi i campi");
+            if(!url.endsWith('/')) url += '/';
+            
+            CONFIG = { dbUrl: url, password: pass };
+            localStorage.setItem('portfolio_config', JSON.stringify(CONFIG));
+            location.reload();
+        }
+
+        function verificaLogin() {
+            const pass = document.getElementById('login-password').value;
+            if (pass === CONFIG.password) {
+                document.getElementById('login-overlay').classList.add('hidden');
+                document.getElementById('app-content').classList.remove('hidden');
+                caricaDati();
+            } else { alert("Password errata!"); }
+        }
+
+        function resetConfig() {
+            if(confirm("Vuoi davvero cancellare la configurazione?")) {
+                localStorage.removeItem('portfolio_config');
+                location.reload();
+            }
+        }
+
+        // --- LOGICA DATABASE ---
         async function caricaDati() {
             try {
-                const res = await fetch(DATA_URL);
+                const res = await fetch(CONFIG.dbUrl + "portafoglio.json");
                 const data = await res.json();
                 portafoglio = data || {};
                 aggiornaTabella();
-                document.getElementById('status').innerText = "☁️ Dati Sincronizzati";
-            } catch (e) { document.getElementById('status').innerText = "❌ Errore Sync"; }
+            } catch (e) { alert("Errore di connessione al database!"); }
         }
 
         async function salvaDati() {
-            await fetch(DATA_URL, {
+            await fetch(CONFIG.dbUrl + "portafoglio.json", {
                 method: 'PUT',
                 body: JSON.stringify(portafoglio)
             });
-            caricaDati();
+            aggiornaTabella();
         }
 
+        // --- LOGICA APPLICATIVA ---
         function aggiornaTabella() {
             const tbody = document.getElementById('corpo-tabella');
+            const cambio = parseFloat(document.getElementById('cambio-valuta').value) || 1;
             tbody.innerHTML = '';
+            let totaleEuro = 0;
+
             for (let id in portafoglio) {
                 const t = portafoglio[id];
+                if (!t.valuta) t.valuta = 'EUR';
+
+                let investitoEuro = t.qta * t.pmc;
+                if (t.valuta === 'USD') investitoEuro = (t.qta * t.pmc) / cambio;
+                totaleEuro += investitoEuro;
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong>${t.nome}</strong></td>
                     <td>${t.qta}</td>
                     <td>${t.pmc.toFixed(2)}</td>
                     <td>
-                        <button class="btn-simula" onclick="apriSimulazione('${id}')">Simula</button>
-                        <button class="btn-elimina" onclick="eliminaTitolo('${id}')">Elimina</button>
+                        <select onchange="cambiaValuta('${id}', this.value)" style="width:70px; padding:2px;">
+                            <option value="EUR" ${t.valuta === 'EUR' ? 'selected' : ''}>€</option>
+                            <option value="USD" ${t.valuta === 'USD' ? 'selected' : ''}>$</option>
+                        </select>
+                    </td>
+                    <td>€ ${investitoEuro.toFixed(2)}</td>
+                    <td>
+                        <button class="btn-simula" onclick="apriSimulazione('${id}')">S</button>
+                        <button class="btn-elimina" onclick="eliminaTitolo('${id}')">X</button>
                     </td>`;
                 tbody.appendChild(tr);
             }
+            document.getElementById('valore-totale').innerText = "€ " + totaleEuro.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        async function cambiaValuta(id, nuovaValuta) {
+            portafoglio[id].valuta = nuovaValuta;
+            await salvaDati();
         }
 
         async function aggiungiTitolo() {
-            const id = "ID" + Date.now();
             const nome = document.getElementById('input-titolo').value;
             const qta = parseFloat(document.getElementById('input-qta').value);
             const pmc = parseFloat(document.getElementById('input-pmc').value);
-            if (!nome || isNaN(qta)) return;
-            portafoglio[id] = { nome, qta, pmc };
+            const valuta = document.getElementById('input-valuta').value;
+
+            if (!nome || isNaN(qta) || isNaN(pmc)) return alert("Inserisci dati validi");
+
+            const id = "ID" + Date.now();
+            portafoglio[id] = { nome, qta, pmc, valuta };
             await salvaDati();
+            
             document.getElementById('input-titolo').value = '';
             document.getElementById('input-qta').value = '';
             document.getElementById('input-pmc').value = '';
@@ -142,7 +230,9 @@
 
         function apriSimulazione(id) {
             idAttualeSimulazione = id;
-            document.querySelector('#sim-titolo span').innerText = portafoglio[id].nome;
+            const t = portafoglio[id];
+            document.querySelector('#sim-titolo span').innerText = t.nome + " (" + t.valuta + ")";
+            document.getElementById('label-sim-prezzo').innerText = "Prezzo (" + t.valuta + ")";
             document.getElementById('simulation-panel').style.display = 'block';
             document.getElementById('sim-qta').value = '';
             document.getElementById('sim-prezzo').value = '';
@@ -154,8 +244,10 @@
             const qtaN = parseFloat(document.getElementById('sim-qta').value);
             const prezN = parseFloat(document.getElementById('sim-prezzo').value);
             if (isNaN(qtaN) || isNaN(prezN)) return;
+
             const nuovoPmc = ((t.qta * t.pmc) + (qtaN * prezN)) / (t.qta + qtaN);
-            document.getElementById('sim-risultato').innerHTML = `Nuovo PMC: <strong>€ ${nuovoPmc.toFixed(2)}</strong><br>Totale azioni: ${t.qta + qtaN}`;
+            const valSimbolo = t.valuta === 'EUR' ? '€' : '$';
+            document.getElementById('sim-risultato').innerHTML = `Nuovo PMC: <strong>${valSimbolo} ${nuovoPmc.toFixed(2)}</strong><br>Azioni totali: ${t.qta + qtaN}`;
         }
 
         function chiudiSimulazione() { document.getElementById('simulation-panel').style.display = 'none'; }
