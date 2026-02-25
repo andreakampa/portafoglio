@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mio Portafoglio Pro</title>
+    <style>
+        /* Stili identici a prima per brevità */
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; max-width: 850px; margin: 20px auto; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .form-group { display: flex; gap: 10px; margin-bottom: 15px; align-items: flex-end; flex-wrap: wrap; }
+        .form-group > div { flex: 1; min-width: 150px; }
+        input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        .btn-simula { background-color: #f39c12; margin-right: 5px; }
+        .btn-elimina { background-color: #e74c3c; }
+        #simulation-panel { display: none; background-color: #e8f8f5; border-left: 5px solid #1abc9c; }
+        .result-box { background: #1abc9c; color: white; padding: 15px; border-radius: 4px; margin-top: 15px; text-align: center; font-size: 1.1em; }
+        .status { font-size: 0.8em; color: #7f8c8d; text-align: right; }
+        #auth-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:white; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-overlay">
+        <h2>Inserisci la tua Password</h2>
+        <input type="password" id="pass-input" style="width:200px; margin-bottom:10px;">
+        <button onclick="verificaAccesso()">Entra nel Portafoglio</button>
+    </div>
+
+    <div id="app-content" style="display:none;">
+        <div class="status" id="status">Sincronizzazione...</div>
+        <h1>📈 Portafoglio Cloud Sync</h1>
+
+        <div class="card">
+            <h2>Aggiungi Titolo</h2>
+            <div class="form-group">
+                <div><label>Titolo</label><input type="text" id="input-titolo"></div>
+                <div><label>Quantità</label><input type="number" id="input-qta"></div>
+                <div><label>PMC (€)</label><input type="number" id="input-pmc" step="0.01"></div>
+                <button onclick="aggiungiTitolo()">Salva nel Cloud</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>I miei Titoli</h2>
+            <table>
+                <thead><tr><th>Titolo</th><th>Quantità</th><th>PMC (€)</th><th>Azioni</th></tr></thead>
+                <tbody id="corpo-tabella"></tbody>
+            </table>
+        </div>
+
+        <div id="simulation-panel" class="card">
+            <h2 id="sim-titolo">Simulazione per: <span></span></h2>
+            <div class="form-group">
+                <div><label>Nuova Quantità</label><input type="number" id="sim-qta" oninput="calcolaNuovoPmc()"></div>
+                <div><label>Prezzo Acquisto (€)</label><input type="number" id="sim-prezzo" step="0.01" oninput="calcolaNuovoPmc()"></div>
+            </div>
+            <div class="result-box" id="sim-risultato">Inserisci i dati...</div>
+            <br><button onclick="chiudiSimulazione()" style="background-color:#7f8c8d">Chiudi</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAZIONE ---
+        const DB_URL = "https://calcolo-pmc-default-rtdb.europe-west1.firebasedatabase.app/"; // Assicurati che finisca con /
+        const DATA_URL = DB_URL + "/portafoglio.json";
+        const MIA_PASSWORD = "0vaffanculo"; // <--- CAMBIA QUESTA!
+
+        let portafoglio = {};
+        let idAttualeSimulazione = null;
+
+        function verificaAccesso() {
+            const inserita = document.getElementById('pass-input').value;
+            if (inserita === MIA_PASSWORD) {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('app-content').style.display = 'block';
+                caricaDati();
+            } else {
+                alert("Password errata!");
+            }
+        }
+
+        async function caricaDati() {
+            try {
+                const res = await fetch(DATA_URL);
+                const data = await res.json();
+                portafoglio = data || {};
+                aggiornaTabella();
+                document.getElementById('status').innerText = "☁️ Dati Sincronizzati";
+            } catch (e) { document.getElementById('status').innerText = "❌ Errore Sync"; }
+        }
+
+        async function salvaDati() {
+            await fetch(DATA_URL, {
+                method: 'PUT',
+                body: JSON.stringify(portafoglio)
+            });
+            caricaDati();
+        }
+
+        function aggiornaTabella() {
+            const tbody = document.getElementById('corpo-tabella');
+            tbody.innerHTML = '';
+            for (let id in portafoglio) {
+                const t = portafoglio[id];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${t.nome}</strong></td>
+                    <td>${t.qta}</td>
+                    <td>${t.pmc.toFixed(2)}</td>
+                    <td>
+                        <button class="btn-simula" onclick="apriSimulazione('${id}')">Simula</button>
+                        <button class="btn-elimina" onclick="eliminaTitolo('${id}')">Elimina</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            }
+        }
+
+        async function aggiungiTitolo() {
+            const id = "ID" + Date.now();
+            const nome = document.getElementById('input-titolo').value;
+            const qta = parseFloat(document.getElementById('input-qta').value);
+            const pmc = parseFloat(document.getElementById('input-pmc').value);
+            if (!nome || isNaN(qta)) return;
+            portafoglio[id] = { nome, qta, pmc };
+            await salvaDati();
+            document.getElementById('input-titolo').value = '';
+            document.getElementById('input-qta').value = '';
+            document.getElementById('input-pmc').value = '';
+        }
+
+        async function eliminaTitolo(id) {
+            if (confirm("Eliminare il titolo?")) {
+                delete portafoglio[id];
+                await salvaDati();
+                if (idAttualeSimulazione === id) chiudiSimulazione();
+            }
+        }
+
+        function apriSimulazione(id) {
+            idAttualeSimulazione = id;
+            document.querySelector('#sim-titolo span').innerText = portafoglio[id].nome;
+            document.getElementById('simulation-panel').style.display = 'block';
+            document.getElementById('sim-qta').value = '';
+            document.getElementById('sim-prezzo').value = '';
+            document.getElementById('sim-risultato').innerText = 'Inserisci i dati...';
+        }
+
+        function calcolaNuovoPmc() {
+            const t = portafoglio[idAttualeSimulazione];
+            const qtaN = parseFloat(document.getElementById('sim-qta').value);
+            const prezN = parseFloat(document.getElementById('sim-prezzo').value);
+            if (isNaN(qtaN) || isNaN(prezN)) return;
+            const nuovoPmc = ((t.qta * t.pmc) + (qtaN * prezN)) / (t.qta + qtaN);
+            document.getElementById('sim-risultato').innerHTML = `Nuovo PMC: <strong>€ ${nuovoPmc.toFixed(2)}</strong><br>Totale azioni: ${t.qta + qtaN}`;
+        }
+
+        function chiudiSimulazione() { document.getElementById('simulation-panel').style.display = 'none'; }
+    </script>
+</body>
+</html>
