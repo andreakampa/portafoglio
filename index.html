@@ -3,144 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portafoglio Tracker</title>
+    <title>Portafoglio Tracker Pro</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --purple: #8e44ad; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1250px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
         
-        /* Dashboard */
-        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; }
-        .stat-card h3 { margin: 0; font-size: 0.85em; opacity: 0.8; text-transform: uppercase; }
-        .stat-card .value { font-size: 1.6em; font-weight: bold; margin-top: 5px; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--primary); color: white; padding: 20px; border-radius: 12px; }
+        .stat-card h3 { margin: 0; font-size: 0.8em; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-card .value { font-size: 1.6em; font-weight: bold; margin-top: 8px; }
 
-        /* Controlli */
-        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 0.9em; }
-        .btn-toggle { background: #3498db; color: white; border: none; padding: 5px 15px; border-radius: 20px; cursor: pointer; }
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: white; padding: 10px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .btn-toggle { background: var(--accent); color: white; border: none; padding: 6px 18px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-toggle:hover { opacity: 0.8; }
         
-        /* Tabella */
-        table { width: 100%; border-collapse: collapse; text-align: left; }
-        th { background: #f8f9fa; padding: 12px; font-size: 0.85em; color: #666; border-bottom: 2px solid #eee; }
-        td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
-        .pos-gain { color: #27ae60; font-weight: bold; }
-        .neg-loss { color: #e74c3c; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th { background: #f8f9fa; padding: 15px 10px; font-size: 0.8em; color: #7f8c8d; text-transform: uppercase; border-bottom: 2px solid #eee; text-align: left; }
+        td { padding: 15px 10px; border-bottom: 1px solid #eee; }
+        .pos-gain { color: var(--success); font-weight: bold; }
+        .neg-loss { color: var(--danger); font-weight: bold; }
         
-        /* Tasti Azione */
-        .btn-action { border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em; color: white; margin-right: 3px; }
-        .btn-simula { background-color: #f39c12; }
-        .btn-compra { background-color: #3498db; }
-        .btn-vendi { background-color: #8e44ad; }
-        .btn-elimina { background-color: #e74c3c; }
+        .btn-action { border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75em; font-weight: bold; color: white; margin-right: 4px; transition: 0.2s; }
+        .btn-edit { background: #95a5a6; }
+        .btn-sim { background: var(--warning); }
+        .btn-buy { background: var(--accent); }
+        .btn-sell { background: var(--purple); }
+        .btn-del { background: var(--danger); }
+        .btn-action:hover { transform: translateY(-1px); filter: brightness(1.1); }
 
-        /* Form */
         .form-group { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-        .form-group > div { flex: 1; min-width: 130px; }
-        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; outline: none; }
+        input:focus { border-color: var(--accent); }
         
-        /* Modali */
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-box { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 450px; }
-        .btn-close { background: #ccc; border: none; padding: 10px; width: 100%; border-radius: 4px; margin-top: 15px; cursor: pointer; }
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(4px); }
+        .modal-box { background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        .btn-close { background: #bdc3c7; border: none; padding: 12px; width: 100%; border-radius: 8px; margin-top: 15px; cursor: pointer; color: white; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="setup-overlay" class="overlay" style="background: white;">
-    <div class="modal-box" style="text-align: center; border: 1px solid #ccc;">
-        <h2>⚙️ Configurazione DB</h2>
+<div id="setup-overlay" class="overlay" style="background: #f4f7f6; display: none;">
+    <div class="modal-box" style="text-align: center;">
+        <h2>⚙️ Setup Database</h2>
         <input type="text" id="setup-db-url" placeholder="Link Firebase URL" style="margin-bottom: 10px;">
-        <input type="password" id="setup-password" placeholder="Tua Password" style="margin-bottom: 15px;">
-        <button onclick="salvaConfigurazione()" style="background:#27ae60; color:white; padding:10px; border:none; width:100%;">Salva e Inizia</button>
+        <input type="password" id="setup-password" placeholder="Crea la tua Password" style="margin-bottom: 15px;">
+        <button onclick="salvaConfigurazione()" style="background:var(--success); color:white; padding:12px; border:none; width:100%; border-radius:8px;">Salva Configurazione</button>
     </div>
 </div>
 
-<div id="login-overlay" class="overlay" style="background: white;">
-    <div class="modal-box" style="text-align: center; border: 1px solid #ccc;">
+<div id="login-overlay" class="overlay" style="background: #f4f7f6; display: none;">
+    <div class="modal-box" style="text-align: center;">
         <h2>🔐 Accesso</h2>
-        <input type="password" id="login-password" placeholder="Password" style="margin-bottom: 15px;">
-        <button onclick="verificaLogin()" style="background:#3498db; color:white; padding:10px; border:none; width:100%;">Entra</button>
-        <p style="font-size: 0.8em; color: #999; cursor: pointer; margin-top: 20px;" onclick="resetConfig()">Reset Configurazione</p>
+        <input type="password" id="login-password" placeholder="Inserisci Password" style="margin-bottom: 15px;">
+        <button onclick="verificaLogin()" style="background:var(--accent); color:white; padding:12px; border:none; width:100%; border-radius:8px;">Sblocca Portafoglio</button>
     </div>
 </div>
 
 <div id="app-content" class="container" style="display:none;">
     <div class="controls">
-        <span id="exchange-info">EUR/USD: Caricamento...</span>
+        <span id="exchange-info" style="font-weight: bold; color: var(--primary);">Cambio: Caricamento...</span>
         <div>
-            Valuta globale: 
+            Mostra in: 
             <button class="btn-toggle" onclick="toggleValuta('EUR')">€ EUR</button>
             <button class="btn-toggle" onclick="toggleValuta('USD')">$ USD</button>
         </div>
     </div>
 
     <div class="dashboard">
-        <div class="stat-card">
-            <h3>Capitale Investito</h3>
-            <div id="dash-investito" class="value">0.00</div>
-        </div>
-        <div class="stat-card">
-            <h3>Controvalore Reale</h3>
-            <div id="dash-attuale" class="value">0.00</div>
-        </div>
-        <div class="stat-card">
-            <h3>P&L Attuale (Latente)</h3>
-            <div id="dash-performance" class="value">0.00</div>
-        </div>
-        <div class="stat-card" style="background: #8e44ad;">
-            <h3>Profitti Realizzati (Vendite)</h3>
-            <div id="dash-realizzato" class="value">0.00</div>
-        </div>
+        <div class="stat-card"><h3>Capitale Investito</h3><div id="dash-investito" class="value">0.00</div></div>
+        <div class="stat-card"><h3>Controvalore Attuale</h3><div id="dash-attuale" class="value">0.00</div></div>
+        <div class="stat-card"><h3>P&L Attuale</h3><div id="dash-performance" class="value">0.00</div></div>
+        <div class="stat-card" style="background: var(--purple);"><h3>P&L Realizzato</h3><div id="dash-realizzato" class="value">0.00</div></div>
     </div>
 
     <div class="card">
-        <h3>➕ Aggiungi Posizione</h3>
-        <p style="font-size:0.8em; margin-top:-10px; color:#666;">Usa il Ticker Yahoo (es. RACE.MI per Ferrari IT, AAPL per Apple)</p>
+        <h3 style="margin-top:0;">➕ Aggiungi Titolo</h3>
         <div class="form-group">
-            <div><label>Ticker</label><input type="text" id="input-titolo" placeholder="Es. AAPL"></div>
-            <div><label>Q.tà posseduta</label><input type="number" id="input-qta"></div>
-            <div><label>PMC</label><input type="number" id="input-pmc" step="0.01"></div>
-            <div>
-                <label>Valuta</label>
-                <select id="input-valuta"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option></select>
-            </div>
-            <button onclick="aggiungiTitolo()" style="background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:4px; cursor:pointer;">Aggiungi</button>
+            <div><label>Ticker (Yahoo)</label><input type="text" id="input-titolo" placeholder="es. AAPL o RACE.MI"></div>
+            <div><label>Quantità</label><input type="number" id="input-qta" step="any"></div>
+            <div><label>PMC</label><input type="number" id="input-pmc" step="any"></div>
+            <div><label>Valuta</label><select id="input-valuta"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option></select></div>
+            <button onclick="aggiungiTitolo()" style="background:var(--success); color:white; border:none; padding:10px 25px; border-radius:8px; cursor:pointer; font-weight:bold;">Aggiungi</button>
         </div>
     </div>
 
     <div class="card" style="overflow-x: auto;">
-        <table id="main-table">
+        <table>
             <thead>
                 <tr>
                     <th>Titolo</th>
                     <th>Q.tà</th>
                     <th>PMC</th>
                     <th>Prezzo Live</th>
-                    <th>Controvalore</th>
+                    <th>Valore Posizione</th>
                     <th>P&L</th>
                     <th>Azioni</th>
                 </tr>
             </thead>
-            <tbody id="corpo-tabella"><tr><td colspan="7">Caricamento portafoglio...</td></tr></tbody>
+            <tbody id="corpo-tabella"></tbody>
         </table>
     </div>
 </div>
 
+<div id="modal-edit" class="overlay">
+    <div class="modal-box" style="border-top: 5px solid #95a5a6;">
+        <h3 style="margin-top:0;">🔧 Modifica / Rettifica</h3>
+        <input type="hidden" id="edit-id">
+        <label>Ticker Yahoo Finance</label>
+        <input type="text" id="edit-ticker" style="margin-bottom:10px;">
+        <label>Rettifica Quantità (Senza generare P&L)</label>
+        <input type="number" id="edit-qta" step="any" style="margin-bottom:10px;">
+        <label>Rettifica PMC</label>
+        <input type="number" id="edit-pmc" step="any" style="margin-bottom:10px;">
+        <label>P&L Realizzato accumulato (opzionale)</label>
+        <input type="number" id="edit-pnl-realizzato" step="any" style="margin-bottom:10px;">
+        
+        <button onclick="salvaModificaTitolo()" style="background:var(--success); color:white; padding:12px; border:none; width:100%; border-radius:8px; font-weight:bold; margin-top:10px;">Salva Modifiche</button>
+        <button class="btn-close" onclick="chiudiModale('modal-edit')">Annulla</button>
+    </div>
+</div>
+
 <div id="modal-simulazione" class="overlay">
-    <div class="modal-box" style="border-top: 4px solid #f39c12;">
-        <h3 id="sim-titolo" style="margin-top:0;">Simulazione su <span></span></h3>
-        <p style="font-size:0.85em; color:#666;">Inserisci il prezzo a cui vorresti comprare e il budget disponibile.</p>
-        
-        <label>Prezzo Ipotetico Acquisto</label>
-        <input type="number" id="sim-prezzo" step="0.01" style="margin-bottom:10px;" oninput="calcolaSimulazione()">
-        
-        <label>Budget da Investire</label>
-        <input type="number" id="sim-budget" step="0.01" placeholder="Es. 1000" oninput="calcolaSimulazione()">
-        
-        <div id="sim-risultato" style="background:#f8f9fa; padding:15px; margin-top:15px; border-radius:4px; font-size:0.9em; border: 1px solid #ddd;">
-            Risultato simulazione...
-        </div>
-        
+    <div class="modal-box" style="border-top: 5px solid var(--warning);">
+        <h3 id="sim-titolo" style="margin-top:0;">Simulazione <span></span></h3>
+        <label>Prezzo Acquisto</label>
+        <input type="number" id="sim-prezzo" step="any" style="margin-bottom:10px;" oninput="calcolaSimulazione()">
+        <label>Budget Disponibile</label>
+        <input type="number" id="sim-budget" step="any" oninput="calcolaSimulazione()">
+        <div id="sim-risultato" style="background:#f9f9f9; padding:15px; margin-top:15px; border-radius:8px; border:1px solid #eee; font-size:0.9em;"></div>
         <button class="btn-close" onclick="chiudiModale('modal-simulazione')">Chiudi</button>
     </div>
 </div>
@@ -148,43 +140,34 @@
 <div id="modal-transazione" class="overlay">
     <div class="modal-box" id="trans-box">
         <h3 id="trans-titolo" style="margin-top:0;">Transazione</h3>
-        <input type="hidden" id="trans-id">
-        <input type="hidden" id="trans-tipo">
-        
-        <label>Azioni transate</label>
-        <input type="number" id="trans-qta" step="0.01" style="margin-bottom:10px;">
-        
-        <label>Prezzo Eseguito (reale)</label>
-        <input type="number" id="trans-prezzo" step="0.01" style="margin-bottom:15px;">
-        
-        <button id="btn-esegui-trans" onclick="eseguiTransazione()" style="width:100%; padding:10px; color:white; border:none; border-radius:4px; cursor:pointer;">Conferma</button>
-        <button class="btn-close" style="background:transparent; color:#333; border:1px solid #ccc;" onclick="chiudiModale('modal-transazione')">Annulla</button>
+        <input type="hidden" id="trans-id"><input type="hidden" id="trans-tipo">
+        <label>Quantità Azioni</label>
+        <input type="number" id="trans-qta" step="any" style="margin-bottom:10px;">
+        <label>Prezzo Eseguito</label>
+        <input type="number" id="trans-prezzo" step="any" style="margin-bottom:15px;">
+        <button id="btn-esegui-trans" onclick="eseguiTransazione()" style="width:100%; padding:12px; color:white; border:none; border-radius:8px; font-weight:bold;">Conferma Operazione</button>
+        <button class="btn-close" style="background:transparent; color:#999; border:1px solid #ccc;" onclick="chiudiModale('modal-transazione')">Annulla</button>
     </div>
 </div>
 
 <script>
     let CONFIG = { dbUrl: '', password: '' };
     let portafoglio = {};
-    let prezziLive = {}; // Salva i prezzi scaricati da Yahoo
-    let cambioEURUSD = 1.08; 
-    let visualizzaIn = 'EUR'; 
+    let prezziLive = {};
+    let cambioEURUSD = 1.08;
+    let visualizzaIn = 'EUR';
     let simId = null;
 
     window.onload = async function() {
         const savedConfig = localStorage.getItem('portfolio_config');
-        if (!savedConfig) {
-            document.getElementById('setup-overlay').style.display = 'flex';
-        } else {
-            CONFIG = JSON.parse(savedConfig);
-            document.getElementById('login-overlay').style.display = 'flex';
-        }
-    }
+        if (!savedConfig) document.getElementById('setup-overlay').style.display = 'flex';
+        else { CONFIG = JSON.parse(savedConfig); document.getElementById('login-overlay').style.display = 'flex'; }
+    };
 
-    // --- SETUP / LOGIN ---
     function salvaConfigurazione() {
         let url = document.getElementById('setup-db-url').value.trim();
         const pass = document.getElementById('setup-password').value.trim();
-        if(!url || !pass) return alert("Compila tutto");
+        if(!url || !pass) return alert("Inserisci dati validi");
         if(!url.endsWith('/')) url += '/';
         localStorage.setItem('portfolio_config', JSON.stringify({ dbUrl: url, password: pass }));
         location.reload();
@@ -198,17 +181,11 @@
         } else alert("Password errata!");
     }
 
-    function resetConfig() {
-        localStorage.removeItem('portfolio_config');
-        location.reload();
-    }
-
-    // --- LOGICA PRINCIPALE E DATI ---
     async function avviaApp() {
         await aggiornaCambio();
         await caricaDati();
-        await aggiornaPrezziLive(); // Scarica prezzi da Yahoo
-        renderizzaTabella();
+        await aggiornaPrezziLive();
+        renderTabella();
     }
 
     async function aggiornaCambio() {
@@ -216,23 +193,22 @@
             const res = await fetch('https://open.er-api.com/v6/latest/EUR');
             const data = await res.json();
             cambioEURUSD = data.rates.USD;
-            document.getElementById('exchange-info').innerText = `EUR/USD: ${cambioEURUSD.toFixed(4)}`;
-        } catch (e) { console.log("Errore cambio API"); }
+            document.getElementById('exchange-info').innerText = `Cambio Real-Time: 1 EUR = ${cambioEURUSD.toFixed(4)} USD`;
+        } catch (e) { console.error("Errore Cambio API"); }
     }
 
     async function caricaDati() {
         try {
             const res = await fetch(CONFIG.dbUrl + "portafoglio.json");
             portafoglio = await res.json() || {};
-        } catch(e) { alert("Errore database"); }
+        } catch(e) { console.error("Errore caricamento DB"); }
     }
 
     async function salvaDati() {
         await fetch(CONFIG.dbUrl + "portafoglio.json", { method: 'PUT', body: JSON.stringify(portafoglio) });
-        renderizzaTabella();
+        renderTabella();
     }
 
-    // MAGIA: Scarica prezzi da Yahoo Finance usando un proxy aperto (per evitare blocchi)
     async function aggiornaPrezziLive() {
         for (let id in portafoglio) {
             const ticker = portafoglio[id].nome;
@@ -241,189 +217,133 @@
                 const res = await fetch(proxyUrl);
                 const data = await res.json();
                 const yahooData = JSON.parse(data.contents);
-                const prezzoLive = yahooData.chart.result[0].meta.regularMarketPrice;
-                prezziLive[id] = prezzoLive;
-            } catch(e) {
-                // Se non trova il ticker, usa il PMC come prezzo temporaneo per non rompere i calcoli
-                prezziLive[id] = portafoglio[id].pmc; 
-            }
+                prezziLive[id] = yahooData.chart.result[0].meta.regularMarketPrice;
+            } catch(e) { prezziLive[id] = portafoglio[id].pmc; }
         }
     }
 
-    function converti(valore, da, a) {
-        if (da === a) return valore;
-        return (da === 'EUR') ? valore * cambioEURUSD : valore / cambioEURUSD;
-    }
+    function converti(v, da, a) { return (da === a) ? v : (da === 'EUR' ? v * cambioEURUSD : v / cambioEURUSD); }
+    function toggleValuta(v) { visualizzaIn = v; renderTabella(); }
+    function chiudiModale(m) { document.getElementById(m).style.display = 'none'; }
 
-    function toggleValuta(val) { visualizzaIn = val; renderizzaTabella(); }
-
-    // --- RENDER TABELLA ---
-    function renderizzaTabella() {
+    function renderTabella() {
         const tbody = document.getElementById('corpo-tabella');
         tbody.innerHTML = '';
-        let totInvestito = 0, totAttuale = 0, totRealizzato = 0;
-        const sim = visualizzaIn === 'EUR' ? '€' : '$';
+        let totInv = 0, totAtt = 0, totReal = 0;
+        const s = visualizzaIn === 'EUR' ? '€' : '$';
 
         for (let id in portafoglio) {
             const t = portafoglio[id];
-            const val = t.valuta || 'EUR';
-            if(t.realizedPnL === undefined) t.realizedPnL = 0;
-            
-            const prezzoMercato = prezziLive[id] || t.pmc;
-            const investito = t.qta * t.pmc;
-            const attuale = t.qta * prezzoMercato;
-            const pnl = attuale - investito;
+            const v = t.valuta || 'EUR';
+            const prLive = prezziLive[id] || t.pmc;
+            const inv = t.qta * t.pmc;
+            const att = t.qta * prLive;
+            const pnl = att - inv;
+            const pnlP = inv > 0 ? (pnl / inv) * 100 : 0;
 
-            // Aggiorna totali globali
-            totInvestito += converti(investito, val, visualizzaIn);
-            totAttuale += converti(attuale, val, visualizzaIn);
-            totRealizzato += converti(t.realizedPnL, val, visualizzaIn);
-
-            const cValAttuale = converti(attuale, val, visualizzaIn);
-            const cPnl = converti(pnl, val, visualizzaIn);
-            const pnlPerc = investito > 0 ? (pnl / investito) * 100 : 0;
+            totInv += converti(inv, v, visualizzaIn);
+            totAtt += converti(att, v, visualizzaIn);
+            totReal += converti(t.realizedPnL || 0, v, visualizzaIn);
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><strong>${t.nome}</strong> <span style="font-size:0.7em; background:#eee; padding:2px 4px;">${val}</span></td>
-                <td>${t.qta.toFixed(2)}</td>
-                <td>${t.pmc.toFixed(2)}</td>
-                <td><strong>${prezzoMercato.toFixed(2)}</strong></td>
-                <td>${sim} ${cValAttuale.toFixed(2)}</td>
-                <td class="${cPnl >= 0 ? 'pos-gain' : 'neg-loss'}">${sim} ${cPnl.toFixed(2)} (${pnlPerc.toFixed(2)}%)</td>
+                <td><b>${t.nome}</b> <span style="font-size:0.7em; opacity:0.6;">${v}</span></td>
+                <td>${parseFloat(t.qta).toFixed(2)}</td>
+                <td>${parseFloat(t.pmc).toFixed(2)}</td>
+                <td><b>${prLive.toFixed(2)}</b></td>
+                <td>${s} ${converti(att, v, visualizzaIn).toFixed(2)}</td>
+                <td class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${converti(pnl, v, visualizzaIn).toFixed(2)} (${pnlP.toFixed(2)}%)</td>
                 <td>
-                    <button class="btn-action btn-simula" onclick="apriSimulazione('${id}')">Simula</button>
-                    <button class="btn-action btn-compra" onclick="apriTransazione('${id}', 'compra')">Comp</button>
-                    <button class="btn-action btn-vendi" onclick="apriTransazione('${id}', 'vendi')">Vend</button>
-                    <button class="btn-action btn-elimina" onclick="eliminaTitolo('${id}')">X</button>
+                    <button class="btn-action btn-edit" onclick="apriModifica('${id}')" title="Rettifica">⚙️</button>
+                    <button class="btn-action btn-sim" onclick="apriSimulazione('${id}')">Sim</button>
+                    <button class="btn-action btn-buy" onclick="apriTransazione('${id}', 'compra')">+</button>
+                    <button class="btn-action btn-sell" onclick="apriTransazione('${id}', 'vendi')">-</button>
+                    <button class="btn-action btn-del" onclick="eliminaTitolo('${id}')">🗑️</button>
                 </td>`;
             tbody.appendChild(tr);
         }
-
-        // Aggiorna Dashboard
-        document.getElementById('dash-investito').innerText = `${sim} ${totInvestito.toFixed(2)}`;
-        document.getElementById('dash-attuale').innerText = `${sim} ${totAttuale.toFixed(2)}`;
-        
-        const totPnl = totAttuale - totInvestito;
-        document.getElementById('dash-performance').innerText = `${sim} ${totPnl.toFixed(2)}`;
-        document.getElementById('dash-performance').className = 'value ' + (totPnl >= 0 ? 'pos-gain' : 'neg-loss');
-
-        document.getElementById('dash-realizzato').innerText = `${sim} ${totRealizzato.toFixed(2)}`;
+        document.getElementById('dash-investito').innerText = `${s} ${totInv.toFixed(2)}`;
+        document.getElementById('dash-attuale').innerText = `${s} ${totAtt.toFixed(2)}`;
+        const tpnl = totAtt - totInv;
+        document.getElementById('dash-performance').innerText = `${s} ${tpnl.toFixed(2)}`;
+        document.getElementById('dash-performance').className = 'value ' + (tpnl >= 0 ? 'pos-gain' : 'neg-loss');
+        document.getElementById('dash-realizzato').innerText = `${s} ${totReal.toFixed(2)}`;
     }
 
-    // --- AZIONI TITOLI ---
-    async function aggiungiTitolo() {
-        const nome = document.getElementById('input-titolo').value.toUpperCase().trim();
-        const qta = parseFloat(document.getElementById('input-qta').value);
-        const pmc = parseFloat(document.getElementById('input-pmc').value);
-        const valuta = document.getElementById('input-valuta').value;
-
-        if (!nome || isNaN(qta) || isNaN(pmc)) return alert("Compila i campi");
-        const id = "ID" + Date.now();
-        portafoglio[id] = { nome, qta, pmc, valuta, realizedPnL: 0 };
-        
-        document.getElementById('input-titolo').value = '';
-        document.getElementById('input-qta').value = '';
-        document.getElementById('input-pmc').value = '';
-        
-        await salvaDati();
-        await aggiornaPrezziLive(); // Scarica il prezzo del nuovo titolo
-        renderizzaTabella();
-    }
-
-    async function eliminaTitolo(id) {
-        if (confirm("Vuoi eliminare questa posizione?")) {
-            delete portafoglio[id]; 
-            await salvaDati(); 
-        }
-    }
-
-    // --- MODALI APRI/CHIUDI ---
-    function chiudiModale(modalId) { document.getElementById(modalId).style.display = 'none'; }
-
-    // --- TRANSAZIONI (COMPRA / VENDI) ---
-    function apriTransazione(id, tipo) {
+    // --- FUNZIONI MODIFICA/RETTIFICA ---
+    function apriModifica(id) {
         const t = portafoglio[id];
+        document.getElementById('edit-id').value = id;
+        document.getElementById('edit-ticker').value = t.nome;
+        document.getElementById('edit-qta').value = t.qta;
+        document.getElementById('edit-pmc').value = t.pmc;
+        document.getElementById('edit-pnl-realizzato').value = t.realizedPnL || 0;
+        document.getElementById('modal-edit').style.display = 'flex';
+    }
+
+    async function salvaModificaTitolo() {
+        const id = document.getElementById('edit-id').value;
+        portafoglio[id].nome = document.getElementById('edit-ticker').value.toUpperCase().trim();
+        portafoglio[id].qta = parseFloat(document.getElementById('edit-qta').value);
+        portafoglio[id].pmc = parseFloat(document.getElementById('edit-pmc').value);
+        portafoglio[id].realizedPnL = parseFloat(document.getElementById('edit-pnl-realizzato').value);
+        
+        chiudiModale('modal-edit');
+        await salvaDati();
+        await aggiornaPrezziLive();
+        renderTabella();
+    }
+
+    // --- ALTRE FUNZIONI ---
+    async function aggiungiTitolo() {
+        const n = document.getElementById('input-titolo').value.toUpperCase().trim();
+        const q = parseFloat(document.getElementById('input-qta').value);
+        const p = parseFloat(document.getElementById('input-pmc').value);
+        if(!n || isNaN(q)) return;
+        const id = "ID" + Date.now();
+        portafoglio[id] = { nome: n, qta: q, pmc: p, valuta: document.getElementById('input-valuta').value, realizedPnL: 0 };
+        await salvaDati(); await aggiornaPrezziLive(); renderTabella();
+    }
+
+    function apriTransazione(id, tipo) {
+        simId = id; const t = portafoglio[id];
         document.getElementById('trans-id').value = id;
         document.getElementById('trans-tipo').value = tipo;
         document.getElementById('trans-qta').value = '';
-        document.getElementById('trans-prezzo').value = prezziLive[id] || t.pmc; // Suggerisce il prezzo live
-        
-        const isCompra = tipo === 'compra';
-        document.getElementById('trans-titolo').innerText = isCompra ? `Compra ${t.nome}` : `Vendi ${t.nome}`;
-        document.getElementById('trans-box').style.borderTop = isCompra ? '4px solid #3498db' : '4px solid #8e44ad';
-        document.getElementById('btn-esegui-trans').style.background = isCompra ? '#3498db' : '#8e44ad';
-
+        document.getElementById('trans-prezzo').value = prezziLive[id] || t.pmc;
+        document.getElementById('trans-titolo').innerText = tipo === 'compra' ? `Compra ${t.nome}` : `Vendi ${t.nome}`;
+        document.getElementById('btn-esegui-trans').style.background = tipo === 'compra' ? 'var(--accent)' : 'var(--purple)';
         document.getElementById('modal-transazione').style.display = 'flex';
     }
 
     async function eseguiTransazione() {
-        const id = document.getElementById('trans-id').value;
-        const tipo = document.getElementById('trans-tipo').value;
-        const qtaTx = parseFloat(document.getElementById('trans-qta').value);
-        const prezzoTx = parseFloat(document.getElementById('trans-prezzo').value);
-        
-        if (isNaN(qtaTx) || isNaN(prezzoTx) || qtaTx <= 0) return alert("Valori non validi");
-        
+        const id = document.getElementById('trans-id').value, tipo = document.getElementById('trans-tipo').value;
+        const q = parseFloat(document.getElementById('trans-qta').value), p = parseFloat(document.getElementById('trans-prezzo').value);
+        if(isNaN(q) || isNaN(p)) return;
         const t = portafoglio[id];
-
-        if (tipo === 'compra') {
-            const nuovoPmc = ((t.qta * t.pmc) + (qtaTx * prezzoTx)) / (t.qta + qtaTx);
-            t.pmc = nuovoPmc;
-            t.qta += qtaTx;
-        } else if (tipo === 'vendi') {
-            if (qtaTx > t.qta) return alert("Non hai abbastanza azioni!");
-            const profitto = (prezzoTx - t.pmc) * qtaTx;
-            t.realizedPnL = (t.realizedPnL || 0) + profitto;
-            t.qta -= qtaTx;
-        }
-        
-        await salvaDati();
-        chiudiModale('modal-transazione');
+        if(tipo === 'compra') { t.pmc = ((t.qta * t.pmc) + (q * p)) / (t.qta + q); t.qta += q; }
+        else { if(q > t.qta) return alert("Azioni insufficienti"); t.realizedPnL = (t.realizedPnL || 0) + ((p - t.pmc) * q); t.qta -= q; }
+        await salvaDati(); chiudiModale('modal-transazione');
     }
 
-    // --- SIMULATORE ---
     function apriSimulazione(id) {
-        simId = id;
-        const t = portafoglio[id];
-        document.querySelector('#sim-titolo span').innerText = `${t.nome} (${t.valuta})`;
+        simId = id; const t = portafoglio[id];
+        document.querySelector('#sim-titolo span').innerText = t.nome;
         document.getElementById('sim-prezzo').value = prezziLive[id] || t.pmc;
         document.getElementById('sim-budget').value = '';
-        document.getElementById('sim-risultato').innerHTML = 'Inserisci prezzo e budget...';
-        
+        document.getElementById('sim-risultato').innerText = 'Inserisci i dati...';
         document.getElementById('modal-simulazione').style.display = 'flex';
     }
 
     function calcolaSimulazione() {
-        const prezzo = parseFloat(document.getElementById('sim-prezzo').value);
-        const budget = parseFloat(document.getElementById('sim-budget').value);
-        
-        if(isNaN(prezzo) || isNaN(budget) || prezzo <= 0) return;
-
-        const t = portafoglio[simId];
-        const valStr = t.valuta === 'EUR' ? '€' : '$';
-        
-        // Quante azioni compro con quel budget?
-        const azioniAcquistabili = budget / prezzo;
-        
-        // Nuovo PMC
-        const nuovoPmc = ((t.qta * t.pmc) + budget) / (t.qta + azioniAcquistabili);
-
-        // Se è in Dollari, calcolo quanto mi costa in Euro
-        let testoConversione = '';
-        if (t.valuta === 'USD') {
-            const budgetInEur = budget / cambioEURUSD;
-            testoConversione = `<br><span style="color:#666; font-size:0.9em;">Il budget inserito equivale a circa <b>€ ${budgetInEur.toFixed(2)} EUR</b></span>`;
-        }
-
-        document.getElementById('sim-risultato').innerHTML = `
-            Con ${valStr} ${budget.toFixed(2)} puoi acquistare: <b>${azioniAcquistabili.toFixed(4)} azioni</b>.
-            ${testoConversione}
-            <hr style="border:0; border-top:1px solid #ddd; margin: 10px 0;">
-            Azioni totali post-acquisto: <b>${(t.qta + azioniAcquistabili).toFixed(4)}</b><br>
-            Il tuo nuovo PMC sarà: <b style="font-size:1.2em; color:#3498db;">${valStr} ${nuovoPmc.toFixed(2)}</b>
-        `;
+        const p = parseFloat(document.getElementById('sim-prezzo').value), b = parseFloat(document.getElementById('sim-budget').value);
+        if(isNaN(p) || isNaN(b) || p <= 0) return;
+        const t = portafoglio[simId], aq = b / p, nPmc = ((t.qta * t.pmc) + b) / (t.qta + aq);
+        let conv = t.valuta === 'USD' ? `<br>Costo stimato: <b>€ ${(b/cambioEURUSD).toFixed(2)} EUR</b>` : '';
+        document.getElementById('sim-risultato').innerHTML = `Azioni acquistabili: <b>${aq.toFixed(4)}</b>${conv}<br>Nuovo PMC: <b style="color:var(--accent)">${nPmc.toFixed(2)}</b>`;
     }
+
+    async function eliminaTitolo(id) { if(confirm("Eliminare?")) { delete portafoglio[id]; await salvaDati(); } }
 </script>
 </body>
 </html>
