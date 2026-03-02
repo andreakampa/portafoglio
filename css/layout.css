@@ -1,0 +1,53 @@
+/* ── NAVBAR ────────────────────────────────────── */
+.navbar {
+    display: flex; align-items: center; gap: 0;
+    background: var(--primary); border-bottom: 1px solid var(--border);
+    padding: 0 20px; height: 54px; position: sticky; top: 0; z-index: 1000;
+}
+.navbar-brand {
+    font-weight: 800; font-size: 1em; color: var(--text);
+    margin-right: 30px; white-space: nowrap;
+}
+.navbar-links { display: flex; gap: 2px; flex: 1; }
+.nav-link {
+    padding: 6px 14px; border-radius: var(--radius-md);
+    color: var(--text-muted); font-size: 0.84em; font-weight: 600;
+    cursor: pointer; transition: all var(--transition); border: none; background: none;
+    white-space: nowrap;
+}
+.nav-link:hover { color: var(--text); background: var(--secondary); text-decoration: none; }
+.nav-link.active { color: var(--accent); background: var(--accent-dim); }
+.navbar-logout {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 1.1em; cursor: pointer; padding: 6px 10px;
+    border-radius: var(--radius-sm); transition: all var(--transition);
+    margin-left: auto;
+}
+.navbar-logout:hover { color: var(--danger); background: var(--danger-dim); }
+
+/* ── MAIN ──────────────────────────────────────── */
+.main-content {
+    max-width: 1400px; margin: 0 auto;
+    padding: 20px 20px;
+}
+
+/* ── DASHBOARD GRID ────────────────────────────── */
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px; margin-bottom: 18px;
+}
+
+/* ── RESPONSIVE ────────────────────────────────── */
+@media (max-width: 768px) {
+    .main-content { padding: 12px; }
+    .navbar { padding: 0 12px; }
+    .navbar-brand { margin-right: 12px; font-size: 0.9em; }
+    .nav-link { padding: 5px 10px; font-size: 0.78em; }
+    .modal { border-radius: var(--radius-lg) var(--radius-lg) 0 0; position: fixed; bottom: 0; max-height: 85vh; width: 100%; }
+    .modal.modal-wide { max-width: 100%; }
+}
+@media (max-width: 480px) {
+    .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+    .navbar-links .nav-link span { display: none; }
+}
