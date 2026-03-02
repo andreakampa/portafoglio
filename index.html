@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio Manager - Restore Version</title>
+    <title>Portfolio Manager - Stable Restore</title>
     <style>
         :root {
             --bg: #0b0e14; --card: #151921; --text: #e1e1e6; --text-dim: #8899a6;
             --accent: #3d8aff; --success: #00c853; --danger: #ff3d00; --border: #2d303e;
         }
-        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
         .container { max-width: 1300px; margin: 0 auto; }
         .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 25px; }
         .stat-card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
         .stat-card h3 { margin: 0; font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; }
         .stat-card .value { font-size: 1.5rem; font-weight: 700; margin: 8px 0; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 0.8rem; transition: 0.2s; }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 0.8rem; }
         .btn-primary { background: var(--accent); color: white; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
         .card-table { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; }
@@ -26,35 +26,32 @@
         .pos { color: var(--success); } .neg { color: var(--danger); }
         .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 9999; }
         .modal { background: var(--card); padding: 25px; border-radius: 15px; width: 90%; max-width: 500px; border: 1px solid var(--border); }
-        input, select { background: #1c212c; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 100%; margin: 8px 0 15px 0; box-sizing: border-box; }
+        input, select { background: #1c212c; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 8px; width: 100%; margin: 8px 0 15px 0; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
 <div id="login-overlay" class="overlay" style="display: flex;">
     <div class="modal" style="text-align: center; max-width: 300px;">
-        <h2>Bentornato</h2>
+        <h2>Sblocca Portafoglio</h2>
         <input type="password" id="login-password" placeholder="Password">
-        <button class="btn btn-primary" style="width:100%" onclick="verificaLogin()">Sblocca</button>
+        <button class="btn btn-primary" style="width:100%" onclick="verificaLogin()">Entra</button>
     </div>
 </div>
 
 <div id="app-content" class="container" style="display:none;">
     <div class="top-bar">
-        <div>
-            <span id="exchange-info" style="font-size: 0.8rem; color: var(--text-dim);">EUR/USD: --</span>
-            <span id="status-indicator" style="font-size: 0.7rem; margin-left:10px; color: var(--accent);">In attesa...</span>
-        </div>
+        <div id="info-header" style="font-size: 0.8rem; color: var(--text-dim);">Connessione in corso...</div>
         <div style="display:flex; gap: 8px;">
-            <button class="btn btn-outline" onclick="toggleValuta('EUR')">€</button>
-            <button class="btn btn-outline" onclick="toggleValuta('USD')">$</button>
+            <button class="btn btn-outline" onclick="toggleValuta('EUR')">€ EUR</button>
+            <button class="btn btn-outline" onclick="toggleValuta('USD')">$ USD</button>
             <button class="btn btn-primary" onclick="apriModaleNuovo()">+ Nuovo Titolo</button>
         </div>
     </div>
 
     <div class="dashboard">
         <div class="stat-card"><h3>Investito</h3><div id="dash-investito" class="value">--</div></div>
-        <div class="stat-card"><h3>Valore Lordo</h3><div id="dash-lordo" class="value">--</div></div>
+        <div class="stat-card"><h3>Lordo</h3><div id="dash-lordo" class="value">--</div></div>
         <div class="stat-card" style="border-top: 2px solid var(--accent);"><h3>Netto (After-Tax)</h3><div id="dash-netto" class="value" style="color:var(--accent)">--</div></div>
         <div class="stat-card"><h3>P&L Realizzato</h3><div id="dash-realizzato" class="value">--</div></div>
     </div>
@@ -64,12 +61,12 @@
             <thead>
                 <tr>
                     <th>Titolo</th>
-                    <th>Quantità</th>
+                    <th>Q.tà</th>
                     <th>PMC</th>
                     <th>Prezzo Live</th>
                     <th>Lordo</th>
-                    <th>Netto After-Tax</th>
-                    <th>P&L Lordo</th>
+                    <th>Netto (Tax)</th>
+                    <th>P&L</th>
                     <th style="text-align:right">Azioni</th>
                 </tr>
             </thead>
@@ -79,45 +76,48 @@
 </div>
 
 <div id="modal-titolo" class="overlay"><div class="modal">
-    <h3>Gestisci Titolo</h3>
+    <h3>Gestione Titolo</h3>
     <input type="text" id="in-ticker" placeholder="Ticker (es: RACE.MI)">
-    <select id="in-tipo">
-        <option value="0.26">Azioni/ETF/Crypto (26%)</option>
-        <option value="0.125">Titoli di Stato (12.5%)</option>
-    </select>
-    <select id="in-valuta">
-        <option value="EUR">Euro (€)</option>
-        <option value="USD">Dollaro ($)</option>
-    </select>
-    <button class="btn btn-primary" style="width:100%" onclick="salvaTitolo()">Salva</button>
-    <button class="btn btn-outline" style="width:100%; margin-top:10px" onclick="chiudiModali()">Chiudi</button>
+    <label style="font-size:0.7rem">Tassazione</label>
+    <select id="in-tax"><option value="0.26">26% (Azioni/ETF)</option><option value="0.125">12.5% (Titoli Stato)</option></select>
+    <label style="font-size:0.7rem">Valuta</label>
+    <select id="in-valuta"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option></select>
+    <button class="btn btn-primary" style="width:100%; margin-top:10px" onclick="salvaTitolo()">Salva Titolo</button>
+    <button class="btn btn-outline" style="width:100%; margin-top:10px" onclick="chiudiModali()">Annulla</button>
 </div></div>
 
 <div id="modal-tx" class="overlay"><div class="modal">
-    <h3 id="tx-titolo-label">Transazioni</h3>
+    <h3 id="tx-label">Transazioni</h3>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
         <select id="tx-tipo"><option value="BUY">Acquisto</option><option value="SELL">Vendita</option></select>
         <input type="date" id="tx-data">
-        <input type="number" id="tx-qta" placeholder="Quantità">
+        <input type="number" id="tx-qta" placeholder="Q.tà">
         <input type="number" id="tx-prezzo" placeholder="Prezzo">
-        <input type="number" id="tx-comm" value="7.00" placeholder="Commissione">
+        <input type="number" id="tx-comm" value="7.00" placeholder="Comm. (€/$)">
     </div>
-    <button class="btn btn-primary" style="width:100%; margin-top:10px" onclick="aggiungiTransazione()">Registra</button>
-    <div id="tx-history" style="margin-top:15px; max-height: 200px; overflow-y:auto; border-top: 1px solid #333; padding-top:10px;"></div>
+    <button class="btn btn-primary" style="width:100%; margin-top:10px" onclick="aggiungiTx()">Registra Operazione</button>
+    <div id="tx-list" style="margin-top:15px; max-height: 200px; overflow-y:auto; border-top: 1px solid var(--border); padding-top:10px;"></div>
     <button class="btn btn-outline" style="width:100%; margin-top:10px" onclick="chiudiModali()">Chiudi</button>
 </div></div>
 
 <script>
-    let CONFIG = JSON.parse(localStorage.getItem('portfolio_config'));
-    let portafoglio = {}; let prezziLive = {};
-    let cambioEURUSD = 1.08; let visualizzaIn = 'EUR'; let activeId = null;
+    // Caricamento immediato della configurazione per evitare errori di puntatore
+    const CONFIG = JSON.parse(localStorage.getItem('portfolio_config'));
+    let portafoglio = {}; 
+    let prezziLive = {};
+    let cambioEURUSD = 1.08;
+    let visualizzaIn = 'EUR';
+    let activeId = null;
 
     function verificaLogin() {
-        if(document.getElementById('login-password').value === CONFIG.password) {
+        const pass = document.getElementById('login-password').value;
+        if(CONFIG && pass === CONFIG.password) {
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('app-content').style.display = 'block';
             avviaApp();
-        } else alert("Password errata");
+        } else {
+            alert("Password non corretta o configurazione mancante.");
+        }
     }
 
     async function avviaApp() {
@@ -128,39 +128,35 @@
     }
 
     async function aggiornaCambio() {
-        try { const r = await fetch('https://open.er-api.com/v6/latest/EUR'); const d = await r.json(); cambioEURUSD = d.rates.USD; document.getElementById('exchange-info').innerText = "EUR/USD: " + cambioEURUSD.toFixed(4); } catch(e){}
+        try {
+            const r = await fetch('https://open.er-api.com/v6/latest/EUR');
+            const d = await r.json();
+            cambioEURUSD = d.rates.USD;
+        } catch(e) { console.error("Errore cambio"); }
     }
 
     async function caricaDati() {
-        // PROVIAMO TUTTI I POSSIBILI NOMI FILE PER ESSERE SICURI DI TROVARE I TUOI DATI
-        const files = ["portafoglio_v2.json", "portafoglio.json", "portafoglio_v3.json"];
-        for (let file of files) {
+        // PUNTATORE ORIGINALE: Cerchiamo portafoglio.json o portafoglio_v2.json
+        const fileNames = ["portafoglio_v2.json", "portafoglio.json"];
+        for(let f of fileNames) {
             try {
-                const r = await fetch(CONFIG.dbUrl + file);
-                if (r.ok) {
-                    const data = await r.json();
-                    if (data && Object.keys(data).length > 0) {
-                        portafoglio = data;
-                        console.log("Dati caricati da: " + file);
-                        return;
-                    }
+                const r = await fetch(CONFIG.dbUrl + f);
+                if(r.ok) {
+                    portafoglio = await r.json() || {};
+                    document.getElementById('info-header').innerText = "Dati caricati con successo.";
+                    return;
                 }
             } catch(e) {}
         }
-        portafoglio = {};
     }
 
     async function salvaDati() {
-        // Salviamo sempre su v2 per consistenza con i tuoi vecchi dati
         await fetch(CONFIG.dbUrl + "portafoglio_v2.json", { method: 'PUT', body: JSON.stringify(portafoglio) });
         renderTabella();
     }
 
     async function aggiornaPrezzi() {
-        const ids = Object.keys(portafoglio || {});
-        if(ids.length === 0) return;
-        document.getElementById('status-indicator').innerText = "Aggiornamento prezzi...";
-        
+        const ids = Object.keys(portafoglio);
         const promises = ids.map(id => {
             const t = portafoglio[id].ticker;
             return fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + t)}`)
@@ -170,24 +166,96 @@
                 }).catch(() => {});
         });
         await Promise.allSettled(promises);
-        document.getElementById('status-indicator').innerText = "Dati Live OK";
     }
 
-    function calcola(id) {
+    function calcolaMetriche(id) {
         let qta = 0, costo = 0, real = 0;
-        // Se hai vecchi dati senza l'array transazioni, li convertiamo al volo
-        if (!portafoglio[id].transazioni && portafoglio[id].quantita) {
-            return { qta: parseFloat(portafoglio[id].quantita), pmc: parseFloat(portafoglio[id].prezzoCarico || 0), real: 0, inv: parseFloat(portafoglio[id].quantita * portafoglio[id].prezzoCarico) };
+        // Gestione compatibilità vecchi dati
+        if(!portafoglio[id].transazioni && portafoglio[id].quantita) {
+            qta = parseFloat(portafoglio[id].quantita);
+            costo = qta * parseFloat(portafoglio[id].prezzoCarico || 0);
+            return { qta, pmc: costo/qta, real: 0, inv: costo };
         }
         
         const txs = (portafoglio[id].transazioni || []).sort((a,b) => new Date(a.data) - new Date(b.data));
         txs.forEach(tx => {
             const q = parseFloat(tx.qta), p = parseFloat(tx.prezzo), c = parseFloat(tx.comm || 0);
             if(tx.tipo === 'BUY') { qta += q; costo += (q*p)+c; }
-            else { const pmc = qta > 0 ? costo/qta : 0; real += (p*q)-(pmc*q)-c; costo -= (pmc*q); qta -= q; }
+            else { 
+                const pmcLoc = qta > 0 ? costo/qta : 0;
+                real += (p*q) - (pmcLoc*q) - c;
+                costo -= (pmcLoc*q); qta -= q;
+            }
         });
         return { qta, pmc: qta > 0 ? costo/qta : 0, real, inv: costo };
     }
 
     function renderTabella() {
-        const tbody = document.getElementById('corpo-tabella
+        const tbody = document.getElementById('corpo-tabella'); tbody.innerHTML = '';
+        let tInv = 0, tLordo = 0, tNetto = 0, tReal = 0;
+        const s = visualizzaIn === 'EUR' ? '€' : '$';
+
+        Object.keys(portafoglio).forEach(id => {
+            const t = portafoglio[id], m = calcolaMetriche(id), live = prezziLive[id] || m.pmc;
+            const val = t.valuta || 'EUR', lordo = m.qta * live, pnl = lordo - m.inv;
+            const netto = lordo - (Math.max(0, pnl) * parseFloat(t.tax || 0.26)) - 7;
+
+            tInv += converti(m.inv, val, visualizzaIn); 
+            tLordo += converti(lordo, val, visualizzaIn);
+            tNetto += converti(netto, val, visualizzaIn); 
+            tReal += converti(m.real, val, visualizzaIn);
+
+            tbody.innerHTML += `<tr>
+                <td><b>${t.ticker}</b></td>
+                <td>${m.qta.toFixed(2)}</td><td>${m.pmc.toFixed(2)}</td><td>${live.toFixed(2)}</td>
+                <td>${s} ${converti(lordo,val,visualizzaIn).toLocaleString()}</td>
+                <td style="color:var(--accent); font-weight:600">${s} ${converti(netto,val,visualizzaIn).toLocaleString()}</td>
+                <td class="${pnl>=0?'pos':'neg'}">${converti(pnl,val,visualizzaIn).toFixed(2)}</td>
+                <td style="text-align:right">
+                    <button class="btn btn-outline" style="padding:4px 8px" onclick="apriTx('${id}')">Transazioni</button>
+                    <button class="btn btn-outline" style="padding:4px 8px; color:var(--danger)" onclick="eliminaT('${id}')">🗑️</button>
+                </td>
+            </tr>`;
+        });
+
+        document.getElementById('dash-investito').innerText = s + " " + tInv.toLocaleString();
+        document.getElementById('dash-lordo').innerText = s + " " + tLordo.toLocaleString();
+        document.getElementById('dash-netto').innerText = s + " " + tNetto.toLocaleString();
+        document.getElementById('dash-realizzato').innerText = s + " " + tReal.toLocaleString();
+    }
+
+    function converti(v, da, a) { return (da===a)?v : (da==='EUR'? v*cambioEURUSD : v/cambioEURUSD); }
+    function apriModaleNuovo() { document.getElementById('modal-titolo').style.display='flex'; }
+    function chiudiModali() { document.querySelectorAll('.overlay').forEach(o => o.style.display='none'); }
+    
+    async function salvaTitolo() {
+        const tick = document.getElementById('in-ticker').value.toUpperCase(); if(!tick) return;
+        const id = "ID" + Date.now();
+        portafoglio[id] = { ticker: tick, transazioni: [], valuta: document.getElementById('in-valuta').value, tax: document.getElementById('in-tax').value };
+        await salvaDati(); chiudiModali(); avviaApp();
+    }
+
+    function apriTx(id) { activeId = id; document.getElementById('tx-label').innerText = "Titolo: " + portafoglio[id].ticker; renderListTx(); document.getElementById('modal-tx').style.display='flex'; }
+    function renderListTx() {
+        const l = document.getElementById('tx-list'); l.innerHTML = '';
+        (portafoglio[activeId].transazioni || []).forEach((tx, i) => {
+            l.innerHTML += `<div style="display:flex; justify-content:space-between; font-size:0.7rem; padding:8px; border-bottom:1px solid #333">
+                <span>${tx.tipo} ${tx.data}</span><span>${tx.qta}@${tx.prezzo}</span>
+                <button onclick="eliminaTx(${i})" style="color:red; background:none; border:none; cursor:pointer">X</button>
+            </div>`;
+        });
+    }
+
+    async function aggiungiTx() {
+        const q = document.getElementById('tx-qta').value, p = document.getElementById('tx-prezzo').value, d = document.getElementById('tx-data').value;
+        if(!q || !p || !d) return;
+        if(!portafoglio[activeId].transazioni) portafoglio[activeId].transazioni = [];
+        portafoglio[activeId].transazioni.push({ tipo: document.getElementById('tx-tipo').value, data: d, qta: parseFloat(q), prezzo: parseFloat(p), comm: parseFloat(document.getElementById('tx-comm').value) });
+        await salvaDati(); renderListTx();
+    }
+    async function eliminaTx(i) { portafoglio[activeId].transazioni.splice(i,1); await salvaDati(); renderListTx(); }
+    async function eliminaT(id) { if(confirm("Eliminare il titolo?")) { delete portafoglio[id]; await salvaDati(); } }
+    function toggleValuta(v) { visualizzaIn = v; renderTabella(); }
+</script>
+</body>
+</html>
