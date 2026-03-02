@@ -84,7 +84,6 @@ function _renderHistoryContent(id, portfolio, onSave) {
         tbody.appendChild(tr);
     });
 
-    // ELIMINA
     tbody.onclick = async e => {
         const delBtn  = e.target.closest('.btn-del-tx');
         const editBtn = e.target.closest('.btn-edit-tx');
@@ -111,7 +110,6 @@ function _renderHistoryContent(id, portfolio, onSave) {
 
 // ── EDIT TRANSACTION MODAL ─────────────────────────────────────────────────
 function _openEditModal(id, origTx, portfolio, onSave) {
-    // rimuovi modale edit precedente se esiste
     document.getElementById('modal-edit-tx')?.remove();
 
     const wrap = document.createElement('div');
@@ -168,7 +166,6 @@ function _openEditModal(id, origTx, portfolio, onSave) {
         if (!newDate || isNaN(newQty) || newQty <= 0 || isNaN(newPr) || newPr <= 0) {
             Toast.show('Compila tutti i campi correttamente', 'err'); return;
         }
-        // trova e sostituisci
         const realIdx = portfolio[id].transactions.findIndex(
             t => t.date === origTx.date && t.qty === origTx.qty &&
                  t.price === origTx.price && t.type === origTx.type
@@ -212,7 +209,7 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
                     </div>
                     <div>
                         <span class="modal-label">Prezzo Eseguito</span>
-                        <input type="number" id="tx-prezzo" step="any" value="${Calc.fmt(prLive).replace('.','').replace(',','.')}">
+                        <input type="number" id="tx-prezzo" step="any" value="${prLive}">
                     </div>
                     <div>
                         <span class="modal-label">Commissione (€)</span>
@@ -293,50 +290,99 @@ export function openSimModal(id, portfolio, prices) {
                 <button class="btn-x" id="sim-close">✕</button>
             </div>
             <div class="modal-body">
-                <div class="form-grid-3">
+                <div style="display:flex; gap:8px; margin-bottom:14px;">
+                    <button id="sim-mode-budget" class="btn-toggle active" style="flex:1;">💶 Per Budget</button>
+                    <button id="sim-mode-qty"    class="btn-toggle"        style="flex:1;">🔢 Per Quantità</button>
+                </div>
+                <div class="form-grid-2" id="sim-fields">
                     <div>
                         <span class="modal-label">Prezzo Simulato</span>
                         <input type="number" id="sim-prezzo" step="any" value="${prLive}">
                     </div>
                     <div>
+                        <span class="modal-label">Commissioni</span>
+                        <input type="number" id="sim-comm" step="any" value="${p.commDefault || 7}">
+                    </div>
+                    <div id="sim-budget-field">
                         <span class="modal-label">Budget Disponibile</span>
                         <input type="number" id="sim-budget" step="any" placeholder="0.00">
                     </div>
-                    <div>
-                        <span class="modal-label">Commissioni</span>
-                        <input type="number" id="sim-comm" step="any" value="${p.commDefault || 7}">
+                    <div id="sim-qty-field" style="display:none;">
+                        <span class="modal-label">Quantità da Acquistare</span>
+                        <input type="number" id="sim-qty" step="any" placeholder="0">
                     </div>
                 </div>
                 <div id="sim-result" class="preview-box" style="display:none; margin-top:14px;"></div>
                 <button id="sim-close2" class="btn btn-ghost btn-full" style="margin-top:16px;">Chiudi</button>
             </div>
         </div>`;
+
     overlay.classList.add('visible');
     document.getElementById('sim-close').onclick  = () => overlay.classList.remove('visible');
     document.getElementById('sim-close2').onclick = () => overlay.classList.remove('visible');
 
-    const calc = () => {
+    let mode = 'budget';
+    document.getElementById('sim-mode-budget').onclick = () => {
+        mode = 'budget';
+        document.getElementById('sim-mode-budget').classList.add('active');
+        document.getElementById('sim-mode-qty').classList.remove('active');
+        document.getElementById('sim-budget-field').style.display = '';
+        document.getElementById('sim-qty-field').style.display = 'none';
+        calcSim();
+    };
+    document.getElementById('sim-mode-qty').onclick = () => {
+        mode = 'qty';
+        document.getElementById('sim-mode-qty').classList.add('active');
+        document.getElementById('sim-mode-budget').classList.remove('active');
+        document.getElementById('sim-budget-field').style.display = 'none';
+        document.getElementById('sim-qty-field').style.display = '';
+        calcSim();
+    };
+
+    const calcSim = () => {
         const pr  = parseFloat(document.getElementById('sim-prezzo').value);
-        const b   = parseFloat(document.getElementById('sim-budget').value);
         const c   = parseFloat(document.getElementById('sim-comm').value) || 0;
         const box = document.getElementById('sim-result');
-        if (isNaN(pr) || isNaN(b) || pr <= 0 || b <= 0) { box.style.display = 'none'; return; }
-        // budget netto = budget - commissioni fisse
-        const net = b - c;
-        if (net <= 0) { box.style.display = 'block'; box.innerHTML = `<span class="text-danger">Budget insufficiente a coprire le commissioni (${Calc.fmt(c)})</span>`; return; }
-        const aq     = net / pr;
-        const newPmc = (qta + aq) > 0 ? ((qta * pmc) + net) / (qta + aq) : 0;
-        const s = p.valuta === 'USD' ? '$' : '€';
-        const convLine = p.valuta === 'USD'
-            ? `<br>Costo in EUR: <b>€ ${Calc.fmt(b / Exchange.rate)}</b>` : '';
-        box.style.display = 'block';
-        box.innerHTML =
-            `Budget: <b>${Calc.fmt(b)}</b> − Commissioni: <b>${Calc.fmt(c)}</b> = Netto: <b class="hl">${Calc.fmt(net)}</b>${convLine}<br>
-             Azioni acquistabili: <b>${Calc.fmt(aq, 4)}</b> a ${Calc.fmt(pr)}<br>
-             Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
-             Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>`;
+        const s   = p.valuta === 'USD' ? '$' : '€';
+
+        if (isNaN(pr) || pr <= 0) { box.style.display = 'none'; return; }
+
+        if (mode === 'budget') {
+            const b = parseFloat(document.getElementById('sim-budget').value);
+            if (isNaN(b) || b <= 0) { box.style.display = 'none'; return; }
+            const net = b - c;
+            if (net <= 0) {
+                box.style.display = 'block';
+                box.innerHTML = `<span class="text-danger">Budget insufficiente a coprire le commissioni (${Calc.fmt(c)})</span>`;
+                return;
+            }
+            const aq     = net / pr;
+            const newPmc = (qta + aq) > 0 ? ((qta * pmc) + net) / (qta + aq) : 0;
+            const convLine = p.valuta === 'USD'
+                ? `<br>Costo in EUR: <b>€ ${Calc.fmt(b / Exchange.rate)}</b>` : '';
+            box.style.display = 'block';
+            box.innerHTML =
+                `Budget: <b>${Calc.fmt(b)}</b> − Commissioni: <b>${Calc.fmt(c)}</b> = Netto: <b class="hl">${Calc.fmt(net)}</b>${convLine}<br>
+                 Azioni acquistabili: <b>${Calc.fmt(aq, 4)}</b> a ${Calc.fmt(pr)}<br>
+                 Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
+                 Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>`;
+
+        } else {
+            const aq = parseFloat(document.getElementById('sim-qty').value);
+            if (isNaN(aq) || aq <= 0) { box.style.display = 'none'; return; }
+            const costo  = aq * pr + c;
+            const newPmc = (qta + aq) > 0 ? ((qta * pmc) + (aq * pr) + c) / (qta + aq) : 0;
+            const convLine = p.valuta === 'USD'
+                ? `<br>Costo in EUR: <b>€ ${Calc.fmt(costo / Exchange.rate)}</b>` : '';
+            box.style.display = 'block';
+            box.innerHTML =
+                `Quantità: <b>${Calc.fmt(aq, 4)}</b> × ${Calc.fmt(pr)} + comm. ${Calc.fmt(c)} = Totale: <b class="hl">${s} ${Calc.fmt(costo)}</b>${convLine}<br>
+                 Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
+                 Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>`;
+        }
     };
-    ['sim-prezzo', 'sim-budget', 'sim-comm'].forEach(el =>
-        document.getElementById(el).oninput = calc
-    );
+
+    ['sim-prezzo', 'sim-comm', 'sim-budget', 'sim-qty'].forEach(el => {
+        document.getElementById(el)?.addEventListener('input', calcSim);
+    });
 }
