@@ -3,102 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portafoglio Tracker Pro</title>
+    <title>Portfolio Manager Pro - Dark Edition</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --purple: #8e44ad; }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1250px; margin: 0 auto; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        :root {
+            --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --text-dim: #b0b0b0;
+            --accent: #3498db; --success: #2ecc71; --danger: #e74c3c; --warning: #f1c40f; --border: #333;
+        }
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
         
-        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: var(--primary); color: white; padding: 20px; border-radius: 12px; }
-        .stat-card h3 { margin: 0; font-size: 0.8em; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
-        .stat-card .value { font-size: 1.6em; font-weight: bold; margin-top: 8px; }
+        /* Dashboard */
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+        .stat-card h3 { margin: 0; font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-card .value { font-size: 1.5rem; font-weight: 700; margin: 8px 0; }
+        .stat-card .sub-value { font-size: 0.85rem; color: var(--text-dim); }
 
-        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: white; padding: 10px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .btn-toggle { background: var(--accent); color: white; border: none; padding: 6px 18px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .btn-toggle:hover { opacity: 0.8; }
-        
-        table { width: 100%; border-collapse: collapse; min-width: 800px; }
-        th { background: #f8f9fa; padding: 15px 10px; font-size: 0.8em; color: #7f8c8d; text-transform: uppercase; border-bottom: 2px solid #eee; text-align: left; }
-        td { padding: 15px 10px; border-bottom: 1px solid #eee; }
-        .pos-gain { color: var(--success); font-weight: bold; }
-        .neg-loss { color: var(--danger); font-weight: bold; }
-        
-        .btn-action { border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75em; font-weight: bold; color: white; margin-right: 4px; transition: 0.2s; }
-        .btn-edit { background: #95a5a6; }
-        .btn-sim { background: var(--warning); }
-        .btn-buy { background: var(--accent); }
-        .btn-sell { background: var(--purple); }
-        .btn-del { background: var(--danger); }
-        .btn-action:hover { transform: translateY(-1px); filter: brightness(1.1); }
+        /* Controls */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-success { background: var(--success); color: white; }
 
-        .form-group { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; outline: none; }
-        input:focus { border-color: var(--accent); }
+        /* Table */
+        .card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+        th { background: #1a1a1a; padding: 15px; color: var(--text-dim); font-weight: 600; border-bottom: 1px solid var(--border); }
+        td { padding: 15px; border-bottom: 1px solid var(--border); }
+        tr:hover { background: #252525; }
+
+        .pos { color: var(--success); }
+        .neg { color: var(--danger); }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; background: var(--border); }
+
+        /* Modals */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
+        .modal { background: var(--card); padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; border: 1px solid var(--border); max-height: 85vh; overflow-y: auto; }
+        input, select { background: #2a2a2a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 100%; margin: 8px 0 15px 0; box-sizing: border-box; }
         
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(4px); }
-        .modal-box { background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        .btn-close { background: #bdc3c7; border: none; padding: 12px; width: 100%; border-radius: 8px; margin-top: 15px; cursor: pointer; color: white; font-weight: bold; }
+        /* Transaction list inside modal */
+        .tx-item { font-size: 0.8rem; padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
     </style>
 </head>
 <body>
 
-<div id="setup-overlay" class="overlay" style="background: #f4f7f6; display: none;">
-    <div class="modal-box" style="text-align: center;">
-        <h2>⚙️ Setup Database</h2>
-        <input type="text" id="setup-db-url" placeholder="Link Firebase URL" style="margin-bottom: 10px;">
-        <input type="password" id="setup-password" placeholder="Crea la tua Password" style="margin-bottom: 15px;">
-        <button onclick="salvaConfigurazione()" style="background:var(--success); color:white; padding:12px; border:none; width:100%; border-radius:8px;">Salva Configurazione</button>
-    </div>
-</div>
-
-<div id="login-overlay" class="overlay" style="background: #f4f7f6; display: none;">
-    <div class="modal-box" style="text-align: center;">
-        <h2>🔐 Accesso</h2>
-        <input type="password" id="login-password" placeholder="Inserisci Password" style="margin-bottom: 15px;">
-        <button onclick="verificaLogin()" style="background:var(--accent); color:white; padding:12px; border:none; width:100%; border-radius:8px;">Sblocca Portafoglio</button>
+<div id="login-overlay" class="overlay" style="display: flex; background: var(--bg);">
+    <div class="modal" style="text-align: center;">
+        <h2>💼 Portfolio Login</h2>
+        <input type="password" id="login-password" placeholder="Password di accesso">
+        <button class="btn btn-primary" style="width:100%" onclick="verificaLogin()">Sblocca</button>
+        <p id="setup-link" style="font-size: 0.7rem; color: #555; margin-top: 20px; cursor: pointer;" onclick="localStorage.removeItem('portfolio_config'); location.reload();">Reset Configurazione</p>
     </div>
 </div>
 
 <div id="app-content" class="container" style="display:none;">
-    <div class="controls">
-        <span id="exchange-info" style="font-weight: bold; color: var(--primary);">Cambio: Caricamento...</span>
+    <div class="top-bar">
+        <div id="exchange-info" style="font-size: 0.8rem; color: var(--text-dim);">Cambio: Caricamento...</div>
         <div>
-            Mostra in: 
-            <button class="btn-toggle" onclick="toggleValuta('EUR')">€ EUR</button>
-            <button class="btn-toggle" onclick="toggleValuta('USD')">$ USD</button>
+            <button class="btn btn-outline" onclick="toggleValuta('EUR')">€ EUR</button>
+            <button class="btn btn-outline" onclick="toggleValuta('USD')">$ USD</button>
+            <button class="btn btn-success" onclick="apriModaleNuovo()">+ Nuovo Titolo</button>
         </div>
     </div>
 
     <div class="dashboard">
-        <div class="stat-card"><h3>Capitale Investito</h3><div id="dash-investito" class="value">0.00</div></div>
-        <div class="stat-card"><h3>Controvalore Attuale</h3><div id="dash-attuale" class="value">0.00</div></div>
-        <div class="stat-card"><h3>P&L Attuale</h3><div id="dash-performance" class="value">0.00</div></div>
-        <div class="stat-card" style="background: var(--purple);"><h3>P&L Realizzato</h3><div id="dash-realizzato" class="value">0.00</div></div>
-    </div>
-
-    <div class="card">
-        <h3 style="margin-top:0;">➕ Aggiungi Titolo</h3>
-        <div class="form-group">
-            <div><label>Ticker (Yahoo)</label><input type="text" id="input-titolo" placeholder="es. AAPL o RACE.MI"></div>
-            <div><label>Quantità</label><input type="number" id="input-qta" step="any"></div>
-            <div><label>PMC</label><input type="number" id="input-pmc" step="any"></div>
-            <div><label>Valuta</label><select id="input-valuta"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option></select></div>
-            <button onclick="aggiungiTitolo()" style="background:var(--success); color:white; border:none; padding:10px 25px; border-radius:8px; cursor:pointer; font-weight:bold;">Aggiungi</button>
+        <div class="stat-card">
+            <h3>Capitale Investito</h3>
+            <div id="dash-investito" class="value">---</div>
+            <div class="sub-value">Commissioni incluse</div>
+        </div>
+        <div class="stat-card">
+            <h3>Controvalore Lordo</h3>
+            <div id="dash-lordo" class="value">---</div>
+            <div id="dash-pnl-lordo" class="sub-value">---</div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid var(--accent);">
+            <h3>Controvalore Netto (After-Tax)</h3>
+            <div id="dash-netto" class="value" style="color: var(--accent);">---</div>
+            <div class="sub-value">Stimato al netto di tasse e vendite</div>
+        </div>
+        <div class="stat-card">
+            <h3>P&L Realizzato</h3>
+            <div id="dash-realizzato" class="value">---</div>
+            <div class="sub-value">Guadagni già consolidati</div>
         </div>
     </div>
 
-    <div class="card" style="overflow-x: auto;">
+    <div class="card">
         <table>
             <thead>
                 <tr>
                     <th>Titolo</th>
-                    <th>Q.tà</th>
+                    <th>Posizione (Q.tà)</th>
                     <th>PMC</th>
                     <th>Prezzo Live</th>
-                    <th>Valore Posizione</th>
-                    <th>P&L</th>
+                    <th>Lordo</th>
+                    <th>Netto Stimato</th>
+                    <th>P&L Lordo</th>
                     <th>Azioni</th>
                 </tr>
             </thead>
@@ -107,243 +109,282 @@
     </div>
 </div>
 
-<div id="modal-edit" class="overlay">
-    <div class="modal-box" style="border-top: 5px solid #95a5a6;">
-        <h3 style="margin-top:0;">🔧 Modifica / Rettifica</h3>
-        <input type="hidden" id="edit-id">
-        <label>Ticker Yahoo Finance</label>
-        <input type="text" id="edit-ticker" style="margin-bottom:10px;">
-        <label>Rettifica Quantità (Senza generare P&L)</label>
-        <input type="number" id="edit-qta" step="any" style="margin-bottom:10px;">
-        <label>Rettifica PMC</label>
-        <input type="number" id="edit-pmc" step="any" style="margin-bottom:10px;">
-        <label>P&L Realizzato accumulato (opzionale)</label>
-        <input type="number" id="edit-pnl-realizzato" step="any" style="margin-bottom:10px;">
-        
-        <button onclick="salvaModificaTitolo()" style="background:var(--success); color:white; padding:12px; border:none; width:100%; border-radius:8px; font-weight:bold; margin-top:10px;">Salva Modifiche</button>
-        <button class="btn-close" onclick="chiudiModale('modal-edit')">Annulla</button>
+<div id="modal-titolo" class="overlay">
+    <div class="modal">
+        <h3 id="modal-titolo-label">Nuovo Titolo</h3>
+        <label>Ticker Yahoo Finance (es. RACE.MI, AAPL)</label>
+        <input type="text" id="in-ticker">
+        <label>Tipo Titolo (per Tassazione)</label>
+        <select id="in-tipo">
+            <option value="0.26">Azione / ETF / Altro (26%)</option>
+            <option value="0.125">Titolo di Stato / White List (12.5%)</option>
+        </select>
+        <label>Valuta Originale</label>
+        <select id="in-valuta">
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+        </select>
+        <button class="btn btn-primary" style="width:100%" onclick="salvaTitolo()">Salva Titolo</button>
+        <button class="btn btn-outline" style="width:100%; margin-top:10px;" onclick="chiudiModali()">Chiudi</button>
     </div>
 </div>
 
-<div id="modal-simulazione" class="overlay">
-    <div class="modal-box" style="border-top: 5px solid var(--warning);">
-        <h3 id="sim-titolo" style="margin-top:0;">Simulazione <span></span></h3>
-        <label>Prezzo Acquisto</label>
-        <input type="number" id="sim-prezzo" step="any" style="margin-bottom:10px;" oninput="calcolaSimulazione()">
-        <label>Budget Disponibile</label>
-        <input type="number" id="sim-budget" step="any" oninput="calcolaSimulazione()">
-        <div id="sim-risultato" style="background:#f9f9f9; padding:15px; margin-top:15px; border-radius:8px; border:1px solid #eee; font-size:0.9em;"></div>
-        <button class="btn-close" onclick="chiudiModale('modal-simulazione')">Chiudi</button>
-    </div>
-</div>
-
-<div id="modal-transazione" class="overlay">
-    <div class="modal-box" id="trans-box">
-        <h3 id="trans-titolo" style="margin-top:0;">Transazione</h3>
-        <input type="hidden" id="trans-id"><input type="hidden" id="trans-tipo">
-        <label>Quantità Azioni</label>
-        <input type="number" id="trans-qta" step="any" style="margin-bottom:10px;">
-        <label>Prezzo Eseguito</label>
-        <input type="number" id="trans-prezzo" step="any" style="margin-bottom:15px;">
-        <button id="btn-esegui-trans" onclick="eseguiTransazione()" style="width:100%; padding:12px; color:white; border:none; border-radius:8px; font-weight:bold;">Conferma Operazione</button>
-        <button class="btn-close" style="background:transparent; color:#999; border:1px solid #ccc;" onclick="chiudiModale('modal-transazione')">Annulla</button>
+<div id="modal-tx" class="overlay">
+    <div class="modal" style="max-width: 600px;">
+        <h3 id="tx-titolo-label">Gestione Transazioni</h3>
+        <div style="background: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><label>Tipo</label><select id="tx-tipo"><option value="BUY">Acquisto</option><option value="SELL">Vendita</option></select></div>
+                <div><label>Data</label><input type="date" id="tx-data"></div>
+                <div><label>Quantità</label><input type="number" id="tx-qta" step="any"></div>
+                <div><label>Prezzo</label><input type="number" id="tx-prezzo" step="any"></div>
+                <div><label>Commissione (€/$)</label><input type="number" id="tx-comm" value="7.00"></div>
+            </div>
+            <button class="btn btn-success" style="width:100%; margin-top:10px;" onclick="aggiungiTransazione()">Registra Transazione</button>
+        </div>
+        <h4>Storico Transazioni</h4>
+        <div id="tx-history"></div>
+        <button class="btn btn-outline" style="width:100%; margin-top:15px;" onclick="chiudiModali()">Chiudi</button>
     </div>
 </div>
 
 <script>
     let CONFIG = { dbUrl: '', password: '' };
-    let portafoglio = {};
+    let portafoglio = {}; 
     let prezziLive = {};
     let cambioEURUSD = 1.08;
     let visualizzaIn = 'EUR';
-    let simId = null;
+    let activeTickerId = null;
 
+    // Inizializzazione
     window.onload = async function() {
-        const savedConfig = localStorage.getItem('portfolio_config');
-        if (!savedConfig) document.getElementById('setup-overlay').style.display = 'flex';
-        else { CONFIG = JSON.parse(savedConfig); document.getElementById('login-overlay').style.display = 'flex'; }
+        const conf = localStorage.getItem('portfolio_config');
+        if(!conf) {
+            const url = prompt("Inserisci URL Firebase:");
+            const pass = prompt("Crea una Password:");
+            if(url && pass) {
+                localStorage.setItem('portfolio_config', JSON.stringify({dbUrl: url.endsWith('/')?url:url+'/', password: pass}));
+                location.reload();
+            }
+        } else {
+            CONFIG = JSON.parse(conf);
+        }
     };
 
-    function salvaConfigurazione() {
-        let url = document.getElementById('setup-db-url').value.trim();
-        const pass = document.getElementById('setup-password').value.trim();
-        if(!url || !pass) return alert("Inserisci dati validi");
-        if(!url.endsWith('/')) url += '/';
-        localStorage.setItem('portfolio_config', JSON.stringify({ dbUrl: url, password: pass }));
-        location.reload();
-    }
-
     function verificaLogin() {
-        if (document.getElementById('login-password').value === CONFIG.password) {
+        if(document.getElementById('login-password').value === CONFIG.password) {
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('app-content').style.display = 'block';
             avviaApp();
-        } else alert("Password errata!");
+        } else alert("Sbagliato");
     }
 
     async function avviaApp() {
         await aggiornaCambio();
         await caricaDati();
-        await aggiornaPrezziLive();
+        await aggiornaTuttiPrezzi();
         renderTabella();
     }
 
     async function aggiornaCambio() {
         try {
-            const res = await fetch('https://open.er-api.com/v6/latest/EUR');
-            const data = await res.json();
-            cambioEURUSD = data.rates.USD;
-            document.getElementById('exchange-info').innerText = `Cambio Real-Time: 1 EUR = ${cambioEURUSD.toFixed(4)} USD`;
-        } catch (e) { console.error("Errore Cambio API"); }
+            const r = await fetch('https://open.er-api.com/v6/latest/EUR');
+            const d = await r.json();
+            cambioEURUSD = d.rates.USD;
+            document.getElementById('exchange-info').innerText = `Cambio: 1 EUR = ${cambioEURUSD.toFixed(4)} USD`;
+        } catch(e) {}
     }
 
     async function caricaDati() {
-        try {
-            const res = await fetch(CONFIG.dbUrl + "portafoglio.json");
-            portafoglio = await res.json() || {};
-        } catch(e) { console.error("Errore caricamento DB"); }
+        const r = await fetch(CONFIG.dbUrl + "portafoglio_v2.json");
+        portafoglio = await r.json() || {};
     }
 
     async function salvaDati() {
-        await fetch(CONFIG.dbUrl + "portafoglio.json", { method: 'PUT', body: JSON.stringify(portafoglio) });
+        await fetch(CONFIG.dbUrl + "portafoglio_v2.json", { method: 'PUT', body: JSON.stringify(portafoglio) });
         renderTabella();
     }
 
-    async function aggiornaPrezziLive() {
-        for (let id in portafoglio) {
-            const ticker = portafoglio[id].nome;
-            try {
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker)}`;
-                const res = await fetch(proxyUrl);
-                const data = await res.json();
-                const yahooData = JSON.parse(data.contents);
-                prezziLive[id] = yahooData.chart.result[0].meta.regularMarketPrice;
-            } catch(e) { prezziLive[id] = portafoglio[id].pmc; }
-        }
+    // CARICAMENTO VELOCE PARALLELO
+    async function aggiornaTuttiPrezzi() {
+        const tickers = Object.keys(portafoglio);
+        const promises = tickers.map(id => {
+            const t = portafoglio[id].ticker;
+            return fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + t)}`)
+                .then(r => r.json())
+                .then(d => {
+                    const y = JSON.parse(d.contents);
+                    prezziLive[id] = y.chart.result[0].meta.regularMarketPrice;
+                }).catch(() => prezziLive[id] = 0);
+        });
+        await Promise.all(promises);
     }
 
-    function converti(v, da, a) { return (da === a) ? v : (da === 'EUR' ? v * cambioEURUSD : v / cambioEURUSD); }
-    function toggleValuta(v) { visualizzaIn = v; renderTabella(); }
-    function chiudiModale(m) { document.getElementById(m).style.display = 'none'; }
+    function converti(v, da, a) { return (da===a)?v : (da==='EUR'? v*cambioEURUSD : v/cambioEURUSD); }
+
+    function calcolaMetriche(tickerId) {
+        const t = portafoglio[tickerId];
+        let qtaAttuale = 0;
+        let costoTotale = 0; // Per calcolo PMC
+        let realizzato = 0;
+
+        // Ordina transazioni per data
+        const txs = (t.transazioni || []).sort((a,b) => new Date(a.data) - new Date(b.data));
+
+        txs.forEach(tx => {
+            const q = parseFloat(tx.qta);
+            const p = parseFloat(tx.prezzo);
+            const c = parseFloat(tx.comm || 0);
+
+            if(tx.tipo === 'BUY') {
+                qtaAttuale += q;
+                costoTotale += (q * p) + c;
+            } else {
+                // Vendita: realizza profitto basato sul PMC attuale
+                const pmcLocale = qtaAttuale > 0 ? costoTotale / qtaAttuale : 0;
+                realizzato += (p * q) - (pmcLocale * q) - c;
+                
+                // Aggiorna qta e costo proporzionalmente
+                costoTotale -= (pmcLocale * q);
+                qtaAttuale -= q;
+            }
+        });
+
+        const pmc = qtaAttuale > 0 ? costoTotale / qtaAttuale : 0;
+        return { qta: qtaAttuale, pmc, realizzato, investito: costoTotale };
+    }
 
     function renderTabella() {
         const tbody = document.getElementById('corpo-tabella');
         tbody.innerHTML = '';
-        let totInv = 0, totAtt = 0, totReal = 0;
+        let totInv = 0, totLordo = 0, totNetto = 0, totReal = 0;
         const s = visualizzaIn === 'EUR' ? '€' : '$';
 
-        for (let id in portafoglio) {
+        for(let id in portafoglio) {
             const t = portafoglio[id];
-            const v = t.valuta || 'EUR';
-            const prLive = prezziLive[id] || t.pmc;
-            const inv = t.qta * t.pmc;
-            const att = t.qta * prLive;
-            const pnl = att - inv;
-            const pnlP = inv > 0 ? (pnl / inv) * 100 : 0;
+            const m = calcolaMetriche(id);
+            const live = prezziLive[id] || 0;
+            const val = t.valuta || 'EUR';
 
-            totInv += converti(inv, v, visualizzaIn);
-            totAtt += converti(att, v, visualizzaIn);
-            totReal += converti(t.realizedPnL || 0, v, visualizzaIn);
+            const lordo = m.qta * live;
+            const pnlLordo = lordo - m.investito;
+            
+            // Calcolo NETTO (After Tax)
+            // Tasse = 26% o 12.5% sulla plusvalenza lorda, meno una commissione di vendita stimata (7€)
+            const commVendita = 7; 
+            const gainPerTasse = Math.max(0, lordo - m.investito - commVendita);
+            const tasse = gainPerTasse * parseFloat(t.tax || 0.26);
+            const nettoStimato = Math.max(0, lordo - tasse - commVendita);
+
+            // Somme dashboard
+            totInv += converti(m.investito, val, visualizzaIn);
+            totLordo += converti(lordo, val, visualizzaIn);
+            totNetto += converti(nettoStimato, val, visualizzaIn);
+            totReal += converti(m.realizzato, val, visualizzaIn);
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><b>${t.nome}</b> <span style="font-size:0.7em; opacity:0.6;">${v}</span></td>
-                <td>${parseFloat(t.qta).toFixed(2)}</td>
-                <td>${parseFloat(t.pmc).toFixed(2)}</td>
-                <td><b>${prLive.toFixed(2)}</b></td>
-                <td>${s} ${converti(att, v, visualizzaIn).toFixed(2)}</td>
-                <td class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${converti(pnl, v, visualizzaIn).toFixed(2)} (${pnlP.toFixed(2)}%)</td>
+                <td><b>${t.ticker}</b> <span class="badge">${val}</span></td>
+                <td>${m.qta.toFixed(2)}</td>
+                <td>${m.pmc.toFixed(2)}</td>
+                <td>${live.toFixed(2)}</td>
+                <td>${s} ${converti(lordo, val, visualizzaIn).toFixed(2)}</td>
+                <td style="color:var(--accent)">${s} ${converti(nettoStimato, val, visualizzaIn).toFixed(2)}</td>
+                <td class="${pnlLordo>=0?'pos':'neg'}">${converti(pnlLordo, val, visualizzaIn).toFixed(2)} (${m.investito>0?(pnlLordo/m.investito*100).toFixed(2):0}%)</td>
                 <td>
-                    <button class="btn-action btn-edit" onclick="apriModifica('${id}')" title="Rettifica">⚙️</button>
-                    <button class="btn-action btn-sim" onclick="apriSimulazione('${id}')">Sim</button>
-                    <button class="btn-action btn-buy" onclick="apriTransazione('${id}', 'compra')">+</button>
-                    <button class="btn-action btn-sell" onclick="apriTransazione('${id}', 'vendi')">-</button>
-                    <button class="btn-action btn-del" onclick="eliminaTitolo('${id}')">🗑️</button>
-                </td>`;
+                    <button class="btn btn-outline" onclick="apriTransazioni('${id}')">Storico / Edit</button>
+                    <button class="btn btn-outline" style="color:var(--danger)" onclick="eliminaTitolo('${id}')">🗑️</button>
+                </td>
+            `;
             tbody.appendChild(tr);
         }
-        document.getElementById('dash-investito').innerText = `${s} ${totInv.toFixed(2)}`;
-        document.getElementById('dash-attuale').innerText = `${s} ${totAtt.toFixed(2)}`;
-        const tpnl = totAtt - totInv;
-        document.getElementById('dash-performance').innerText = `${s} ${tpnl.toFixed(2)}`;
-        document.getElementById('dash-performance').className = 'value ' + (tpnl >= 0 ? 'pos-gain' : 'neg-loss');
-        document.getElementById('dash-realizzato').innerText = `${s} ${totReal.toFixed(2)}`;
+
+        document.getElementById('dash-investito').innerText = s + ' ' + totInv.toLocaleString();
+        document.getElementById('dash-lordo').innerText = s + ' ' + totLordo.toLocaleString();
+        document.getElementById('dash-pnl-lordo').innerText = (totLordo-totInv).toLocaleString() + " " + s;
+        document.getElementById('dash-pnl-lordo').className = "sub-value " + (totLordo-totInv>=0?'pos':'neg');
+        document.getElementById('dash-netto').innerText = s + ' ' + totNetto.toLocaleString();
+        document.getElementById('dash-realizzato').innerText = s + ' ' + totReal.toLocaleString();
     }
 
-    // --- FUNZIONI MODIFICA/RETTIFICA ---
-    function apriModifica(id) {
-        const t = portafoglio[id];
-        document.getElementById('edit-id').value = id;
-        document.getElementById('edit-ticker').value = t.nome;
-        document.getElementById('edit-qta').value = t.qta;
-        document.getElementById('edit-pmc').value = t.pmc;
-        document.getElementById('edit-pnl-realizzato').value = t.realizedPnL || 0;
-        document.getElementById('modal-edit').style.display = 'flex';
+    // MODALI
+    function apriModaleNuovo() { 
+        activeTickerId = null;
+        document.getElementById('modal-titolo-label').innerText = "Nuovo Titolo";
+        document.getElementById('modal-titolo').style.display = 'flex'; 
     }
 
-    async function salvaModificaTitolo() {
-        const id = document.getElementById('edit-id').value;
-        portafoglio[id].nome = document.getElementById('edit-ticker').value.toUpperCase().trim();
-        portafoglio[id].qta = parseFloat(document.getElementById('edit-qta').value);
-        portafoglio[id].pmc = parseFloat(document.getElementById('edit-pmc').value);
-        portafoglio[id].realizedPnL = parseFloat(document.getElementById('edit-pnl-realizzato').value);
-        
-        chiudiModale('modal-edit');
+    function chiudiModali() { document.querySelectorAll('.overlay').forEach(o => o.style.display='none'); }
+
+    async function salvaTitolo() {
+        const ticker = document.getElementById('in-ticker').value.toUpperCase().trim();
+        if(!ticker) return;
+        const id = activeTickerId || "ID" + Date.now();
+        if(!portafoglio[id]) portafoglio[id] = { ticker, transazioni: [], valuta: document.getElementById('in-valuta').value, tax: document.getElementById('in-tipo').value };
+        else {
+            portafoglio[id].ticker = ticker;
+            portafoglio[id].valuta = document.getElementById('in-valuta').value;
+            portafoglio[id].tax = document.getElementById('in-tipo').value;
+        }
         await salvaDati();
-        await aggiornaPrezziLive();
+        await aggiornaTuttiPrezzi();
+        chiudiModali();
         renderTabella();
     }
 
-    // --- ALTRE FUNZIONI ---
-    async function aggiungiTitolo() {
-        const n = document.getElementById('input-titolo').value.toUpperCase().trim();
-        const q = parseFloat(document.getElementById('input-qta').value);
-        const p = parseFloat(document.getElementById('input-pmc').value);
-        if(!n || isNaN(q)) return;
-        const id = "ID" + Date.now();
-        portafoglio[id] = { nome: n, qta: q, pmc: p, valuta: document.getElementById('input-valuta').value, realizedPnL: 0 };
-        await salvaDati(); await aggiornaPrezziLive(); renderTabella();
-    }
-
-    function apriTransazione(id, tipo) {
-        simId = id; const t = portafoglio[id];
-        document.getElementById('trans-id').value = id;
-        document.getElementById('trans-tipo').value = tipo;
-        document.getElementById('trans-qta').value = '';
-        document.getElementById('trans-prezzo').value = prezziLive[id] || t.pmc;
-        document.getElementById('trans-titolo').innerText = tipo === 'compra' ? `Compra ${t.nome}` : `Vendi ${t.nome}`;
-        document.getElementById('btn-esegui-trans').style.background = tipo === 'compra' ? 'var(--accent)' : 'var(--purple)';
-        document.getElementById('modal-transazione').style.display = 'flex';
-    }
-
-    async function eseguiTransazione() {
-        const id = document.getElementById('trans-id').value, tipo = document.getElementById('trans-tipo').value;
-        const q = parseFloat(document.getElementById('trans-qta').value), p = parseFloat(document.getElementById('trans-prezzo').value);
-        if(isNaN(q) || isNaN(p)) return;
+    function apriTransazioni(id) {
+        activeTickerId = id;
         const t = portafoglio[id];
-        if(tipo === 'compra') { t.pmc = ((t.qta * t.pmc) + (q * p)) / (t.qta + q); t.qta += q; }
-        else { if(q > t.qta) return alert("Azioni insufficienti"); t.realizedPnL = (t.realizedPnL || 0) + ((p - t.pmc) * q); t.qta -= q; }
-        await salvaDati(); chiudiModale('modal-transazione');
+        document.getElementById('tx-titolo-label').innerText = "Transazioni: " + t.ticker;
+        renderStorico();
+        document.getElementById('modal-tx').style.display = 'flex';
     }
 
-    function apriSimulazione(id) {
-        simId = id; const t = portafoglio[id];
-        document.querySelector('#sim-titolo span').innerText = t.nome;
-        document.getElementById('sim-prezzo').value = prezziLive[id] || t.pmc;
-        document.getElementById('sim-budget').value = '';
-        document.getElementById('sim-risultato').innerText = 'Inserisci i dati...';
-        document.getElementById('modal-simulazione').style.display = 'flex';
+    function renderStorico() {
+        const cont = document.getElementById('tx-history');
+        cont.innerHTML = '';
+        const t = portafoglio[activeTickerId];
+        t.transazioni.forEach((tx, index) => {
+            const div = document.createElement('div');
+            div.className = 'tx-item';
+            div.innerHTML = `
+                <span><b>${tx.tipo}</b> ${tx.data}</span>
+                <span>${tx.qta} @ ${tx.prezzo} (Comm: ${tx.comm})</span>
+                <button onclick="eliminaTx(${index})" style="background:none; border:none; color:var(--danger); cursor:pointer;">✖</button>
+            `;
+            cont.appendChild(div);
+        });
     }
 
-    function calcolaSimulazione() {
-        const p = parseFloat(document.getElementById('sim-prezzo').value), b = parseFloat(document.getElementById('sim-budget').value);
-        if(isNaN(p) || isNaN(b) || p <= 0) return;
-        const t = portafoglio[simId], aq = b / p, nPmc = ((t.qta * t.pmc) + b) / (t.qta + aq);
-        let conv = t.valuta === 'USD' ? `<br>Costo stimato: <b>€ ${(b/cambioEURUSD).toFixed(2)} EUR</b>` : '';
-        document.getElementById('sim-risultato').innerHTML = `Azioni acquistabili: <b>${aq.toFixed(4)}</b>${conv}<br>Nuovo PMC: <b style="color:var(--accent)">${nPmc.toFixed(2)}</b>`;
+    async function aggiungiTransazione() {
+        const q = document.getElementById('tx-qta').value;
+        const p = document.getElementById('tx-prezzo').value;
+        const d = document.getElementById('tx-data').value;
+        const c = document.getElementById('tx-comm').value;
+        if(!q || !p || !d) return alert("Mancano dati");
+
+        portafoglio[activeTickerId].transazioni.push({
+            tipo: document.getElementById('tx-tipo').value,
+            data: d, qta: parseFloat(q), prezzo: parseFloat(p), comm: parseFloat(c)
+        });
+        await salvaDati();
+        renderStorico();
     }
 
-    async function eliminaTitolo(id) { if(confirm("Eliminare?")) { delete portafoglio[id]; await salvaDati(); } }
+    async function eliminaTx(index) {
+        portafoglio[activeTickerId].transazioni.splice(index, 1);
+        await salvaDati();
+        renderStorico();
+    }
+
+    async function eliminaTitolo(id) {
+        if(confirm("Eliminare intero titolo e storico?")) {
+            delete portafoglio[id];
+            await salvaDati();
+        }
+    }
+    
+    function toggleValuta(v) { visualizzaIn = v; renderTabella(); }
 </script>
 </body>
 </html>
