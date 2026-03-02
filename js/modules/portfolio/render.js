@@ -210,10 +210,10 @@ export function renderKPI({ portfolio, prices, currency }) {
             <div class="value">${s} ${Calc.fmt(atTax)}</div>
             <div class="sub">Tasse stimate: ${s} ${Calc.fmt(totTax)}</div>
         </div>
-        <div class="stat-card ${netto >= 0 ? 'c-success' : 'c-danger'}">
-            <h3>P&L Totale Netto</h3>
-            <div class="value ${netto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(netto)}</div>
-            <div class="sub">realizzato + non realizzato</div>
+                <div class="stat-card ${atTax - totInv + totReal >= 0 ? 'c-success' : 'c-danger'}">
+            <h3>P&L After Tax</h3>
+            <div class="value ${atTax - totInv + totReal >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(atTax - totInv + totReal)}</div>
+            <div class="sub">(controvalore after tax − investito) + realizzato</div>
         </div>
         <div class="stat-card c-warning">
             <h3>Commissioni Pagate</h3>
@@ -221,3 +221,4 @@ export function renderKPI({ portfolio, prices, currency }) {
             <div class="sub">totale su tutte le posizioni</div>
         </div>`;
 }
+
