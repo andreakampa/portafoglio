@@ -33,11 +33,21 @@ export const Calc = {
     },
 
     fmt(n, d = 2) {
-        return (n === null || n === undefined || isNaN(n)) ? '—' : Number(n).toFixed(d);
-    },
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return Number(n).toLocaleString('it-IT', {
+        minimumFractionDigits: d,
+        maximumFractionDigits: d
+    });
+},
 
-    fmtSign(n, d = 2) {
-        if (isNaN(n)) return '—';
-        return (n >= 0 ? '+' : '') + this.fmt(n, d);
-    }
+fmtSign(n, d = 2) {
+    if (isNaN(n)) return '—';
+    const formatted = Math.abs(n).toLocaleString('it-IT', {
+        minimumFractionDigits: d,
+        maximumFractionDigits: d
+    });
+    return (n >= 0 ? '+' : '-') + formatted;
+}
+
 };
+
