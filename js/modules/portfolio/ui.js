@@ -22,7 +22,7 @@ export function openHistoryModal(id, portfolio, onSave) {
                         <thead><tr>
                             <th>Data</th><th>Tipo</th><th>Q.tà</th>
                             <th>Prezzo</th><th>Commissione</th><th>Totale</th>
-                            <th>PMC post-trade</th><th>P&L trade</th><th></th>
+                            <th>PMC post-trade</th><th>P&L trade</th><th>Azioni</th>
                         </tr></thead>
                         <tbody id="hist-tbody"></tbody>
                     </table>
@@ -77,25 +77,112 @@ function _renderHistoryContent(id, portfolio, onSave) {
             <td>${tradePnL !== null
                 ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(tradePnL)}</span>`
                 : '—'}</td>
-            <td>
-                <button class="btn-del-tx" data-idx="${i}" title="Elimina transazione">🗑</button>
+            <td style="display:flex; gap:4px;">
+                <button class="btn btn-dark btn-sm btn-icon btn-edit-tx" data-idx="${i}" title="Modifica">✏️</button>
+                <button class="btn-del-tx" data-idx="${i}" title="Elimina">🗑</button>
             </td>`;
         tbody.appendChild(tr);
     });
 
+    // ELIMINA
     tbody.onclick = async e => {
-        const btn = e.target.closest('.btn-del-tx');
-        if (!btn) return;
-        const origIdx = txsSorted[+btn.dataset.idx];
-        if (!confirm(`Eliminare la transazione del ${origIdx.date}?`)) return;
+        const delBtn  = e.target.closest('.btn-del-tx');
+        const editBtn = e.target.closest('.btn-edit-tx');
+
+        if (delBtn) {
+            const origTx = txsSorted[+delBtn.dataset.idx];
+            if (!confirm(`Eliminare la transazione del ${origTx.date}?`)) return;
+            const realIdx = portfolio[id].transactions.findIndex(
+                t => t.date === origTx.date && t.qty === origTx.qty &&
+                     t.price === origTx.price && t.type === origTx.type
+            );
+            if (realIdx > -1) portfolio[id].transactions.splice(realIdx, 1);
+            await onSave();
+            _renderHistoryContent(id, portfolio, onSave);
+            Toast.show('Transazione rimossa', 'ok');
+        }
+
+        if (editBtn) {
+            const origTx = txsSorted[+editBtn.dataset.idx];
+            _openEditModal(id, origTx, portfolio, onSave);
+        }
+    };
+}
+
+// ── EDIT TRANSACTION MODAL ─────────────────────────────────────────────────
+function _openEditModal(id, origTx, portfolio, onSave) {
+    // rimuovi modale edit precedente se esiste
+    document.getElementById('modal-edit-tx')?.remove();
+
+    const wrap = document.createElement('div');
+    wrap.id = 'modal-edit-tx';
+    wrap.className = 'overlay visible';
+    wrap.innerHTML = `
+        <div class="modal" style="border-top: 3px solid var(--warning);">
+            <div class="modal-header">
+                <h3>✏️ Modifica Transazione — ${portfolio[id].nome}</h3>
+                <button class="btn-x" id="edit-tx-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid-2">
+                    <div>
+                        <span class="modal-label">Data</span>
+                        <input type="date" id="edit-tx-data" value="${origTx.date}">
+                    </div>
+                    <div>
+                        <span class="modal-label">Tipo</span>
+                        <select id="edit-tx-tipo">
+                            <option value="buy"  ${origTx.type === 'buy'  ? 'selected' : ''}>🟢 Acquisto</option>
+                            <option value="sell" ${origTx.type === 'sell' ? 'selected' : ''}>🔴 Vendita</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="modal-label">Quantità</span>
+                        <input type="number" id="edit-tx-qta" step="any" value="${origTx.qty}">
+                    </div>
+                    <div>
+                        <span class="modal-label">Prezzo</span>
+                        <input type="number" id="edit-tx-prezzo" step="any" value="${origTx.price}">
+                    </div>
+                    <div>
+                        <span class="modal-label">Commissione</span>
+                        <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}">
+                    </div>
+                </div>
+                <button id="edit-tx-save" class="btn btn-warning btn-full" style="margin-top:16px;">💾 Salva Modifiche</button>
+                <button id="edit-tx-cancel" class="btn btn-ghost btn-full" style="margin-top:8px;">Annulla</button>
+            </div>
+        </div>`;
+    document.body.appendChild(wrap);
+
+    const close = () => wrap.remove();
+    document.getElementById('edit-tx-close').onclick  = close;
+    document.getElementById('edit-tx-cancel').onclick = close;
+
+    document.getElementById('edit-tx-save').onclick = async () => {
+        const newDate = document.getElementById('edit-tx-data').value;
+        const newType = document.getElementById('edit-tx-tipo').value;
+        const newQty  = parseFloat(document.getElementById('edit-tx-qta').value);
+        const newPr   = parseFloat(document.getElementById('edit-tx-prezzo').value);
+        const newComm = parseFloat(document.getElementById('edit-tx-comm').value) || 0;
+        if (!newDate || isNaN(newQty) || newQty <= 0 || isNaN(newPr) || newPr <= 0) {
+            Toast.show('Compila tutti i campi correttamente', 'err'); return;
+        }
+        // trova e sostituisci
         const realIdx = portfolio[id].transactions.findIndex(
-            t => t.date === origIdx.date && t.qty === origIdx.qty &&
-                 t.price === origIdx.price && t.type === origIdx.type
+            t => t.date === origTx.date && t.qty === origTx.qty &&
+                 t.price === origTx.price && t.type === origTx.type
         );
-        if (realIdx > -1) portfolio[id].transactions.splice(realIdx, 1);
+        if (realIdx > -1) {
+            portfolio[id].transactions[realIdx] = {
+                date: newDate, type: newType,
+                qty: newQty, price: newPr, commission: newComm
+            };
+        }
+        close();
         await onSave();
         _renderHistoryContent(id, portfolio, onSave);
-        Toast.show('Transazione rimossa', 'ok');
+        Toast.show('Transazione aggiornata', 'ok');
     };
 }
 
@@ -125,7 +212,7 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
                     </div>
                     <div>
                         <span class="modal-label">Prezzo Eseguito</span>
-                        <input type="number" id="tx-prezzo" step="any" value="${Calc.fmt(prLive)}">
+                        <input type="number" id="tx-prezzo" step="any" value="${Calc.fmt(prLive).replace('.','').replace(',','.')}">
                     </div>
                     <div>
                         <span class="modal-label">Commissione (€)</span>
@@ -209,14 +296,14 @@ export function openSimModal(id, portfolio, prices) {
                 <div class="form-grid-3">
                     <div>
                         <span class="modal-label">Prezzo Simulato</span>
-                        <input type="number" id="sim-prezzo" step="any" value="${Calc.fmt(prLive)}">
+                        <input type="number" id="sim-prezzo" step="any" value="${prLive}">
                     </div>
                     <div>
                         <span class="modal-label">Budget Disponibile</span>
                         <input type="number" id="sim-budget" step="any" placeholder="0.00">
                     </div>
                     <div>
-                        <span class="modal-label">Commissione Stimata</span>
+                        <span class="modal-label">Commissioni</span>
                         <input type="number" id="sim-comm" step="any" value="${p.commDefault || 7}">
                     </div>
                 </div>
@@ -234,17 +321,20 @@ export function openSimModal(id, portfolio, prices) {
         const c   = parseFloat(document.getElementById('sim-comm').value) || 0;
         const box = document.getElementById('sim-result');
         if (isNaN(pr) || isNaN(b) || pr <= 0 || b <= 0) { box.style.display = 'none'; return; }
+        // budget netto = budget - commissioni fisse
         const net = b - c;
-        const aq  = net / pr;
+        if (net <= 0) { box.style.display = 'block'; box.innerHTML = `<span class="text-danger">Budget insufficiente a coprire le commissioni (${Calc.fmt(c)})</span>`; return; }
+        const aq     = net / pr;
         const newPmc = (qta + aq) > 0 ? ((qta * pmc) + net) / (qta + aq) : 0;
         const s = p.valuta === 'USD' ? '$' : '€';
         const convLine = p.valuta === 'USD'
             ? `<br>Costo in EUR: <b>€ ${Calc.fmt(b / Exchange.rate)}</b>` : '';
         box.style.display = 'block';
-        box.innerHTML = `Azioni acquistabili (netto comm.): <b>${Calc.fmt(aq, 4)}</b><br>
-            Budget: <b>${Calc.fmt(b)}</b> (comm. <b>${Calc.fmt(c)}</b>)${convLine}<br>
-            Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
-            Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>`;
+        box.innerHTML =
+            `Budget: <b>${Calc.fmt(b)}</b> − Commissioni: <b>${Calc.fmt(c)}</b> = Netto: <b class="hl">${Calc.fmt(net)}</b>${convLine}<br>
+             Azioni acquistabili: <b>${Calc.fmt(aq, 4)}</b> a ${Calc.fmt(pr)}<br>
+             Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
+             Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>`;
     };
     ['sim-prezzo', 'sim-budget', 'sim-comm'].forEach(el =>
         document.getElementById(el).oninput = calc
