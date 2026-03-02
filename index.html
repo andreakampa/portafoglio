@@ -5,345 +5,723 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portafoglio Tracker Pro</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --purple: #8e44ad; }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1250px; margin: 0 auto; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        
-        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: var(--primary); color: white; padding: 20px; border-radius: 12px; }
-        .stat-card h3 { margin: 0; font-size: 0.8em; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
-        .stat-card .value { font-size: 1.6em; font-weight: bold; margin-top: 8px; }
+        :root {
+            --primary: #2c3e50; --accent: #3498db; --success: #27ae60;
+            --danger: #e74c3c; --warning: #f39c12; --purple: #8e44ad;
+            --bg: #f4f7f6; --card: #ffffff; --text: #333;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
+        .container { max-width: 1350px; margin: 0 auto; }
 
-        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: white; padding: 10px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .btn-toggle { background: var(--accent); color: white; border: none; padding: 6px 18px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .btn-toggle:hover { opacity: 0.8; }
-        
-        table { width: 100%; border-collapse: collapse; min-width: 800px; }
-        th { background: #f8f9fa; padding: 15px 10px; font-size: 0.8em; color: #7f8c8d; text-transform: uppercase; border-bottom: 2px solid #eee; text-align: left; }
-        td { padding: 15px 10px; border-bottom: 1px solid #eee; }
+        /* DASHBOARD */
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--primary); color: white; padding: 20px; border-radius: 12px; position: relative; overflow: hidden; transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-card::after { content: ''; position: absolute; right: -15px; top: -15px; width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%; }
+        .stat-card h3 { margin: 0; font-size: 0.75em; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-card .value { font-size: 1.5em; font-weight: bold; margin-top: 8px; word-break: break-all; }
+        .stat-card .sub { font-size: 0.75em; opacity: 0.7; margin-top: 4px; }
+
+        /* CONTROLS */
+        .controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+            margin-bottom: 20px; background: white; padding: 12px 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .controls-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .btn-toggle { background: var(--bg); color: var(--primary); border: 2px solid #ddd; padding: 6px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.85em; }
+        .btn-toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .btn-refresh { background: var(--success); color: white; border: none; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.85em; transition: 0.2s; }
+        .btn-refresh:hover { opacity: 0.85; }
+        .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* CARD */
+        .card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.07); margin-bottom: 20px; }
+        .card h3 { margin-top: 0; margin-bottom: 15px; color: var(--primary); }
+
+        /* FORM */
+        .form-group { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .form-field { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+        .form-field label { font-size: 0.78em; font-weight: 600; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; }
+        input, select { padding: 9px 12px; border: 1.5px solid #ddd; border-radius: 8px; width: 100%; outline: none; font-size: 0.9em; transition: border-color 0.2s; background: #fafafa; }
+        input:focus, select:focus { border-color: var(--accent); background: white; }
+        .btn-add { background: var(--success); color: white; border: none; padding: 9px 22px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9em; white-space: nowrap; transition: 0.2s; align-self: flex-end; }
+        .btn-add:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        /* TABLE */
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 820px; }
+        th { background: #f8f9fa; padding: 12px 10px; font-size: 0.75em; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #eee; text-align: left; white-space: nowrap; }
+        td { padding: 13px 10px; border-bottom: 1px solid #f0f0f0; font-size: 0.9em; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #fafcff; }
+        .ticker-name { font-weight: 700; font-size: 0.95em; }
+        .currency-badge { display: inline-block; font-size: 0.65em; background: #eef2f7; color: #7f8c8d; padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle; }
         .pos-gain { color: var(--success); font-weight: bold; }
         .neg-loss { color: var(--danger); font-weight: bold; }
-        
-        .btn-action { border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75em; font-weight: bold; color: white; margin-right: 4px; transition: 0.2s; }
+        .price-loading { color: #bbb; font-style: italic; font-size: 0.85em; }
+
+        /* ACTION BUTTONS */
+        .btn-action { border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.72em; font-weight: bold; color: white; transition: 0.15s; white-space: nowrap; }
+        .btn-action:hover { transform: translateY(-1px); filter: brightness(1.15); }
         .btn-edit { background: #95a5a6; }
         .btn-sim { background: var(--warning); }
         .btn-buy { background: var(--accent); }
         .btn-sell { background: var(--purple); }
         .btn-del { background: var(--danger); }
-        .btn-action:hover { transform: translateY(-1px); filter: brightness(1.1); }
+        .actions-cell { display: flex; gap: 4px; flex-wrap: wrap; min-width: 180px; }
 
-        .form-group { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; outline: none; }
-        input:focus { border-color: var(--accent); }
-        
-        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(4px); }
-        .modal-box { background: white; padding: 30px; border-radius: 15px; width: 90%; max-width: 450px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        .btn-close { background: #bdc3c7; border: none; padding: 12px; width: 100%; border-radius: 8px; margin-top: 15px; cursor: pointer; color: white; font-weight: bold; }
+        /* OVERLAY & MODAL */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(5px); }
+        .overlay.visible { display: flex; }
+        .modal-box { background: white; padding: 28px 30px; border-radius: 16px; width: 92%; max-width: 460px; box-shadow: 0 25px 50px rgba(0,0,0,0.25); animation: modalIn 0.2s ease; }
+        @keyframes modalIn { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-box h3 { margin-top: 0; margin-bottom: 18px; color: var(--primary); }
+        .modal-label { font-size: 0.78em; font-weight: 600; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px; margin-top: 12px; }
+        .modal-label:first-of-type { margin-top: 0; }
+        .btn-confirm { width: 100%; padding: 12px; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 0.95em; cursor: pointer; margin-top: 16px; transition: 0.2s; }
+        .btn-confirm:hover { filter: brightness(1.08); }
+        .btn-close { background: transparent; border: 1.5px solid #ddd; padding: 10px; width: 100%; border-radius: 8px; margin-top: 10px; cursor: pointer; color: #999; font-weight: bold; transition: 0.2s; }
+        .btn-close:hover { background: #f5f5f5; }
+
+        /* AUTH SCREENS */
+        .auth-overlay { position: fixed; inset: 0; background: var(--bg); display: none; justify-content: center; align-items: center; z-index: 3000; }
+        .auth-overlay.visible { display: flex; }
+        .auth-box { background: white; padding: 40px; border-radius: 16px; width: 92%; max-width: 400px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+        .auth-box h2 { margin-top: 0; color: var(--primary); }
+        .auth-box p { color: #7f8c8d; font-size: 0.9em; margin-bottom: 20px; }
+        .auth-box input { margin-bottom: 12px; }
+        .btn-auth { background: var(--accent); color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 1em; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-auth:hover { filter: brightness(1.08); }
+        .btn-auth.success { background: var(--success); }
+        .auth-error { color: var(--danger); font-size: 0.85em; margin-top: 8px; min-height: 20px; }
+
+        /* LOADING SPINNER */
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* TOAST */
+        #toast { position: fixed; bottom: 24px; right: 24px; background: #2c3e50; color: white; padding: 12px 20px; border-radius: 10px; font-size: 0.88em; z-index: 9999; opacity: 0; transform: translateY(10px); transition: 0.3s; pointer-events: none; }
+        #toast.show { opacity: 1; transform: translateY(0); }
+        #toast.toast-ok { background: var(--success); }
+        #toast.toast-err { background: var(--danger); }
+
+        /* SIMULAZIONE */
+        .sim-result-box { background: #f9f9f9; padding: 15px; margin-top: 14px; border-radius: 10px; border: 1px solid #eee; font-size: 0.88em; line-height: 1.7; }
+        .sim-result-box b { color: var(--primary); }
+
+        /* RESPONSIVE */
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .modal-box { padding: 20px; }
+            .auth-box { padding: 25px; }
+        }
     </style>
 </head>
 <body>
 
-<div id="setup-overlay" class="overlay" style="background: #f4f7f6; display: none;">
-    <div class="modal-box" style="text-align: center;">
-        <h2>⚙️ Setup Database</h2>
-        <input type="text" id="setup-db-url" placeholder="Link Firebase URL" style="margin-bottom: 10px;">
-        <input type="password" id="setup-password" placeholder="Crea la tua Password" style="margin-bottom: 15px;">
-        <button onclick="salvaConfigurazione()" style="background:var(--success); color:white; padding:12px; border:none; width:100%; border-radius:8px;">Salva Configurazione</button>
+<!-- TOAST NOTIFICATION -->
+<div id="toast"></div>
+
+<!-- SETUP -->
+<div id="setup-overlay" class="auth-overlay">
+    <div class="auth-box">
+        <h2>⚙️ Prima Configurazione</h2>
+        <p>Inserisci l'URL del tuo Firebase Realtime Database e crea una password di accesso.</p>
+        <input type="url" id="setup-db-url" placeholder="https://PROGETTO.firebaseio.com/">
+        <input type="password" id="setup-password" placeholder="Crea password di accesso" id="setup-password">
+        <input type="password" id="setup-password2" placeholder="Conferma password">
+        <div class="auth-error" id="setup-error"></div>
+        <button class="btn-auth success" onclick="salvaConfigurazione()">Salva e Continua</button>
     </div>
 </div>
 
-<div id="login-overlay" class="overlay" style="background: #f4f7f6; display: none;">
-    <div class="modal-box" style="text-align: center;">
-        <h2>🔐 Accesso</h2>
-        <input type="password" id="login-password" placeholder="Inserisci Password" style="margin-bottom: 15px;">
-        <button onclick="verificaLogin()" style="background:var(--accent); color:white; padding:12px; border:none; width:100%; border-radius:8px;">Sblocca Portafoglio</button>
+<!-- LOGIN -->
+<div id="login-overlay" class="auth-overlay">
+    <div class="auth-box">
+        <h2>🔐 Portafoglio Tracker</h2>
+        <p>Inserisci la password per accedere al tuo portafoglio.</p>
+        <input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter') verificaLogin()">
+        <div class="auth-error" id="login-error"></div>
+        <button class="btn-auth" onclick="verificaLogin()">Sblocca</button>
+        <br><br>
+        <a href="#" style="font-size:0.8em; color:#bbb;" onclick="resetConfig()">Riconfigura database</a>
     </div>
 </div>
 
+<!-- APP -->
 <div id="app-content" class="container" style="display:none;">
+
     <div class="controls">
-        <span id="exchange-info" style="font-weight: bold; color: var(--primary);">Cambio: Caricamento...</span>
-        <div>
-            Mostra in: 
-            <button class="btn-toggle" onclick="toggleValuta('EUR')">€ EUR</button>
-            <button class="btn-toggle" onclick="toggleValuta('USD')">$ USD</button>
+        <span id="exchange-info" style="font-weight:600; color:var(--primary); font-size:0.9em;">Cambio: —</span>
+        <div class="controls-right">
+            <span style="font-size:0.85em; color:#999;">Mostra in:</span>
+            <button id="btn-eur" class="btn-toggle active" onclick="toggleValuta('EUR')">€ EUR</button>
+            <button id="btn-usd" class="btn-toggle" onclick="toggleValuta('USD')">$ USD</button>
+            <button id="btn-refresh" class="btn-refresh" onclick="refreshPrezzi()">🔄 Aggiorna Prezzi</button>
+            <span id="last-update" style="font-size:0.78em; color:#bbb;"></span>
         </div>
     </div>
 
     <div class="dashboard">
-        <div class="stat-card"><h3>Capitale Investito</h3><div id="dash-investito" class="value">0.00</div></div>
-        <div class="stat-card"><h3>Controvalore Attuale</h3><div id="dash-attuale" class="value">0.00</div></div>
-        <div class="stat-card"><h3>P&L Attuale</h3><div id="dash-performance" class="value">0.00</div></div>
-        <div class="stat-card" style="background: var(--purple);"><h3>P&L Realizzato</h3><div id="dash-realizzato" class="value">0.00</div></div>
-    </div>
-
-    <div class="card">
-        <h3 style="margin-top:0;">➕ Aggiungi Titolo</h3>
-        <div class="form-group">
-            <div><label>Ticker (Yahoo)</label><input type="text" id="input-titolo" placeholder="es. AAPL o RACE.MI"></div>
-            <div><label>Quantità</label><input type="number" id="input-qta" step="any"></div>
-            <div><label>PMC</label><input type="number" id="input-pmc" step="any"></div>
-            <div><label>Valuta</label><select id="input-valuta"><option value="EUR">EUR (€)</option><option value="USD">USD ($)</option></select></div>
-            <button onclick="aggiungiTitolo()" style="background:var(--success); color:white; border:none; padding:10px 25px; border-radius:8px; cursor:pointer; font-weight:bold;">Aggiungi</button>
+        <div class="stat-card">
+            <h3>Capitale Investito</h3>
+            <div id="dash-investito" class="value">—</div>
+        </div>
+        <div class="stat-card">
+            <h3>Controvalore Attuale</h3>
+            <div id="dash-attuale" class="value">—</div>
+        </div>
+        <div class="stat-card">
+            <h3>P&L Non Realizzato</h3>
+            <div id="dash-performance" class="value">—</div>
+            <div id="dash-perf-pct" class="sub"></div>
+        </div>
+        <div class="stat-card" style="background:var(--purple);">
+            <h3>P&L Realizzato</h3>
+            <div id="dash-realizzato" class="value">—</div>
+        </div>
+        <div class="stat-card" style="background:var(--warning);">
+            <h3>P&L Totale</h3>
+            <div id="dash-totale" class="value">—</div>
         </div>
     </div>
 
-    <div class="card" style="overflow-x: auto;">
-        <table>
-            <thead>
-                <tr>
-                    <th>Titolo</th>
-                    <th>Q.tà</th>
-                    <th>PMC</th>
-                    <th>Prezzo Live</th>
-                    <th>Valore Posizione</th>
-                    <th>P&L</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody id="corpo-tabella"></tbody>
-        </table>
+    <div class="card">
+        <h3>➕ Aggiungi Titolo</h3>
+        <div class="form-group">
+            <div class="form-field" style="flex:2; min-width:140px;">
+                <label>Ticker Yahoo Finance</label>
+                <input type="text" id="input-titolo" placeholder="es. AAPL, RACE.MI, BTC-USD" onkeydown="if(event.key==='Enter') aggiungiTitolo()">
+            </div>
+            <div class="form-field" style="flex:1;">
+                <label>Quantità</label>
+                <input type="number" id="input-qta" step="any" min="0" placeholder="0">
+            </div>
+            <div class="form-field" style="flex:1;">
+                <label>PMC (Prezzo Medio)</label>
+                <input type="number" id="input-pmc" step="any" min="0" placeholder="0.00">
+            </div>
+            <div class="form-field" style="flex:1;">
+                <label>Valuta</label>
+                <select id="input-valuta">
+                    <option value="EUR">EUR (€)</option>
+                    <option value="USD">USD ($)</option>
+                </select>
+            </div>
+            <button class="btn-add" onclick="aggiungiTitolo()">Aggiungi</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Titolo</th>
+                        <th>Q.tà</th>
+                        <th>PMC</th>
+                        <th>Prezzo Live</th>
+                        <th>Variazione</th>
+                        <th>Valore Posizione</th>
+                        <th>P&L Posizione</th>
+                        <th>P&L Realizzato</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="corpo-tabella">
+                    <tr><td colspan="9" style="text-align:center; padding:30px; color:#bbb;">Nessun titolo nel portafoglio</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
+<!-- MODAL: MODIFICA -->
 <div id="modal-edit" class="overlay">
     <div class="modal-box" style="border-top: 5px solid #95a5a6;">
-        <h3 style="margin-top:0;">🔧 Modifica / Rettifica</h3>
+        <h3>🔧 Rettifica Manuale</h3>
         <input type="hidden" id="edit-id">
-        <label>Ticker Yahoo Finance</label>
-        <input type="text" id="edit-ticker" style="margin-bottom:10px;">
-        <label>Rettifica Quantità (Senza generare P&L)</label>
-        <input type="number" id="edit-qta" step="any" style="margin-bottom:10px;">
-        <label>Rettifica PMC</label>
-        <input type="number" id="edit-pmc" step="any" style="margin-bottom:10px;">
-        <label>P&L Realizzato accumulato (opzionale)</label>
-        <input type="number" id="edit-pnl-realizzato" step="any" style="margin-bottom:10px;">
-        
-        <button onclick="salvaModificaTitolo()" style="background:var(--success); color:white; padding:12px; border:none; width:100%; border-radius:8px; font-weight:bold; margin-top:10px;">Salva Modifiche</button>
+        <span class="modal-label">Ticker Yahoo Finance</span>
+        <input type="text" id="edit-ticker">
+        <span class="modal-label">Rettifica Quantità (senza generare P&L)</span>
+        <input type="number" id="edit-qta" step="any">
+        <span class="modal-label">Rettifica PMC</span>
+        <input type="number" id="edit-pmc" step="any">
+        <span class="modal-label">Valuta</span>
+        <select id="edit-valuta">
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+        </select>
+        <span class="modal-label">P&L Realizzato accumulato</span>
+        <input type="number" id="edit-pnl-realizzato" step="any">
+        <button class="btn-confirm" style="background:var(--success);" onclick="salvaModificaTitolo()">Salva Modifiche</button>
         <button class="btn-close" onclick="chiudiModale('modal-edit')">Annulla</button>
     </div>
 </div>
 
+<!-- MODAL: SIMULAZIONE -->
 <div id="modal-simulazione" class="overlay">
     <div class="modal-box" style="border-top: 5px solid var(--warning);">
-        <h3 id="sim-titolo" style="margin-top:0;">Simulazione <span></span></h3>
-        <label>Prezzo Acquisto</label>
-        <input type="number" id="sim-prezzo" step="any" style="margin-bottom:10px;" oninput="calcolaSimulazione()">
-        <label>Budget Disponibile</label>
-        <input type="number" id="sim-budget" step="any" oninput="calcolaSimulazione()">
-        <div id="sim-risultato" style="background:#f9f9f9; padding:15px; margin-top:15px; border-radius:8px; border:1px solid #eee; font-size:0.9em;"></div>
+        <h3>📊 Simulazione — <span id="sim-nome"></span></h3>
+        <span class="modal-label">Prezzo di Acquisto Simulato</span>
+        <input type="number" id="sim-prezzo" step="any" oninput="calcolaSimulazione()" placeholder="0.00">
+        <span class="modal-label">Budget Disponibile</span>
+        <input type="number" id="sim-budget" step="any" oninput="calcolaSimulazione()" placeholder="0.00">
+        <div id="sim-risultato" class="sim-result-box" style="display:none;"></div>
         <button class="btn-close" onclick="chiudiModale('modal-simulazione')">Chiudi</button>
     </div>
 </div>
 
+<!-- MODAL: TRANSAZIONE -->
 <div id="modal-transazione" class="overlay">
     <div class="modal-box" id="trans-box">
         <h3 id="trans-titolo" style="margin-top:0;">Transazione</h3>
-        <input type="hidden" id="trans-id"><input type="hidden" id="trans-tipo">
-        <label>Quantità Azioni</label>
-        <input type="number" id="trans-qta" step="any" style="margin-bottom:10px;">
-        <label>Prezzo Eseguito</label>
-        <input type="number" id="trans-prezzo" step="any" style="margin-bottom:15px;">
-        <button id="btn-esegui-trans" onclick="eseguiTransazione()" style="width:100%; padding:12px; color:white; border:none; border-radius:8px; font-weight:bold;">Conferma Operazione</button>
-        <button class="btn-close" style="background:transparent; color:#999; border:1px solid #ccc;" onclick="chiudiModale('modal-transazione')">Annulla</button>
+        <input type="hidden" id="trans-id">
+        <input type="hidden" id="trans-tipo">
+        <span class="modal-label">Quantità Azioni</span>
+        <input type="number" id="trans-qta" step="any" placeholder="0">
+        <span class="modal-label">Prezzo Eseguito</span>
+        <input type="number" id="trans-prezzo" step="any" placeholder="0.00">
+        <div id="trans-anteprima" style="background:#f9f9f9; padding:12px; border-radius:8px; margin-top:12px; font-size:0.85em; color:#555; min-height:40px;"></div>
+        <button id="btn-esegui-trans" class="btn-confirm" onclick="eseguiTransazione()">Conferma Operazione</button>
+        <button class="btn-close" onclick="chiudiModale('modal-transazione')">Annulla</button>
     </div>
 </div>
 
 <script>
-    let CONFIG = { dbUrl: '', password: '' };
-    let portafoglio = {};
-    let prezziLive = {};
-    let cambioEURUSD = 1.08;
-    let visualizzaIn = 'EUR';
-    let simId = null;
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let CONFIG = { dbUrl: '', passwordHash: '' };
+let portafoglio = {};
+let prezziLive = {};
+let prevClose = {};
+let cambioEURUSD = 1.08;
+let visualizzaIn = 'EUR';
+let simId = null;
+let autoRefreshTimer = null;
+const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minuti
 
-    window.onload = async function() {
-        const savedConfig = localStorage.getItem('portfolio_config');
-        if (!savedConfig) document.getElementById('setup-overlay').style.display = 'flex';
-        else { CONFIG = JSON.parse(savedConfig); document.getElementById('login-overlay').style.display = 'flex'; }
-    };
+// ─── UTILITY ─────────────────────────────────────────────────────────────────
+async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
-    function salvaConfigurazione() {
-        let url = document.getElementById('setup-db-url').value.trim();
-        const pass = document.getElementById('setup-password').value.trim();
-        if(!url || !pass) return alert("Inserisci dati validi");
-        if(!url.endsWith('/')) url += '/';
-        localStorage.setItem('portfolio_config', JSON.stringify({ dbUrl: url, password: pass }));
+function toast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show' + (type ? ' toast-' + type : '');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.className = '', 3000);
+}
+
+function fmt(n, dec = 2) { return isNaN(n) ? '—' : n.toFixed(dec); }
+function converti(v, da, a) { return (da === a) ? v : (da === 'EUR' ? v * cambioEURUSD : v / cambioEURUSD); }
+function chiudiModale(m) { document.getElementById(m).classList.remove('visible'); }
+function apriModale(m) { document.getElementById(m).classList.add('visible'); }
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+window.onload = async function () {
+    const saved = localStorage.getItem('portfolio_config_v2');
+    if (!saved) {
+        document.getElementById('setup-overlay').classList.add('visible');
+    } else {
+        CONFIG = JSON.parse(saved);
+        document.getElementById('login-overlay').classList.add('visible');
+    }
+};
+
+async function salvaConfigurazione() {
+    let url = document.getElementById('setup-db-url').value.trim();
+    const pass = document.getElementById('setup-password').value;
+    const pass2 = document.getElementById('setup-password2').value;
+    const errEl = document.getElementById('setup-error');
+
+    if (!url || !pass) { errEl.textContent = 'Inserisci URL e password.'; return; }
+    if (pass !== pass2) { errEl.textContent = 'Le password non coincidono.'; return; }
+    if (pass.length < 4) { errEl.textContent = 'Password troppo corta (min. 4 caratteri).'; return; }
+    if (!url.endsWith('/')) url += '/';
+
+    const hash = await sha256(pass);
+    localStorage.setItem('portfolio_config_v2', JSON.stringify({ dbUrl: url, passwordHash: hash }));
+    toast('Configurazione salvata!', 'ok');
+    location.reload();
+}
+
+async function verificaLogin() {
+    const pass = document.getElementById('login-password').value;
+    const hash = await sha256(pass);
+    if (hash === CONFIG.passwordHash) {
+        document.getElementById('login-overlay').classList.remove('visible');
+        document.getElementById('app-content').style.display = 'block';
+        avviaApp();
+    } else {
+        document.getElementById('login-error').textContent = 'Password errata.';
+        document.getElementById('login-password').value = '';
+    }
+}
+
+function resetConfig() {
+    if (confirm('Questa azione rimuoverà la configurazione locale. Continui?')) {
+        localStorage.removeItem('portfolio_config_v2');
         location.reload();
     }
+}
 
-    function verificaLogin() {
-        if (document.getElementById('login-password').value === CONFIG.password) {
-            document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('app-content').style.display = 'block';
-            avviaApp();
-        } else alert("Password errata!");
-    }
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function avviaApp() {
+    await Promise.all([aggiornaCambio(), caricaDati()]);
+    await aggiornaPrezziLive();
+    renderTabella();
+    avviaAutoRefresh();
+}
 
-    async function avviaApp() {
+function avviaAutoRefresh() {
+    clearInterval(autoRefreshTimer);
+    autoRefreshTimer = setInterval(async () => {
         await aggiornaCambio();
-        await caricaDati();
         await aggiornaPrezziLive();
         renderTabella();
-    }
+        aggiornaTimestamp();
+    }, AUTO_REFRESH_MS);
+}
 
-    async function aggiornaCambio() {
-        try {
-            const res = await fetch('https://open.er-api.com/v6/latest/EUR');
-            const data = await res.json();
+function aggiornaTimestamp() {
+    const now = new Date();
+    document.getElementById('last-update').textContent =
+        `Aggiornato: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+async function aggiornaCambio() {
+    try {
+        const res = await fetch('https://open.er-api.com/v6/latest/EUR');
+        const data = await res.json();
+        if (data.result === 'success') {
             cambioEURUSD = data.rates.USD;
-            document.getElementById('exchange-info').innerText = `Cambio Real-Time: 1 EUR = ${cambioEURUSD.toFixed(4)} USD`;
-        } catch (e) { console.error("Errore Cambio API"); }
+            document.getElementById('exchange-info').textContent =
+                `Cambio Real-Time: 1 EUR = ${cambioEURUSD.toFixed(4)} USD`;
+        }
+    } catch (e) {
+        document.getElementById('exchange-info').textContent = `Cambio (cached): 1 EUR = ${cambioEURUSD.toFixed(4)} USD`;
     }
+}
 
-    async function caricaDati() {
+async function fetchPrezzoTicker(ticker) {
+    const urls = [
+        `https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=5d')}`,
+        `https://corsproxy.io/?${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=5d')}`
+    ];
+    for (const url of urls) {
         try {
-            const res = await fetch(CONFIG.dbUrl + "portafoglio.json");
-            portafoglio = await res.json() || {};
-        } catch(e) { console.error("Errore caricamento DB"); }
+            const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+            const raw = await res.json();
+            const data = url.includes('allorigins') ? JSON.parse(raw.contents) : raw;
+            const meta = data.chart.result[0].meta;
+            const closes = data.chart.result[0].indicators?.quote?.[0]?.close;
+            const prev = closes ? closes.filter(Boolean).slice(-2)[0] : null;
+            return { price: meta.regularMarketPrice, prevClose: prev || meta.chartPreviousClose };
+        } catch (e) { /* prova proxy successivo */ }
     }
+    return null;
+}
 
-    async function salvaDati() {
-        await fetch(CONFIG.dbUrl + "portafoglio.json", { method: 'PUT', body: JSON.stringify(portafoglio) });
-        renderTabella();
-    }
+async function aggiornaPrezziLive() {
+    const ids = Object.keys(portafoglio);
+    if (!ids.length) return;
 
-    async function aggiornaPrezziLive() {
-        for (let id in portafoglio) {
-            const ticker = portafoglio[id].nome;
-            try {
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker)}`;
-                const res = await fetch(proxyUrl);
-                const data = await res.json();
-                const yahooData = JSON.parse(data.contents);
-                prezziLive[id] = yahooData.chart.result[0].meta.regularMarketPrice;
-            } catch(e) { prezziLive[id] = portafoglio[id].pmc; }
+    const btn = document.getElementById('btn-refresh');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Aggiornamento...';
+
+    const results = await Promise.allSettled(
+        ids.map(id => fetchPrezzoTicker(portafoglio[id].nome))
+    );
+
+    results.forEach((result, i) => {
+        const id = ids[i];
+        if (result.status === 'fulfilled' && result.value) {
+            prezziLive[id] = result.value.price;
+            prevClose[id] = result.value.prevClose;
+        } else {
+            if (!prezziLive[id]) prezziLive[id] = portafoglio[id].pmc;
         }
+    });
+
+    btn.disabled = false;
+    btn.innerHTML = '🔄 Aggiorna Prezzi';
+    aggiornaTimestamp();
+}
+
+// ─── FIREBASE DB ──────────────────────────────────────────────────────────────
+async function caricaDati() {
+    try {
+        const res = await fetch(CONFIG.dbUrl + 'portafoglio.json');
+        const data = await res.json();
+        portafoglio = data || {};
+    } catch (e) { toast('Errore caricamento dati', 'err'); }
+}
+
+async function salvaDati() {
+    try {
+        await fetch(CONFIG.dbUrl + 'portafoglio.json', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(portafoglio)
+        });
+    } catch (e) { toast('Errore salvataggio dati', 'err'); }
+    renderTabella();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function toggleValuta(v) {
+    visualizzaIn = v;
+    document.getElementById('btn-eur').classList.toggle('active', v === 'EUR');
+    document.getElementById('btn-usd').classList.toggle('active', v === 'USD');
+    renderTabella();
+}
+
+async function refreshPrezzi() {
+    await aggiornaCambio();
+    await aggiornaPrezziLive();
+    renderTabella();
+    toast('Prezzi aggiornati', 'ok');
+}
+
+function renderTabella() {
+    const tbody = document.getElementById('corpo-tabella');
+    const s = visualizzaIn === 'EUR' ? '€' : '$';
+    let totInv = 0, totAtt = 0, totReal = 0;
+
+    if (!Object.keys(portafoglio).length) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#bbb;">Nessun titolo nel portafoglio</td></tr>`;
+        aggiornaKPI(0, 0, 0, s);
+        return;
     }
 
-    function converti(v, da, a) { return (da === a) ? v : (da === 'EUR' ? v * cambioEURUSD : v / cambioEURUSD); }
-    function toggleValuta(v) { visualizzaIn = v; renderTabella(); }
-    function chiudiModale(m) { document.getElementById(m).style.display = 'none'; }
+    tbody.innerHTML = '';
 
-    function renderTabella() {
-        const tbody = document.getElementById('corpo-tabella');
-        tbody.innerHTML = '';
-        let totInv = 0, totAtt = 0, totReal = 0;
-        const s = visualizzaIn === 'EUR' ? '€' : '$';
-
-        for (let id in portafoglio) {
-            const t = portafoglio[id];
-            const v = t.valuta || 'EUR';
-            const prLive = prezziLive[id] || t.pmc;
-            const inv = t.qta * t.pmc;
-            const att = t.qta * prLive;
-            const pnl = att - inv;
-            const pnlP = inv > 0 ? (pnl / inv) * 100 : 0;
-
-            totInv += converti(inv, v, visualizzaIn);
-            totAtt += converti(att, v, visualizzaIn);
-            totReal += converti(t.realizedPnL || 0, v, visualizzaIn);
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><b>${t.nome}</b> <span style="font-size:0.7em; opacity:0.6;">${v}</span></td>
-                <td>${parseFloat(t.qta).toFixed(2)}</td>
-                <td>${parseFloat(t.pmc).toFixed(2)}</td>
-                <td><b>${prLive.toFixed(2)}</b></td>
-                <td>${s} ${converti(att, v, visualizzaIn).toFixed(2)}</td>
-                <td class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${converti(pnl, v, visualizzaIn).toFixed(2)} (${pnlP.toFixed(2)}%)</td>
-                <td>
-                    <button class="btn-action btn-edit" onclick="apriModifica('${id}')" title="Rettifica">⚙️</button>
-                    <button class="btn-action btn-sim" onclick="apriSimulazione('${id}')">Sim</button>
-                    <button class="btn-action btn-buy" onclick="apriTransazione('${id}', 'compra')">+</button>
-                    <button class="btn-action btn-sell" onclick="apriTransazione('${id}', 'vendi')">-</button>
-                    <button class="btn-action btn-del" onclick="eliminaTitolo('${id}')">🗑️</button>
-                </td>`;
-            tbody.appendChild(tr);
-        }
-        document.getElementById('dash-investito').innerText = `${s} ${totInv.toFixed(2)}`;
-        document.getElementById('dash-attuale').innerText = `${s} ${totAtt.toFixed(2)}`;
-        const tpnl = totAtt - totInv;
-        document.getElementById('dash-performance').innerText = `${s} ${tpnl.toFixed(2)}`;
-        document.getElementById('dash-performance').className = 'value ' + (tpnl >= 0 ? 'pos-gain' : 'neg-loss');
-        document.getElementById('dash-realizzato').innerText = `${s} ${totReal.toFixed(2)}`;
-    }
-
-    // --- FUNZIONI MODIFICA/RETTIFICA ---
-    function apriModifica(id) {
+    for (let id in portafoglio) {
         const t = portafoglio[id];
-        document.getElementById('edit-id').value = id;
-        document.getElementById('edit-ticker').value = t.nome;
-        document.getElementById('edit-qta').value = t.qta;
-        document.getElementById('edit-pmc').value = t.pmc;
-        document.getElementById('edit-pnl-realizzato').value = t.realizedPnL || 0;
-        document.getElementById('modal-edit').style.display = 'flex';
+        const v = t.valuta || 'EUR';
+        const prLive = prezziLive[id] ?? t.pmc;
+        const prPrev = prevClose[id];
+        const inv = t.qta * t.pmc;
+        const att = t.qta * prLive;
+        const pnl = att - inv;
+        const pnlPct = inv > 0 ? (pnl / inv) * 100 : 0;
+        const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
+
+        totInv += converti(inv, v, visualizzaIn);
+        totAtt += converti(att, v, visualizzaIn);
+        totReal += converti(t.realizedPnL || 0, v, visualizzaIn);
+
+        const varHtml = varDay !== null
+            ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'}">${varDay >= 0 ? '+' : ''}${fmt(varDay)}%</span>`
+            : '<span style="color:#ccc;">—</span>';
+
+        const pnlConv = converti(pnl, v, visualizzaIn);
+        const realConv = converti(t.realizedPnL || 0, v, visualizzaIn);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><span class="ticker-name">${t.nome}</span><span class="currency-badge">${v}</span></td>
+            <td>${fmt(t.qta, 4)}</td>
+            <td>${fmt(t.pmc)}</td>
+            <td><b>${fmt(prLive)}</b></td>
+            <td>${varHtml}</td>
+            <td>${s} ${fmt(converti(att, v, visualizzaIn))}</td>
+            <td class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${fmt(pnlConv)} <small>(${pnlPct >= 0 ? '+' : ''}${fmt(pnlPct)}%)</small></td>
+            <td class="${(t.realizedPnL || 0) >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${fmt(realConv)}</td>
+            <td>
+                <div class="actions-cell">
+                    <button class="btn-action btn-edit" onclick="apriModifica('${id}')" title="Rettifica manuale">⚙️</button>
+                    <button class="btn-action btn-sim" onclick="apriSimulazione('${id}')" title="Simulazione acquisto">Sim</button>
+                    <button class="btn-action btn-buy" onclick="apriTransazione('${id}','compra')" title="Acquisto">+</button>
+                    <button class="btn-action btn-sell" onclick="apriTransazione('${id}','vendi')" title="Vendita">−</button>
+                    <button class="btn-action btn-del" onclick="eliminaTitolo('${id}')" title="Elimina">🗑️</button>
+                </div>
+            </td>`;
+        tbody.appendChild(tr);
+    }
+    aggiornaKPI(totInv, totAtt, totReal, s);
+}
+
+function aggiornaKPI(totInv, totAtt, totReal, s) {
+    const tpnl = totAtt - totInv;
+    const tpnlPct = totInv > 0 ? (tpnl / totInv) * 100 : 0;
+    document.getElementById('dash-investito').textContent = `${s} ${fmt(totInv)}`;
+    document.getElementById('dash-attuale').textContent = `${s} ${fmt(totAtt)}`;
+    document.getElementById('dash-performance').textContent = `${s} ${fmt(tpnl)}`;
+    document.getElementById('dash-performance').className = 'value ' + (tpnl >= 0 ? 'pos-gain' : 'neg-loss');
+    document.getElementById('dash-perf-pct').textContent = `${tpnlPct >= 0 ? '+' : ''}${fmt(tpnlPct)}%`;
+    document.getElementById('dash-realizzato').textContent = `${s} ${fmt(totReal)}`;
+    const totale = tpnl + totReal;
+    document.getElementById('dash-totale').textContent = `${s} ${fmt(totale)}`;
+    document.getElementById('dash-totale').className = 'value ' + (totale >= 0 ? 'pos-gain' : 'neg-loss');
+}
+
+// ─── AGGIUNGI / ELIMINA ───────────────────────────────────────────────────────
+async function aggiungiTitolo() {
+    const nome = document.getElementById('input-titolo').value.toUpperCase().trim();
+    const qta = parseFloat(document.getElementById('input-qta').value);
+    const pmc = parseFloat(document.getElementById('input-pmc').value) || 0;
+    if (!nome || isNaN(qta) || qta <= 0) { toast('Inserisci ticker e quantità validi', 'err'); return; }
+
+    const id = 'T' + Date.now();
+    portafoglio[id] = { nome, qta, pmc, valuta: document.getElementById('input-valuta').value, realizedPnL: 0 };
+
+    document.getElementById('input-titolo').value = '';
+    document.getElementById('input-qta').value = '';
+    document.getElementById('input-pmc').value = '';
+
+    await salvaDati();
+    // Fetch prezzo solo per il nuovo titolo
+    const result = await fetchPrezzoTicker(nome);
+    if (result) { prezziLive[id] = result.price; prevClose[id] = result.prevClose; }
+    renderTabella();
+    toast(`${nome} aggiunto al portafoglio`, 'ok');
+}
+
+async function eliminaTitolo(id) {
+    if (!confirm(`Eliminare ${portafoglio[id]?.nome}?`)) return;
+    const nome = portafoglio[id].nome;
+    delete portafoglio[id];
+    delete prezziLive[id];
+    delete prevClose[id];
+    await salvaDati();
+    toast(`${nome} rimosso`, 'ok');
+}
+
+// ─── MODIFICA ─────────────────────────────────────────────────────────────────
+function apriModifica(id) {
+    const t = portafoglio[id];
+    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-ticker').value = t.nome;
+    document.getElementById('edit-qta').value = t.qta;
+    document.getElementById('edit-pmc').value = t.pmc;
+    document.getElementById('edit-valuta').value = t.valuta || 'EUR';
+    document.getElementById('edit-pnl-realizzato').value = t.realizedPnL || 0;
+    apriModale('modal-edit');
+}
+
+async function salvaModificaTitolo() {
+    const id = document.getElementById('edit-id').value;
+    const nuovoTicker = document.getElementById('edit-ticker').value.toUpperCase().trim();
+    const vecchioTicker = portafoglio[id].nome;
+
+    portafoglio[id] = {
+        ...portafoglio[id],
+        nome: nuovoTicker,
+        qta: parseFloat(document.getElementById('edit-qta').value),
+        pmc: parseFloat(document.getElementById('edit-pmc').value),
+        valuta: document.getElementById('edit-valuta').value,
+        realizedPnL: parseFloat(document.getElementById('edit-pnl-realizzato').value) || 0
+    };
+
+    chiudiModale('modal-edit');
+    await salvaDati();
+
+    if (nuovoTicker !== vecchioTicker) {
+        const result = await fetchPrezzoTicker(nuovoTicker);
+        if (result) { prezziLive[id] = result.price; prevClose[id] = result.prevClose; }
+    }
+    renderTabella();
+    toast('Modifiche salvate', 'ok');
+}
+
+// ─── TRANSAZIONI ──────────────────────────────────────────────────────────────
+function apriTransazione(id, tipo) {
+    simId = id;
+    const t = portafoglio[id];
+    document.getElementById('trans-id').value = id;
+    document.getElementById('trans-tipo').value = tipo;
+    document.getElementById('trans-qta').value = '';
+    document.getElementById('trans-prezzo').value = fmt(prezziLive[id] ?? t.pmc);
+    document.getElementById('trans-titolo').textContent = tipo === 'compra' ? `🟢 Acquisto ${t.nome}` : `🔴 Vendita ${t.nome}`;
+    document.getElementById('btn-esegui-trans').style.background = tipo === 'compra' ? 'var(--accent)' : 'var(--purple)';
+    document.getElementById('trans-anteprima').innerHTML = '';
+    // Aggiorna anteprima al cambio input
+    ['trans-qta', 'trans-prezzo'].forEach(el =>
+        document.getElementById(el).oninput = aggiornaAnteprimaTransazione
+    );
+    apriModale('modal-transazione');
+}
+
+function aggiornaAnteprimaTransazione() {
+    const id = document.getElementById('trans-id').value;
+    const tipo = document.getElementById('trans-tipo').value;
+    const q = parseFloat(document.getElementById('trans-qta').value);
+    const p = parseFloat(document.getElementById('trans-prezzo').value);
+    const t = portafoglio[id];
+    const box = document.getElementById('trans-anteprima');
+    if (isNaN(q) || isNaN(p) || q <= 0) { box.innerHTML = ''; return; }
+
+    if (tipo === 'compra') {
+        const nuovoPmc = ((t.qta * t.pmc) + (q * p)) / (t.qta + q);
+        box.innerHTML = `Nuovo PMC: <b style="color:var(--accent)">${fmt(nuovoPmc)}</b> &nbsp;|&nbsp; Nuova Q.tà: <b>${fmt(t.qta + q, 4)}</b> &nbsp;|&nbsp; Costo: <b>${fmt(q * p)}</b>`;
+    } else {
+        const pnlVendita = (p - t.pmc) * q;
+        const cls = pnlVendita >= 0 ? 'pos-gain' : 'neg-loss';
+        box.innerHTML = `P&L questa vendita: <b class="${cls}">${fmt(pnlVendita)}</b> &nbsp;|&nbsp; Q.tà rimanente: <b>${fmt(t.qta - q, 4)}</b>`;
+    }
+}
+
+async function eseguiTransazione() {
+    const id = document.getElementById('trans-id').value;
+    const tipo = document.getElementById('trans-tipo').value;
+    const q = parseFloat(document.getElementById('trans-qta').value);
+    const p = parseFloat(document.getElementById('trans-prezzo').value);
+    if (isNaN(q) || q <= 0 || isNaN(p) || p <= 0) { toast('Dati non validi', 'err'); return; }
+
+    const t = portafoglio[id];
+    if (tipo === 'compra') {
+        t.pmc = ((t.qta * t.pmc) + (q * p)) / (t.qta + q);
+        t.qta += q;
+    } else {
+        if (q > t.qta) { toast('Quantità insufficiente', 'err'); return; }
+        t.realizedPnL = (t.realizedPnL || 0) + ((p - t.pmc) * q);
+        t.qta -= q;
+        if (t.qta < 0.0001) t.qta = 0; // zero praticamente
     }
 
-    async function salvaModificaTitolo() {
-        const id = document.getElementById('edit-id').value;
-        portafoglio[id].nome = document.getElementById('edit-ticker').value.toUpperCase().trim();
-        portafoglio[id].qta = parseFloat(document.getElementById('edit-qta').value);
-        portafoglio[id].pmc = parseFloat(document.getElementById('edit-pmc').value);
-        portafoglio[id].realizedPnL = parseFloat(document.getElementById('edit-pnl-realizzato').value);
-        
-        chiudiModale('modal-edit');
-        await salvaDati();
-        await aggiornaPrezziLive();
-        renderTabella();
-    }
+    chiudiModale('modal-transazione');
+    await salvaDati();
+    toast(`${tipo === 'compra' ? 'Acquisto' : 'Vendita'} di ${t.nome} registrata`, 'ok');
+}
 
-    // --- ALTRE FUNZIONI ---
-    async function aggiungiTitolo() {
-        const n = document.getElementById('input-titolo').value.toUpperCase().trim();
-        const q = parseFloat(document.getElementById('input-qta').value);
-        const p = parseFloat(document.getElementById('input-pmc').value);
-        if(!n || isNaN(q)) return;
-        const id = "ID" + Date.now();
-        portafoglio[id] = { nome: n, qta: q, pmc: p, valuta: document.getElementById('input-valuta').value, realizedPnL: 0 };
-        await salvaDati(); await aggiornaPrezziLive(); renderTabella();
-    }
+// ─── SIMULAZIONE ──────────────────────────────────────────────────────────────
+function apriSimulazione(id) {
+    simId = id;
+    const t = portafoglio[id];
+    document.getElementById('sim-nome').textContent = t.nome;
+    document.getElementById('sim-prezzo').value = fmt(prezziLive[id] ?? t.pmc);
+    document.getElementById('sim-budget').value = '';
+    document.getElementById('sim-risultato').style.display = 'none';
+    apriModale('modal-simulazione');
+}
 
-    function apriTransazione(id, tipo) {
-        simId = id; const t = portafoglio[id];
-        document.getElementById('trans-id').value = id;
-        document.getElementById('trans-tipo').value = tipo;
-        document.getElementById('trans-qta').value = '';
-        document.getElementById('trans-prezzo').value = prezziLive[id] || t.pmc;
-        document.getElementById('trans-titolo').innerText = tipo === 'compra' ? `Compra ${t.nome}` : `Vendi ${t.nome}`;
-        document.getElementById('btn-esegui-trans').style.background = tipo === 'compra' ? 'var(--accent)' : 'var(--purple)';
-        document.getElementById('modal-transazione').style.display = 'flex';
-    }
+function calcolaSimulazione() {
+    const p = parseFloat(document.getElementById('sim-prezzo').value);
+    const b = parseFloat(document.getElementById('sim-budget').value);
+    const box = document.getElementById('sim-risultato');
+    if (isNaN(p) || isNaN(b) || p <= 0 || b <= 0) { box.style.display = 'none'; return; }
 
-    async function eseguiTransazione() {
-        const id = document.getElementById('trans-id').value, tipo = document.getElementById('trans-tipo').value;
-        const q = parseFloat(document.getElementById('trans-qta').value), p = parseFloat(document.getElementById('trans-prezzo').value);
-        if(isNaN(q) || isNaN(p)) return;
-        const t = portafoglio[id];
-        if(tipo === 'compra') { t.pmc = ((t.qta * t.pmc) + (q * p)) / (t.qta + q); t.qta += q; }
-        else { if(q > t.qta) return alert("Azioni insufficienti"); t.realizedPnL = (t.realizedPnL || 0) + ((p - t.pmc) * q); t.qta -= q; }
-        await salvaDati(); chiudiModale('modal-transazione');
-    }
+    const t = portafoglio[simId];
+    const aq = b / p;
+    const nPmc = ((t.qta * t.pmc) + (q => q * p)(aq)) / (t.qta + aq);
+    const pnlDopoAcquisto = (prezziLive[simId] ?? t.pmc - nPmc) * (t.qta + aq);
+    const v = t.valuta || 'EUR';
+    const convLine = v === 'USD' && visualizzaIn === 'EUR'
+        ? `<br>Costo in EUR: <b>€ ${fmt(b / cambioEURUSD)}</b>` : '';
 
-    function apriSimulazione(id) {
-        simId = id; const t = portafoglio[id];
-        document.querySelector('#sim-titolo span').innerText = t.nome;
-        document.getElementById('sim-prezzo').value = prezziLive[id] || t.pmc;
-        document.getElementById('sim-budget').value = '';
-        document.getElementById('sim-risultato').innerText = 'Inserisci i dati...';
-        document.getElementById('modal-simulazione').style.display = 'flex';
-    }
-
-    function calcolaSimulazione() {
-        const p = parseFloat(document.getElementById('sim-prezzo').value), b = parseFloat(document.getElementById('sim-budget').value);
-        if(isNaN(p) || isNaN(b) || p <= 0) return;
-        const t = portafoglio[simId], aq = b / p, nPmc = ((t.qta * t.pmc) + b) / (t.qta + aq);
-        let conv = t.valuta === 'USD' ? `<br>Costo stimato: <b>€ ${(b/cambioEURUSD).toFixed(2)} EUR</b>` : '';
-        document.getElementById('sim-risultato').innerHTML = `Azioni acquistabili: <b>${aq.toFixed(4)}</b>${conv}<br>Nuovo PMC: <b style="color:var(--accent)">${nPmc.toFixed(2)}</b>`;
-    }
-
-    async function eliminaTitolo(id) { if(confirm("Eliminare?")) { delete portafoglio[id]; await salvaDati(); } }
+    box.style.display = 'block';
+    box.innerHTML = `
+        Azioni acquistabili: <b>${fmt(aq, 4)}</b><br>
+        Costo operazione: <b>${fmt(b)}</b>${convLine}<br>
+        Nuovo PMC: <b style="color:var(--accent)">${fmt(nPmc)}</b>
+        (attuale: ${fmt(t.pmc)})<br>
+        Nuova Q.tà totale: <b>${fmt(t.qta + aq, 4)}</b>
+    `;
+}
 </script>
 </body>
 </html>
