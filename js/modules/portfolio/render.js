@@ -162,12 +162,12 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
 
 export function renderKPI({ portfolio, prices, currency }) {
     const s = currency === 'EUR' ? '€' : '$';
-    let totInv = 0, totAtt = 0, totReal = 0, totTax = 0;
+    let totInv = 0, totAtt = 0, totReal = 0, totTax = 0, totComm = 0;
 
     for (const id in portfolio) {
         const p = portfolio[id];
         const v = p.valuta || 'EUR';
-        const { qta, pmc, realizedPnL } = Calc.position(p);
+        const { qta, pmc, realizedPnL, totalComm } = Calc.position(p);
         const prLive = prices[id] ?? pmc;
         const inv = qta * pmc, att = qta * prLive;
         const tax = Calc.taxOnGain(att - inv, p.tipoAsset);
@@ -176,6 +176,7 @@ export function renderKPI({ portfolio, prices, currency }) {
         totAtt  += cv(att);
         totReal += cv(realizedPnL);
         totTax  += cv(tax);
+        totComm += cv(totalComm);
     }
 
     const pnl    = totAtt - totInv;
@@ -213,5 +214,10 @@ export function renderKPI({ portfolio, prices, currency }) {
             <h3>P&L Totale Netto</h3>
             <div class="value ${netto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(netto)}</div>
             <div class="sub">realizzato + non realizzato</div>
+        </div>
+        <div class="stat-card c-warning">
+            <h3>Commissioni Pagate</h3>
+            <div class="value">${s} ${Calc.fmt(totComm)}</div>
+            <div class="sub">totale su tutte le posizioni</div>
         </div>`;
 }
