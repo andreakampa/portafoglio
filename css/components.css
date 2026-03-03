@@ -384,6 +384,16 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
     flex-shrink: 0;
 }
 
+.ticker-logo {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    object-fit: contain;
+    background: #fff;
+    padding: 2px;
+    flex-shrink: 0;
+}
+
+
 
 
 
