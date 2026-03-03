@@ -7,6 +7,7 @@
     --border:       #2e3650;
     --border-light: #3a4468;
     --accent:       #4a9eff;
+    --cyan:         #00d2d3;
     --accent-dim:   rgba(74,158,255,0.12);
     --success:      #2ecc71;
     --success-dim:  rgba(46,204,113,0.12);
@@ -78,6 +79,7 @@ select option { background: var(--secondary); }
 .text-warning { color: var(--warning); }
 .text-accent  { color: var(--accent); }
 .text-purple  { color: var(--purple); }
+.text-cyan    { color: var(--cyan); }
 .fw-bold      { font-weight: 700; }
 .fw-600       { font-weight: 600; }
 .fs-sm        { font-size: 0.82em; }
@@ -107,4 +109,5 @@ select option { background: var(--secondary); }
     border-radius: var(--radius-sm);
 }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
 
