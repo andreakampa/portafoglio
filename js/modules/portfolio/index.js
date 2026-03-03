@@ -156,26 +156,39 @@ export class PortfolioPage {
                     suggestBox.innerHTML = '<div class="suggest-empty">Nessun risultato</div>';
                     return;
                 }
-                suggestBox.innerHTML = results.map(r => `
-                    <div class="suggest-item" data-ticker="${r.ticker}" data-currency="${r.currency}" data-name="${r.name}">
+                    suggestBox.innerHTML = results.map(r => `
+                    <div class="suggest-item" 
+                         data-ticker="${r.ticker}" 
+                         data-currency="${r.currency}" 
+                         data-name="${r.name}"
+                         data-tipo="${r.tipoAsset}"
+                         data-tipolabel="${r.tipoLabel}">
                         <span class="suggest-ticker">${r.ticker}</span>
                         <span class="suggest-name">${r.name}</span>
-                        <span class="suggest-meta">${r.exchange} · ${r.currency}</span>
+                        <span class="suggest-meta">${r.exchange} · ${r.currency} · ${r.tipoLabel}</span>
                     </div>`).join('');
 
-                suggestBox.querySelectorAll('.suggest-item').forEach(el => {
+
+                                suggestBox.querySelectorAll('.suggest-item').forEach(el => {
                     el.addEventListener('click', () => {
-                        const ticker   = el.dataset.ticker;
-                        const currency = el.dataset.currency;
-                        const name     = el.dataset.name;
+                        const ticker    = el.dataset.ticker;
+                        const currency  = el.dataset.currency;
+                        const name      = el.dataset.name;
+                        const tipoAsset = el.dataset.tipo;
+                        const tipoLabel = el.dataset.tipolabel;
                         hiddenTicker.value = ticker;
                         hiddenValuta.value = currency;
                         inputTitolo.value  = ticker;
                         suggestBox.innerHTML = '';
                         suggestBox.classList.remove('visible');
                         btnAdd.disabled = false;
+
+                        // imposta automaticamente il tipo asset nel select
+                        const selectTipo = document.getElementById('input-tipo-asset');
+                        if (selectTipo) selectTipo.value = tipoAsset;
+
                         selectedBox.innerHTML =
-                            `<b>${ticker}</b> — ${name} <span class="badge">${currency}</span>`;
+                            `<b>${ticker}</b> — ${name} <span class="badge">${currency}</span> <span class="badge">${tipoLabel}</span>`;
                         selectedBox.className = 'ticker-selected-box selected';
                     });
                 });
@@ -246,4 +259,5 @@ export class PortfolioPage {
         Toast.show(`${nome} rimosso`, 'ok');
     }
 }
+
 
