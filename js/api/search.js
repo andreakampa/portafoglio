@@ -8,16 +8,15 @@ const CURRENCY_MAP = {
     'CHF': 'EUR', 'JPY': 'USD', 'CAD': 'USD', 'AUD': 'USD',
 };
 
-// Mappa quoteType Yahoo → tipoAsset nostro + aliquota italiana
 const ASSET_TYPE_MAP = {
-    'EQUITY':          { tipo: 'stock', label: 'Azione (26%)' },
-    'ETF':             { tipo: 'stock', label: 'ETF (26%)' },
-    'MUTUALFUND':      { tipo: 'stock', label: 'Fondo (26%)' },
-    'CRYPTOCURRENCY':  { tipo: 'stock', label: 'Crypto (26%)' },
-    'BOND':            { tipo: 'bond',  label: 'Obbligazione (12.5%)' },
-    'FUTURE':          { tipo: 'stock', label: 'Future (26%)' },
-    'INDEX':           { tipo: 'stock', label: 'Indice (26%)' },
-    'OPTION':          { tipo: 'stock', label: 'Opzione (26%)' },
+    'EQUITY':         { tipo: 'stock',  label: 'Azione (26%)' },
+    'ETF':            { tipo: 'stock',  label: 'ETF (26%)' },
+    'MUTUALFUND':     { tipo: 'stock',  label: 'Fondo (26%)' },
+    'CRYPTOCURRENCY': { tipo: 'crypto', label: 'Crypto (33%)' },
+    'BOND':           { tipo: 'bond',   label: 'Obbligazione (12.5%)' },
+    'FUTURE':         { tipo: 'stock',  label: 'Future (26%)' },
+    'INDEX':          { tipo: 'stock',  label: 'Indice (26%)' },
+    'OPTION':         { tipo: 'stock',  label: 'Opzione (26%)' },
 };
 
 export const Search = {
@@ -32,7 +31,7 @@ export const Search = {
                 return quotes
                     .filter(q => q.symbol && q.quoteType !== 'CURRENCY')
                     .map(q => {
-                        const assetInfo = ASSET_TYPE_MAP[q.quoteType?.toUpperCase()] 
+                        const assetInfo = ASSET_TYPE_MAP[q.quoteType?.toUpperCase()]
                             ?? { tipo: 'stock', label: 'Altro (26%)' };
                         return {
                             ticker:    q.symbol,
