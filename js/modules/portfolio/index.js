@@ -4,6 +4,7 @@ import { Toast } from '../../core/toast.js';
 import { Exchange } from '../../api/exchange.js';
 import { Yahoo } from '../../api/yahoo.js';
 import { Search } from '../../api/search.js';
+import { renderPage, renderTable, renderKPI, renderSkeleton, renderMobileCards } from './render.js';
 import { renderPage, renderTable, renderKPI, renderSkeleton } from './render.js';
 import { openTransactionModal, openHistoryModal, openSimModal } from './ui.js';
 
@@ -71,10 +72,11 @@ export class PortfolioPage {
         }
     }
 
-    async _save() {
+        async _save() {
         await DB.save('portafoglio', this.portfolio);
         renderTable(this._state(), this._handlers());
         renderKPI(this._state());
+        renderMobileCards(this._state(), this._handlers());
     }
 
     async _refreshPrices(soloId = null) {
@@ -94,6 +96,8 @@ export class PortfolioPage {
         this._updateTimestamp();
         renderTable(this._state(), this._handlers());
         renderKPI(this._state());
+        renderMobileCards(this._state(), this._handlers());
+
     }
 
     async _backgroundRefresh() {
@@ -259,6 +263,7 @@ export class PortfolioPage {
         Toast.show(`${nome} rimosso`, 'ok');
     }
 }
+
 
 
 
