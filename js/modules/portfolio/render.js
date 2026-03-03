@@ -130,7 +130,9 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><div class="ticker-cell">
+                ${p.logoUrl ? `<img src="${p.logoUrl}" class="ticker-logo" alt="">` : ''}
                 <span class="ticker-name">${p.nome}</span>
+
                 <span class="badge">${v}</span>${assetBadge}
             </div></td>
             <td>${Calc.fmt(qta, 4)}</td>
@@ -287,7 +289,9 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
         card.innerHTML = `
             <div class="mobile-card-header" data-id="${id}">
                 <div class="mobile-card-left">
+                    ${p.logoUrl ? `<img src="${p.logoUrl}" class="ticker-logo" alt="">` : ''}
                     <span class="ticker-name">${p.nome}</span>
+
                     <span class="badge">${v}</span>${assetBadge}
                 </div>
                 <div class="mobile-card-right">
@@ -355,4 +359,5 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
         container.appendChild(card);
     }
 }
+
 
