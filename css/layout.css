@@ -84,6 +84,11 @@
     /* Controls bar impilata */
     .controls-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
     .controls-right { flex-wrap: wrap; }
+
+    /* tabella storico compatta su mobile */
+    .tx-table-compact th,
+    .tx-table-compact td { padding: 6px 5px; font-size: 0.78em; }
+
 }
 
 @media (max-width: 480px) {
@@ -101,6 +106,7 @@
     table { min-width: 600px; }
     .kpi-value { font-size: 1em; }
 }
+
 
 
 
