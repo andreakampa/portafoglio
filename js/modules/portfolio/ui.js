@@ -79,7 +79,7 @@ function _renderHistoryContent(id, portfolio, onSave) {
                 : '—'}</td>
             <td style="display:flex; gap:4px;">
                 <button class="btn btn-dark btn-sm btn-icon btn-edit-tx" data-idx="${i}" title="Modifica">✏️</button>
-                <button class="btn-del-tx" data-idx="${i}" title="Elimina">🗑</button>
+                <button class="btn-del-tx" data-idx="${i}" title="Elimina">✕</button>
             </td>`;
         tbody.appendChild(tr);
     });
@@ -386,3 +386,4 @@ export function openSimModal(id, portfolio, prices) {
         document.getElementById(el)?.addEventListener('input', calcSim);
     });
 }
+
