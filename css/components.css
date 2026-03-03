@@ -375,6 +375,17 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
 }
 .mobile-card-actions .btn { flex: 1; min-width: 80px; font-size: 0.78em; }
 
+.suggest-logo {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    object-fit: contain;
+    background: #fff;
+    padding: 1px;
+    flex-shrink: 0;
+}
+
+
+
 
 
 
