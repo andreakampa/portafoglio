@@ -4,6 +4,9 @@ import { Toast } from '../../core/toast.js';
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
+function lockScroll()   { document.body.classList.add('modal-open'); }
+function unlockScroll() { document.body.classList.remove('modal-open'); }
+
 // ── HISTORY MODAL ──────────────────────────────────────────────────────────
 export function openHistoryModal(id, portfolio, onSave) {
     const p = portfolio[id];
@@ -18,11 +21,11 @@ export function openHistoryModal(id, portfolio, onSave) {
             <div class="modal-body">
                 <div class="preview-box" id="hist-summary" style="margin-bottom:14px;"></div>
                 <div class="table-wrapper">
-                    <table class="tx-table">
+                    <table class="tx-table tx-table-compact">
                         <thead><tr>
                             <th>Data</th><th>Tipo</th><th>Q.tà</th>
-                            <th>Prezzo</th><th>Commissione</th><th>Totale</th>
-                            <th>PMC post-trade</th><th>P&L trade</th><th>Azioni</th>
+                            <th>Prezzo</th><th>Comm.</th><th>Totale</th>
+                            <th>PMC</th><th>P&L</th><th></th>
                         </tr></thead>
                         <tbody id="hist-tbody"></tbody>
                     </table>
@@ -30,7 +33,11 @@ export function openHistoryModal(id, portfolio, onSave) {
             </div>
         </div>`;
     overlay.classList.add('visible');
-    document.getElementById('hist-close').onclick = () => overlay.classList.remove('visible');
+    lockScroll();
+    document.getElementById('hist-close').onclick = () => {
+        overlay.classList.remove('visible');
+        unlockScroll();
+    };
     _renderHistoryContent(id, portfolio, onSave);
 }
 
@@ -68,7 +75,7 @@ function _renderHistoryContent(id, portfolio, onSave) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${tx.date}</td>
-            <td class="${tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'buy' ? '🟢 Acquisto' : '🔴 Vendita'}</td>
+            <td class="${tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
             <td>${Calc.fmt(q, 4)}</td>
             <td>${Calc.fmt(pr)}</td>
             <td>${Calc.fmt(c)}</td>
@@ -152,8 +159,9 @@ function _openEditModal(id, origTx, portfolio, onSave) {
             </div>
         </div>`;
     document.body.appendChild(wrap);
+    lockScroll();
 
-    const close = () => wrap.remove();
+    const close = () => { wrap.remove(); unlockScroll(); };
     document.getElementById('edit-tx-close').onclick  = close;
     document.getElementById('edit-tx-cancel').onclick = close;
 
@@ -224,8 +232,11 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
             </div>
         </div>`;
     overlay.classList.add('visible');
-    document.getElementById('tx-close').onclick  = () => overlay.classList.remove('visible');
-    document.getElementById('tx-cancel').onclick = () => overlay.classList.remove('visible');
+    lockScroll();
+
+    const closeModal = () => { overlay.classList.remove('visible'); unlockScroll(); };
+    document.getElementById('tx-close').onclick  = closeModal;
+    document.getElementById('tx-cancel').onclick = closeModal;
 
     const preview = () => _txPreview(id, type, portfolio, prices);
     document.getElementById('tx-qta').oninput    = preview;
@@ -244,7 +255,7 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
         }
         if (!portfolio[id].transactions) portfolio[id].transactions = [];
         portfolio[id].transactions.push({ date: dt, type, qty: q, price: pr, commission: c });
-        overlay.classList.remove('visible');
+        closeModal();
         await onSave();
         Toast.show(`${isBuy ? 'Acquisto' : 'Vendita'} di ${p.nome} registrata`, 'ok');
     };
@@ -318,8 +329,11 @@ export function openSimModal(id, portfolio, prices) {
         </div>`;
 
     overlay.classList.add('visible');
-    document.getElementById('sim-close').onclick  = () => overlay.classList.remove('visible');
-    document.getElementById('sim-close2').onclick = () => overlay.classList.remove('visible');
+    lockScroll();
+
+    const closeModal = () => { overlay.classList.remove('visible'); unlockScroll(); };
+    document.getElementById('sim-close').onclick  = closeModal;
+    document.getElementById('sim-close2').onclick = closeModal;
 
     let mode = 'budget';
     document.getElementById('sim-mode-budget').onclick = () => {
@@ -386,4 +400,3 @@ export function openSimModal(id, portfolio, prices) {
         document.getElementById(el)?.addEventListener('input', calcSim);
     });
 }
-
