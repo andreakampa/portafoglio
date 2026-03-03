@@ -58,6 +58,8 @@
     .navbar { padding: 0 10px; }
     .navbar-brand { margin-right: 10px; font-size: 0.88em; }
 
+    body.modal-open { overflow: hidden; touch-action: none; }
+
     /* KPI compatti: scroll orizzontale */
     .kpi-group { padding: 12px 14px; overflow-x: auto; }
     .kpi-row   { flex-wrap: nowrap; min-width: max-content; }
@@ -99,5 +101,6 @@
     table { min-width: 600px; }
     .kpi-value { font-size: 1em; }
 }
+
 
 
