@@ -233,13 +233,17 @@ export class PortfolioPage {
         if (Object.values(this.portfolio).find(p => p.nome === nome)) {
             Toast.show(`${nome} già presente`, 'err'); return;
         }
-        const id = 'T' + Date.now();
-        this.portfolio[id] = {
-            nome, valuta,
-            tipoAsset:   document.getElementById('input-tipo-asset').value,
-            commDefault: parseFloat(document.getElementById('input-comm-default').value) || 7,
-            transactions: []
-        };
+          
+       const id = 'T' + Date.now();
+const logoUrl = document.getElementById('input-logo-url').value || null;
+this.portfolio[id] = {
+    nome, valuta,
+    tipoAsset:   document.getElementById('input-tipo-asset').value,
+    commDefault: parseFloat(document.getElementById('input-comm-default').value) || 7,
+    logoUrl,
+    transactions: []
+};
+
         document.getElementById('input-titolo').value       = '';
         document.getElementById('input-ticker-final').value = '';
         document.getElementById('input-valuta').value       = '';
@@ -262,6 +266,7 @@ export class PortfolioPage {
         Toast.show(`${nome} rimosso`, 'ok');
     }
 }
+
 
 
 
