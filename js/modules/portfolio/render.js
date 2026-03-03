@@ -40,7 +40,7 @@ export function renderPage(container) {
         <input type="hidden" id="input-tipo-asset">
     </div>
 
-    <div class="card">
+        <div class="card desktop-only">
         <div class="card-title">💼 Posizioni</div>
         <div class="table-wrapper">
             <table>
@@ -62,6 +62,12 @@ export function renderPage(container) {
             </table>
         </div>
     </div>
+
+    <div class="mobile-only">
+        <div class="card-title" style="padding: 0 4px 10px;">💼 Posizioni</div>
+        <div id="mobile-cards"></div>
+    </div>
+
 
     <div id="modal-history"     class="overlay"></div>
     <div id="modal-transazione" class="overlay"></div>
@@ -246,7 +252,119 @@ export function renderKPI({ portfolio, prices, currency }) {
                 </div>
             </div>
         </div>`;
+
+    export function renderMobileCards({ portfolio, prices, prevClose, currency }, handlers) {
+    const container = document.getElementById('mobile-cards');
+    if (!container) return;
+    const s = currency === 'EUR' ? '€' : '$';
+
+    if (!Object.keys(portfolio).length) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div>`;
+        return;
+    }
+
+    container.innerHTML = '';
+    for (const id in portfolio) {
+        const p = portfolio[id];
+        const v = p.valuta || 'EUR';
+        const { qta, pmc, realizedPnL } = Calc.position(p);
+        const prLive  = prices[id]    ?? pmc;
+        const prPrev  = prevClose[id] ?? null;
+        const inv     = qta * pmc;
+        const att     = qta * prLive;
+        const pnl     = att - inv;
+        const pnlP    = inv > 0 ? (pnl / inv) * 100 : 0;
+        const tax     = Calc.taxOnGain(pnl, p.tipoAsset);
+        const pnlAT   = pnl - tax;
+        const varDay  = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
+        const cv      = x => Exchange.convert(x, v, currency);
+
+        const assetBadge =
+            p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>' :
+            p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>' : '';
+
+        const varHtml = varDay !== null
+            ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${Calc.fmtSign(varDay)}%</span>`
+            : '<span class="text-muted">—</span>';
+
+        const card = document.createElement('div');
+        card.className = 'mobile-card';
+        card.innerHTML = `
+            <div class="mobile-card-header" data-id="${id}">
+                <div class="mobile-card-left">
+                    <span class="ticker-name">${p.nome}</span>
+                    <span class="badge">${v}</span>${assetBadge}
+                </div>
+                <div class="mobile-card-right">
+                    <span class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnl))}</span>
+                    <span class="fs-xs ${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">(${Calc.fmtSign(pnlP)}%)</span>
+                </div>
+                <span class="mobile-card-arrow">›</span>
+            </div>
+            <div class="mobile-card-summary">
+                <div class="mobile-card-row">
+                    <span class="text-muted">Prezzo</span>
+                    <span><b>${Calc.fmt(prLive)}</b> &nbsp; Var: ${varHtml}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="text-muted">Q.tà / PMC</span>
+                    <span>${Calc.fmt(qta, 4)} / ${Calc.fmt(pmc)}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="text-muted">Controvalore</span>
+                    <span>${s} ${Calc.fmt(cv(att))}</span>
+                </div>
+            </div>
+            <div class="mobile-card-detail" id="detail-${id}" style="display:none;">
+                <div class="mobile-card-row">
+                    <span class="text-muted">P&L After Tax</span>
+                    <span class="${pnlAT >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAT))}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="text-muted">Tasse stimate</span>
+                    <span class="text-warning">${s} ${Calc.fmt(cv(tax))}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="text-muted">P&L Realizzato</span>
+                    <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(cv(realizedPnL))}</span>
+                </div>
+                <div class="mobile-card-actions">
+                    <button class="btn btn-dark btn-sm"    data-action="history" data-id="${id}">📜 Storico</button>
+                    <button class="btn btn-success btn-sm" data-action="buy"     data-id="${id}">＋ Compra</button>
+                    <button class="btn btn-purple btn-sm"  data-action="sell"    data-id="${id}">－ Vendi</button>
+                    <button class="btn btn-sm"             data-action="sim"     data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
+                    <button class="btn btn-danger btn-sm"  data-action="delete"  data-id="${id}">🗑 Elimina</button>
+                </div>
+            </div>`;
+
+        // espandi/comprimi al click sull'header
+        card.querySelector('.mobile-card-header').addEventListener('click', () => {
+            const detail = document.getElementById(`detail-${id}`);
+            const arrow  = card.querySelector('.mobile-card-arrow');
+            const isOpen = detail.style.display !== 'none';
+            detail.style.display = isOpen ? 'none' : 'block';
+            arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+        });
+
+        // bottoni azioni
+        card.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const { action, id } = btn.dataset;
+                if (action === 'history')  handlers.onHistory(id);
+                if (action === 'buy')      handlers.onTransaction(id, 'buy');
+                if (action === 'sell')     handlers.onTransaction(id, 'sell');
+                if (action === 'sim')      handlers.onSimulation(id);
+                if (action === 'delete')   handlers.onDelete(id);
+            });
+        });
+
+        container.appendChild(card);
+    }
 }
+
+}
+
 
 
 
