@@ -17,7 +17,7 @@ export function renderPage(container) {
 
     <div class="dashboard" id="dashboard"></div>
 
-        <div class="card">
+    <div class="card">
         <div class="card-title">➕ Aggiungi Titolo</div>
         <div class="form-row">
             <div class="form-field" style="flex:2; min-width:150px; position:relative;">
@@ -40,7 +40,7 @@ export function renderPage(container) {
         <input type="hidden" id="input-tipo-asset">
     </div>
 
-        <div class="card desktop-only">
+    <div class="card desktop-only">
         <div class="card-title">💼 Posizioni</div>
         <div class="table-wrapper">
             <table>
@@ -67,7 +67,6 @@ export function renderPage(container) {
         <div class="card-title" style="padding: 0 4px 10px;">💼 Posizioni</div>
         <div id="mobile-cards"></div>
     </div>
-
 
     <div id="modal-history"     class="overlay"></div>
     <div id="modal-transazione" class="overlay"></div>
@@ -101,15 +100,14 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
         const prLive = prices[id] ?? pmc;
         const prPrev = prevClose[id] ?? null;
 
-        const inv      = qta * pmc;
-        const att      = qta * prLive;
-        const pnl      = att - inv;
-        const tax      = Calc.taxOnGain(pnl, p.tipoAsset);
+        const inv         = qta * pmc;
+        const att         = qta * prLive;
+        const pnl         = att - inv;
+        const tax         = Calc.taxOnGain(pnl, p.tipoAsset);
         const pnlAfterTax = pnl - tax;
-        const varDay   = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
-        const cv = x => Exchange.convert(x, v, currency);
+        const varDay      = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
+        const cv          = x => Exchange.convert(x, v, currency);
 
-        // % P&L con cambio storico (async, aggiorna cella dopo fetch)
         const pnlP = inv > 0 ? (pnl / inv) * 100 : 0;
         const rowId = `row-pnlp-${id}`;
         Calc.pnlPercentWithFx(p, prLive, currency).then(pct => {
@@ -120,15 +118,13 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
             }
         });
 
-
         const varHtml = varDay !== null
             ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'}">${Calc.fmtSign(varDay)}%</span>`
             : '<span class="text-muted">—</span>';
 
-                const assetBadge =
+        const assetBadge =
             p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>' :
             p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>' : '';
-
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -141,13 +137,10 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
             <td><b>${Calc.fmt(prLive)}</b></td>
             <td>${varHtml}</td>
             <td>${s} ${Calc.fmt(cv(att))}</td>
-
             <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                 ${s} ${Calc.fmt(cv(pnl))}
                 <br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>
             </td>
-
-
             <td>
                 <span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAfterTax))}</span>
                 <br><span class="text-muted fs-xs">tasse: ${s} ${Calc.fmt(cv(tax))}</span>
@@ -196,11 +189,11 @@ export function renderKPI({ portfolio, prices, currency }) {
         totComm += cv(totalComm);
     }
 
-    const pnl        = totAtt - totInv;
-    const pnlP       = totInv > 0 ? (pnl / totInv) * 100 : 0;
-    const pnlAfterTax = pnl - totTax;
+    const pnl          = totAtt - totInv;
+    const pnlP         = totInv > 0 ? (pnl / totInv) * 100 : 0;
+    const pnlAfterTax  = pnl - totTax;
     const pnlAfterTaxP = totInv > 0 ? (pnlAfterTax / totInv) * 100 : 0;
-    const totNetto   = pnlAfterTax + totReal;
+    const totNetto     = pnlAfterTax + totReal;
 
     const dash = document.getElementById('dashboard');
     if (!dash) return;
@@ -252,8 +245,9 @@ export function renderKPI({ portfolio, prices, currency }) {
                 </div>
             </div>
         </div>`;
+}
 
-    export function renderMobileCards({ portfolio, prices, prevClose, currency }, handlers) {
+export function renderMobileCards({ portfolio, prices, prevClose, currency }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -268,16 +262,16 @@ export function renderKPI({ portfolio, prices, currency }) {
         const p = portfolio[id];
         const v = p.valuta || 'EUR';
         const { qta, pmc, realizedPnL } = Calc.position(p);
-        const prLive  = prices[id]    ?? pmc;
-        const prPrev  = prevClose[id] ?? null;
-        const inv     = qta * pmc;
-        const att     = qta * prLive;
-        const pnl     = att - inv;
-        const pnlP    = inv > 0 ? (pnl / inv) * 100 : 0;
-        const tax     = Calc.taxOnGain(pnl, p.tipoAsset);
-        const pnlAT   = pnl - tax;
-        const varDay  = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
-        const cv      = x => Exchange.convert(x, v, currency);
+        const prLive = prices[id]    ?? pmc;
+        const prPrev = prevClose[id] ?? null;
+        const inv    = qta * pmc;
+        const att    = qta * prLive;
+        const pnl    = att - inv;
+        const pnlP   = inv > 0 ? (pnl / inv) * 100 : 0;
+        const tax    = Calc.taxOnGain(pnl, p.tipoAsset);
+        const pnlAT  = pnl - tax;
+        const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
+        const cv     = x => Exchange.convert(x, v, currency);
 
         const assetBadge =
             p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>' :
@@ -337,7 +331,6 @@ export function renderKPI({ portfolio, prices, currency }) {
                 </div>
             </div>`;
 
-        // espandi/comprimi al click sull'header
         card.querySelector('.mobile-card-header').addEventListener('click', () => {
             const detail = document.getElementById(`detail-${id}`);
             const arrow  = card.querySelector('.mobile-card-arrow');
@@ -346,7 +339,6 @@ export function renderKPI({ portfolio, prices, currency }) {
             arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
         });
 
-        // bottoni azioni
         card.querySelectorAll('[data-action]').forEach(btn => {
             btn.addEventListener('click', e => {
                 e.stopPropagation();
@@ -362,12 +354,3 @@ export function renderKPI({ portfolio, prices, currency }) {
         container.appendChild(card);
     }
 }
-
-}
-
-
-
-
-
-
-
