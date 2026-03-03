@@ -103,12 +103,22 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
         const inv      = qta * pmc;
         const att      = qta * prLive;
         const pnl      = att - inv;
-        const pnlP     = inv > 0 ? (pnl / inv) * 100 : 0;
         const tax      = Calc.taxOnGain(pnl, p.tipoAsset);
         const pnlAfterTax = pnl - tax;
         const varDay   = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
-
         const cv = x => Exchange.convert(x, v, currency);
+
+        // % P&L con cambio storico (async, aggiorna cella dopo fetch)
+        const pnlP = inv > 0 ? (pnl / inv) * 100 : 0;
+        const rowId = `row-pnlp-${id}`;
+        Calc.pnlPercentWithFx(p, prLive, currency).then(pct => {
+            const el = document.getElementById(rowId);
+            if (el) {
+                el.textContent = `(${Calc.fmtSign(pct)}%)`;
+                el.className = `fs-xs ${pct >= 0 ? 'text-cyan' : 'neg-loss'}`;
+            }
+        });
+
 
         const varHtml = varDay !== null
             ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'}">${Calc.fmtSign(varDay)}%</span>`
@@ -127,10 +137,12 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
             <td><b>${Calc.fmt(prLive)}</b></td>
             <td>${varHtml}</td>
             <td>${s} ${Calc.fmt(cv(att))}</td>
-             <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
+
+            <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                 ${s} ${Calc.fmt(cv(pnl))}
-                <br><span class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>
+                <br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>
             </td>
+
 
             <td>
                 <span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAfterTax))}</span>
@@ -237,4 +249,5 @@ export function renderKPI({ portfolio, prices, currency }) {
             </div>
         </div>`;
 }
+
 
