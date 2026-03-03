@@ -46,24 +46,27 @@
 .modal-wide .table-wrapper { overflow-x: auto; }
 
 /* ── RESPONSIVE MOBILE ─────────────────────────── */
-@media (max-width: 900px) {
+/* ── SHOW/HIDE DESKTOP vs MOBILE ───────────────── */
+.desktop-only { display: block; }
+.mobile-only  { display: none; }
+
+@media (max-width: 768px) {
+    .desktop-only { display: none; }
+    .mobile-only  { display: block; }
+
     .main-content { padding: 10px; }
     .navbar { padding: 0 10px; }
     .navbar-brand { margin-right: 10px; font-size: 0.88em; }
 
-    /* KPI impilati */
-    .kpi-row { flex-direction: column; gap: 10px; }
-    .kpi-sep { display: none; }
-    .kpi-item { padding: 0 !important; min-width: unset; }
-
-    /* Tabella posizioni: scroll orizzontale gestito */
-    .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table { min-width: 700px; }
+    /* KPI compatti: scroll orizzontale */
+    .kpi-group { padding: 12px 14px; overflow-x: auto; }
+    .kpi-row   { flex-wrap: nowrap; min-width: max-content; }
+    .kpi-item  { min-width: 120px; }
 
     /* Card padding ridotto */
-    .card { padding: 14px; }
+    .card { padding: 12px; }
 
-    /* Modali full screen su mobile */
+    /* Modali dal basso */
     .overlay { align-items: flex-end; }
     .modal {
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -79,10 +82,15 @@
     /* Controls bar impilata */
     .controls-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
     .controls-right { flex-wrap: wrap; }
-
-    /* Bottoni azione più grandi (touch) */
-    .btn-action { width: 36px; height: 36px; font-size: 1em; }
 }
+
+@media (max-width: 480px) {
+    body { font-size: 15px; }
+    .navbar-brand { display: none; }
+    .nav-link { padding: 5px 10px; font-size: 0.82em; }
+    .kpi-value { font-size: 1em; }
+}
+
 
 @media (max-width: 480px) {
     body { font-size: 15px; }
@@ -91,4 +99,5 @@
     table { min-width: 600px; }
     .kpi-value { font-size: 1em; }
 }
+
 
