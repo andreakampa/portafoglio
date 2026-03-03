@@ -4,7 +4,7 @@ import { Search } from '../../api/search.js';
 
 function logoImg(nome, cssClass) {
     const base = (nome || '').split('.')[0].split('-')[0].toUpperCase();
-    return `<img src="https://img.logo.dev/ticker/${base}?token=pk_free" class="${cssClass}" alt="" onerror="this.style.display='none'">`;
+    return `<img src="https://financialmodelingprep.com/image-stock/${base}.png" class="${cssClass}" alt="" onerror="this.style.display='none'">`;
 }
 
 export function renderPage(container) {
@@ -362,3 +362,4 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
         container.appendChild(card);
     }
 }
+
