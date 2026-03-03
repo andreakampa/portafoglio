@@ -35,6 +35,7 @@ export class PortfolioPage {
         this._updateExchangeLabel();
         renderTable(this._state(), this._handlers());
         renderKPI(this._state());
+        renderMobileCards(this._state(), this._handlers());
 
         this._refreshPrices();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
@@ -71,7 +72,7 @@ export class PortfolioPage {
         }
     }
 
-        async _save() {
+    async _save() {
         await DB.save('portafoglio', this.portfolio);
         renderTable(this._state(), this._handlers());
         renderKPI(this._state());
@@ -96,7 +97,6 @@ export class PortfolioPage {
         renderTable(this._state(), this._handlers());
         renderKPI(this._state());
         renderMobileCards(this._state(), this._handlers());
-
     }
 
     async _backgroundRefresh() {
@@ -118,7 +118,7 @@ export class PortfolioPage {
             `Agg. ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     }
 
-        _bindStaticEvents() {
+    _bindStaticEvents() {
         document.getElementById('btn-refresh')?.addEventListener('click', async () => {
             await Exchange.update();
             this._updateExchangeLabel();
@@ -159,39 +159,43 @@ export class PortfolioPage {
                     suggestBox.innerHTML = '<div class="suggest-empty">Nessun risultato</div>';
                     return;
                 }
-                    suggestBox.innerHTML = results.map(r => `
-                    <div class="suggest-item" 
-                         data-ticker="${r.ticker}" 
-                         data-currency="${r.currency}" 
+                suggestBox.innerHTML = results.map(r => `
+                    <div class="suggest-item"
+                         data-ticker="${r.ticker}"
+                         data-currency="${r.currency}"
                          data-name="${r.name}"
                          data-tipo="${r.tipoAsset}"
-                         data-tipolabel="${r.tipoLabel}">
+                         data-tipolabel="${r.tipoLabel}"
+                         data-logo="${r.logoUrl || ''}">
+                        ${r.logoUrl ? `<img src="${r.logoUrl}" class="suggest-logo" alt="">` : ''}
                         <span class="suggest-ticker">${r.ticker}</span>
                         <span class="suggest-name">${r.name}</span>
                         <span class="suggest-meta">${r.exchange} · ${r.currency} · ${r.tipoLabel}</span>
                     </div>`).join('');
 
-
-                                suggestBox.querySelectorAll('.suggest-item').forEach(el => {
+                suggestBox.querySelectorAll('.suggest-item').forEach(el => {
                     el.addEventListener('click', () => {
                         const ticker    = el.dataset.ticker;
                         const currency  = el.dataset.currency;
                         const name      = el.dataset.name;
                         const tipoAsset = el.dataset.tipo;
                         const tipoLabel = el.dataset.tipolabel;
+                        const logo      = el.dataset.logo || '';
+
                         hiddenTicker.value = ticker;
                         hiddenValuta.value = currency;
                         inputTitolo.value  = ticker;
+                        document.getElementById('input-logo-url').value = logo;
                         suggestBox.innerHTML = '';
                         suggestBox.classList.remove('visible');
                         btnAdd.disabled = false;
 
-                        // imposta automaticamente il tipo asset nel select
                         const hiddenTipo = document.getElementById('input-tipo-asset');
                         if (hiddenTipo) hiddenTipo.value = tipoAsset;
 
                         selectedBox.innerHTML =
-                            `<b>${ticker}</b> — ${name} <span class="badge">${currency}</span> <span class="badge">${tipoLabel}</span>`;
+                            `${logo ? `<img src="${logo}" class="ticker-logo" alt="">` : ''}
+                             <b>${ticker}</b> — ${name} <span class="badge">${currency}</span> <span class="badge">${tipoLabel}</span>`;
                         selectedBox.className = 'ticker-selected-box selected';
                     });
                 });
@@ -206,7 +210,6 @@ export class PortfolioPage {
 
         document.getElementById('btn-add-titolo')?.addEventListener('click', () => this._aggiungiTitolo());
     }
-
 
     _setValuta(v) {
         this.currency = v;
@@ -226,27 +229,26 @@ export class PortfolioPage {
         };
     }
 
-      async _aggiungiTitolo() {
+    async _aggiungiTitolo() {
         const nome   = document.getElementById('input-ticker-final').value.toUpperCase().trim();
         const valuta = document.getElementById('input-valuta').value || 'EUR';
         if (!nome) { Toast.show('Seleziona un titolo dalla lista', 'err'); return; }
         if (Object.values(this.portfolio).find(p => p.nome === nome)) {
             Toast.show(`${nome} già presente`, 'err'); return;
         }
-          
-       const id = 'T' + Date.now();
-const logoUrl = document.getElementById('input-logo-url').value || null;
-this.portfolio[id] = {
-    nome, valuta,
-    tipoAsset:   document.getElementById('input-tipo-asset').value,
-    commDefault: parseFloat(document.getElementById('input-comm-default').value) || 7,
-    logoUrl,
-    transactions: []
-};
-
+        const id = 'T' + Date.now();
+        const logoUrl = document.getElementById('input-logo-url').value || null;
+        this.portfolio[id] = {
+            nome, valuta,
+            tipoAsset:   document.getElementById('input-tipo-asset').value,
+            commDefault: parseFloat(document.getElementById('input-comm-default').value) || 7,
+            logoUrl,
+            transactions: []
+        };
         document.getElementById('input-titolo').value       = '';
         document.getElementById('input-ticker-final').value = '';
         document.getElementById('input-valuta').value       = '';
+        document.getElementById('input-logo-url').value     = '';
         document.getElementById('btn-add-titolo').disabled  = true;
         document.getElementById('ticker-selected').textContent = '— nessuno selezionato —';
         document.getElementById('ticker-selected').className   = 'ticker-selected-box';
@@ -254,7 +256,6 @@ this.portfolio[id] = {
         this._refreshPrices(id);
         Toast.show(`${nome} aggiunto (${valuta})`, 'ok');
     }
-
 
     async _elimina(id) {
         const nome = this.portfolio[id]?.nome;
@@ -266,9 +267,3 @@ this.portfolio[id] = {
         Toast.show(`${nome} rimosso`, 'ok');
     }
 }
-
-
-
-
-
-
