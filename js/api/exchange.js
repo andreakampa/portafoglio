@@ -1,16 +1,9 @@
 const RATE_CACHE_KEY = 'ptpro_fx_history';
 const FX_TTL = 24 * 60 * 60 * 1000;
 
-const FX_PROXIES = [
-    date => `https://corsproxy.io/?${encodeURIComponent('https://open.er-api.com/v6/history/period/' + date + '/' + date + '?base=EUR')}`,
-    date => `https://api.allorigins.win/get?url=${encodeURIComponent('https://open.er-api.com/v6/history/period/' + date + '/' + date + '?base=EUR')}`,
-    date => `https://thingproxy.freeboard.io/fetch/https://open.er-api.com/v6/history/period/${date}/${date}?base=EUR`,
-];
-
 const LATEST_PROXIES = [
     `https://corsproxy.io/?${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
     `https://api.allorigins.win/get?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
-    `https://thingproxy.freeboard.io/fetch/https://open.er-api.com/v6/latest/EUR`,
 ];
 
 export const Exchange = {
@@ -36,35 +29,18 @@ export const Exchange = {
         return from === 'EUR' ? value * this.rate : value / this.rate;
     },
 
+    // Usa sempre il tasso attuale — l'API storica non è disponibile gratuitamente
     async getRateForDate(dateStr) {
         const cache = this._loadFxCache();
         if (cache[dateStr]) return cache[dateStr];
-
-        for (let i = 0; i < FX_PROXIES.length; i++) {
-            try {
-                const r = await fetch(FX_PROXIES[i](dateStr), { signal: AbortSignal.timeout(5000) });
-                const raw = await r.json();
-                const d = (i === 1) ? JSON.parse(raw.contents) : raw;
-                const rate = d?.rates?.[dateStr]?.USD ?? this.rate;
-                cache[dateStr] = rate;
-                this._saveFxCache(cache);
-                return rate;
-            } catch (e) { /* prova proxy successivo */ }
-        }
+        cache[dateStr] = this.rate;
+        this._saveFxCache(cache);
         return this.rate;
     },
 
     async getWeightedHistoricRate(transactions, fromCurrency, toCurrency) {
         if (fromCurrency === toCurrency) return 1;
-        const buys = (transactions || []).filter(t => t.type === 'buy');
-        if (!buys.length) return this.rate;
-        let totalQty = 0, weightedRate = 0;
-        await Promise.all(buys.map(async tx => {
-            const rate = await this.getRateForDate(tx.date);
-            totalQty     += +tx.qty;
-            weightedRate += rate * +tx.qty;
-        }));
-        return totalQty > 0 ? weightedRate / totalQty : this.rate;
+        return this.rate;
     },
 
     _loadFxCache() {
