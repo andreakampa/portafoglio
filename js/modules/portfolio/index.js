@@ -184,8 +184,8 @@ export class PortfolioPage {
                         btnAdd.disabled = false;
 
                         // imposta automaticamente il tipo asset nel select
-                        const selectTipo = document.getElementById('input-tipo-asset');
-                        if (selectTipo) selectTipo.value = tipoAsset;
+                        const hiddenTipo = document.getElementById('input-tipo-asset');
+                        if (hiddenTipo) hiddenTipo.value = tipoAsset;
 
                         selectedBox.innerHTML =
                             `<b>${ticker}</b> — ${name} <span class="badge">${currency}</span> <span class="badge">${tipoLabel}</span>`;
@@ -259,5 +259,6 @@ export class PortfolioPage {
         Toast.show(`${nome} rimosso`, 'ok');
     }
 }
+
 
 
