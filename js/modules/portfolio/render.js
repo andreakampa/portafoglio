@@ -22,7 +22,7 @@ export function renderPage(container) {
         <div class="form-row">
             <div class="form-field" style="flex:2; min-width:150px; position:relative;">
                 <label>Cerca Titolo</label>
-                <input type="text" id="input-titolo" placeholder="Cerca per nome o ticker: Apple, RACE, BTC..." autocomplete="off">
+                <input type="text" id="input-titolo" placeholder="Cerca per nome, ticker, ISIN: Apple, RACE, BTC, IT0005534308..." autocomplete="off">
                 <div id="ticker-suggestions" class="ticker-suggestions"></div>
             </div>
             <div class="form-field" style="min-width:220px;">
@@ -247,6 +247,7 @@ export function renderKPI({ portfolio, prices, currency }) {
             </div>
         </div>`;
 }
+
 
 
 
