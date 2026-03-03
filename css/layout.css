@@ -37,11 +37,13 @@
 }
 
 /* ── TX TABLE (storico) — no scroll orizzontale ── */
-.tx-table { width: 100%; border-collapse: collapse; font-size: 0.82em; table-layout: fixed; }
-.tx-table th { font-size: 0.66em; padding: 8px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tx-table td { padding: 9px 6px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-table { width: 100%; border-collapse: collapse; font-size: 0.78em; }
+.tx-table th { font-size: 0.66em; padding: 6px 5px; white-space: nowrap; }
+.tx-table td { padding: 8px 5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .tx-table tr:last-child td { border-bottom: none; }
-.modal-wide .table-wrapper { overflow-x: hidden; }
+.tx-table td:last-child { white-space: nowrap; min-width: 64px; }
+.modal-wide { max-width: 900px !important; }
+.modal-wide .table-wrapper { overflow-x: auto; }
 
 /* ── RESPONSIVE MOBILE ─────────────────────────── */
 @media (max-width: 900px) {
@@ -89,3 +91,4 @@
     table { min-width: 600px; }
     .kpi-value { font-size: 1em; }
 }
+
