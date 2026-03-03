@@ -1,5 +1,6 @@
 import { Calc } from './calc.js';
 import { Exchange } from '../../api/exchange.js';
+import { Search } from '../../api/search.js';
 
 export function renderPage(container) {
     container.innerHTML = `
@@ -19,9 +20,14 @@ export function renderPage(container) {
     <div class="card">
         <div class="card-title">➕ Aggiungi Titolo</div>
         <div class="form-row">
-            <div class="form-field" style="flex:2; min-width:150px;">
-                <label>Ticker Yahoo Finance</label>
-                <input type="text" id="input-titolo" placeholder="AAPL, RACE.MI, BTC-USD ...">
+            <div class="form-field" style="flex:2; min-width:150px; position:relative;">
+                <label>Cerca Titolo</label>
+                <input type="text" id="input-titolo" placeholder="Cerca per nome o ticker: Apple, RACE, BTC..." autocomplete="off">
+                <div id="ticker-suggestions" class="ticker-suggestions"></div>
+            </div>
+            <div class="form-field" style="min-width:180px;">
+                <label>Titolo Selezionato</label>
+                <div id="ticker-selected" class="ticker-selected-box">— nessuno selezionato —</div>
             </div>
             <div class="form-field">
                 <label>Tipo Asset</label>
@@ -30,20 +36,16 @@ export function renderPage(container) {
                     <option value="bond">Titolo di Stato (12.5%)</option>
                 </select>
             </div>
-            <div class="form-field">
-                <label>Valuta</label>
-                <select id="input-valuta">
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                </select>
-            </div>
             <div class="form-field" style="min-width:120px;">
                 <label>Commissione Default (€)</label>
                 <input type="number" id="input-comm-default" placeholder="7.00" step="0.01">
             </div>
-            <button id="btn-add-titolo" class="btn btn-success" style="align-self:flex-end;">Aggiungi</button>
+            <button id="btn-add-titolo" class="btn btn-success" style="align-self:flex-end;" disabled>Aggiungi</button>
         </div>
+        <input type="hidden" id="input-ticker-final">
+        <input type="hidden" id="input-valuta">
     </div>
+
 
     <div class="card">
         <div class="card-title">💼 Posizioni</div>
@@ -249,5 +251,6 @@ export function renderKPI({ portfolio, prices, currency }) {
             </div>
         </div>`;
 }
+
 
 
