@@ -228,3 +228,62 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
 }
 .coming-soon .icon { font-size: 4em; margin-bottom: 16px; }
 .coming-soon h2 { color: var(--text); margin-bottom: 8px; }
+
+/* ── KPI GROUPS ────────────────────────────────── */
+.kpi-group {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 14px;
+}
+.kpi-label {
+    font-size: 0.7em; font-weight: 700;
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 12px;
+}
+.kpi-row {
+    display: flex; align-items: center;
+    gap: 0; flex-wrap: wrap;
+}
+.kpi-item {
+    flex: 1; min-width: 130px;
+    padding: 4px 16px 4px 0;
+}
+.kpi-item:first-child { padding-left: 0; }
+.kpi-title {
+    font-size: 0.72em; color: var(--text-muted);
+    margin-bottom: 4px;
+}
+.kpi-value {
+    font-size: 1.15em; font-weight: 700; color: var(--text);
+}
+.kpi-sub {
+    font-size: 0.72em; color: var(--text-muted); margin-top: 2px;
+}
+.kpi-sep {
+    width: 1px; background: var(--border);
+    align-self: stretch; margin: 0 16px 0 0;
+    min-height: 40px;
+}
+
+/* ── ACTION BUTTONS ────────────────────────────── */
+.action-btns {
+    display: flex; gap: 5px; align-items: center;
+}
+.btn-action {
+    width: 30px; height: 30px;
+    border: none; border-radius: var(--radius-sm);
+    cursor: pointer; font-size: 0.85em;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: filter var(--transition), transform var(--transition);
+    font-weight: 700; color: #fff;
+}
+.btn-action:hover { filter: brightness(1.2); transform: translateY(-1px); }
+.btn-action-history { background: var(--secondary); color: var(--text-muted); border: 1px solid var(--border); }
+.btn-action-history:hover { color: var(--text); }
+.btn-action-buy     { background: var(--success); }
+.btn-action-sell    { background: var(--purple); }
+.btn-action-sim     { background: #2a7f5e; }
+.btn-action-delete  { background: var(--danger); }
+
