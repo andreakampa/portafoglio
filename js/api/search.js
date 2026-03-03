@@ -41,6 +41,7 @@ export const Search = {
                             currency:  CURRENCY_MAP[q.currency] || (q.currency?.startsWith('EUR') ? 'EUR' : 'USD'),
                             tipoAsset: assetInfo.tipo,
                             tipoLabel: assetInfo.label,
+                            logoUrl:   q.logoUrl || q.iconUrl || null,
                         };
                     });
             } catch (e) { /* prova proxy successivo */ }
