@@ -327,6 +327,55 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
 
 .badge-crypto { background: var(--warning-dim); color: var(--warning); border-color: var(--warning); }
 
+/* ── MOBILE CARDS ──────────────────────────────── */
+.mobile-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color var(--transition);
+}
+.mobile-card:active { border-color: var(--border-light); }
+
+.mobile-card-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 16px; cursor: pointer;
+}
+.mobile-card-left {
+    display: flex; align-items: center; gap: 6px; flex: 1;
+    font-size: 1em; font-weight: 700;
+}
+.mobile-card-right {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+}
+.mobile-card-arrow {
+    color: var(--text-muted); font-size: 1.3em;
+    transition: transform 0.2s ease; margin-left: 6px;
+}
+.mobile-card-summary {
+    padding: 0 16px 12px;
+    border-top: 1px solid var(--border);
+}
+.mobile-card-detail {
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    background: var(--secondary);
+}
+.mobile-card-row {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 6px 0;
+    font-size: 0.88em;
+    border-bottom: 1px solid var(--border);
+}
+.mobile-card-row:last-child { border-bottom: none; }
+.mobile-card-actions {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 12px;
+}
+.mobile-card-actions .btn { flex: 1; min-width: 80px; font-size: 0.78em; }
+
+
 
 
 
