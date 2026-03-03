@@ -1,11 +1,13 @@
 const PROXIES = [
+    ticker => `https://corsproxy.io/?${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=5d')}`,
     ticker => `https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=5d')}`,
-    ticker => `https://corsproxy.io/?${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=5d')}`
+    ticker => `https://thingproxy.freeboard.io/fetch/https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`,
 ];
 
 const PROXIES_30D = [
+    ticker => `https://corsproxy.io/?${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=1mo')}`,
     ticker => `https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=1mo')}`,
-    ticker => `https://corsproxy.io/?${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=1mo')}`
+    ticker => `https://thingproxy.freeboard.io/fetch/https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1mo`,
 ];
 
 export const Yahoo = {
@@ -14,7 +16,7 @@ export const Yahoo = {
             try {
                 const r = await fetch(PROXIES[i](ticker), { signal: AbortSignal.timeout(7000) });
                 const raw = await r.json();
-                const parsed = (i === 0) ? JSON.parse(raw.contents) : raw;
+                const parsed = (i === 1) ? JSON.parse(raw.contents) : raw;
                 const result = parsed.chart.result[0];
                 const meta   = result.meta;
                 const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
@@ -47,7 +49,7 @@ export const Yahoo = {
             try {
                 const r = await fetch(PROXIES_30D[i](ticker), { signal: AbortSignal.timeout(7000) });
                 const raw = await r.json();
-                const parsed = (i === 0) ? JSON.parse(raw.contents) : raw;
+                const parsed = (i === 1) ? JSON.parse(raw.contents) : raw;
                 const closes = parsed.chart.result[0].indicators?.quote?.[0]?.close ?? [];
                 return closes.filter(v => v !== null && v !== undefined);
             } catch (e) { /* try next proxy */ }
