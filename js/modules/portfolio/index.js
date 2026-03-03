@@ -5,7 +5,6 @@ import { Exchange } from '../../api/exchange.js';
 import { Yahoo } from '../../api/yahoo.js';
 import { Search } from '../../api/search.js';
 import { renderPage, renderTable, renderKPI, renderSkeleton, renderMobileCards } from './render.js';
-import { renderPage, renderTable, renderKPI, renderSkeleton } from './render.js';
 import { openTransactionModal, openHistoryModal, openSimModal } from './ui.js';
 
 export class PortfolioPage {
@@ -263,6 +262,7 @@ export class PortfolioPage {
         Toast.show(`${nome} rimosso`, 'ok');
     }
 }
+
 
 
 
