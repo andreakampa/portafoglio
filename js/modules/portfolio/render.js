@@ -9,7 +9,7 @@ export function renderPage(container) {
             <span class="text-muted fs-sm">Mostra in:</span>
             <button id="btn-eur" class="btn-toggle active">€ EUR</button>
             <button id="btn-usd" class="btn-toggle">$ USD</button>
-            <button id="btn-refresh" class="btn btn-success btn-sm">🔄 Aggiorna</button>
+            <button id="btn-refresh" class="btn btn-success btn-sm">🔄 Aggiorna prezzi</button>
             <span class="text-muted fs-xs" id="last-update"></span>
         </div>
     </div>
@@ -21,7 +21,7 @@ export function renderPage(container) {
         <div class="form-row">
             <div class="form-field" style="flex:2; min-width:150px;">
                 <label>Ticker Yahoo Finance</label>
-                <input type="text" id="input-titolo" placeholder="AAPL, RACE.MI, BTC-USD, BTP-...">
+                <input type="text" id="input-titolo" placeholder="AAPL, RACE.MI, BTC-USD ...">
             </div>
             <div class="form-field">
                 <label>Tipo Asset</label>
@@ -55,10 +55,10 @@ export function renderPage(container) {
                         <th>Q.tà</th>
                         <th>PMC</th>
                         <th>Prezzo Live</th>
-                        <th>Var. Giornaliera</th>
+                        <th>Var. Oggi</th>
                         <th>Controvalore</th>
-                        <th>After Tax</th>
                         <th>P&L Posizione</th>
+                        <th>P&L After Tax</th>
                         <th>P&L Realizzato</th>
                         <th>Azioni</th>
                     </tr>
@@ -97,16 +97,16 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
         const p = portfolio[id];
         const v = p.valuta || 'EUR';
         const { qta, pmc, realizedPnL } = Calc.position(p);
-        const prLive = prices[id]    ?? pmc;
+        const prLive = prices[id] ?? pmc;
         const prPrev = prevClose[id] ?? null;
 
-        const inv  = qta * pmc;
-        const att  = qta * prLive;
-        const pnl  = att - inv;
-        const pnlP = inv > 0 ? (pnl / inv) * 100 : 0;
-        const tax  = Calc.taxOnGain(pnl, p.tipoAsset);
-        const afterTax = att - tax;
-        const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
+        const inv      = qta * pmc;
+        const att      = qta * prLive;
+        const pnl      = att - inv;
+        const pnlP     = inv > 0 ? (pnl / inv) * 100 : 0;
+        const tax      = Calc.taxOnGain(pnl, p.tipoAsset);
+        const pnlAfterTax = pnl - tax;
+        const varDay   = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
 
         const cv = x => Exchange.convert(x, v, currency);
 
@@ -127,22 +127,22 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
             <td><b>${Calc.fmt(prLive)}</b></td>
             <td>${varHtml}</td>
             <td>${s} ${Calc.fmt(cv(att))}</td>
-            <td>
-                <span class="after-tax-val">${s} ${Calc.fmt(cv(afterTax))}</span>
-                <br><span class="text-muted fs-xs">tasse: ${Calc.fmt(cv(tax))}</span>
-            </td>
             <td class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">
                 ${s} ${Calc.fmt(cv(pnl))}
                 <br><span class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>
             </td>
+            <td>
+                <span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAfterTax))}</span>
+                <br><span class="text-muted fs-xs">tasse: ${s} ${Calc.fmt(cv(tax))}</span>
+            </td>
             <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(cv(realizedPnL))}</td>
             <td>
-                <div style="display:flex; gap:4px; flex-wrap:nowrap;">
-                    <button class="btn btn-dark btn-sm btn-icon" data-action="history" data-id="${id}" title="Storico transazioni">📜</button>
-                    <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">+ Compra</button>
-                    <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">− Vendi</button>
-                    <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;" title="Simulazione">Sim</button>
-                    <button class="btn btn-danger btn-sm btn-icon" data-action="delete" data-id="${id}" title="Elimina">🗑</button>
+                <div class="action-btns">
+                    <button class="btn-action btn-action-history"  data-action="history" data-id="${id}" title="Storico">📜</button>
+                    <button class="btn-action btn-action-buy"      data-action="buy"     data-id="${id}" title="Acquisto">＋</button>
+                    <button class="btn-action btn-action-sell"     data-action="sell"    data-id="${id}" title="Vendita">－</button>
+                    <button class="btn-action btn-action-sim"      data-action="sim"     data-id="${id}" title="Simulazione">◎</button>
+                    <button class="btn-action btn-action-delete"   data-action="delete"  data-id="${id}" title="Elimina">✕</button>
                 </div>
             </td>`;
         tbody.appendChild(tr);
@@ -179,46 +179,60 @@ export function renderKPI({ portfolio, prices, currency }) {
         totComm += cv(totalComm);
     }
 
-    const pnl    = totAtt - totInv;
-    const pnlP   = totInv > 0 ? (pnl / totInv) * 100 : 0;
-    const netto  = pnl + totReal;
-    const atTax  = totAtt - totTax;
+    const pnl        = totAtt - totInv;
+    const pnlP       = totInv > 0 ? (pnl / totInv) * 100 : 0;
+    const pnlAfterTax = pnl - totTax;
+    const pnlAfterTaxP = totInv > 0 ? (pnlAfterTax / totInv) * 100 : 0;
+    const totNetto   = pnlAfterTax + totReal;
 
     const dash = document.getElementById('dashboard');
     if (!dash) return;
     dash.innerHTML = `
-        <div class="stat-card c-accent">
-            <h3>Capitale Investito</h3>
-            <div class="value">${s} ${Calc.fmt(totInv)}</div>
-            <div class="sub">incl. commissioni</div>
+        <div class="kpi-group">
+            <div class="kpi-label">💼 Portafoglio</div>
+            <div class="kpi-row">
+                <div class="kpi-item">
+                    <div class="kpi-title">Investito</div>
+                    <div class="kpi-value">${s} ${Calc.fmt(totInv)}</div>
+                </div>
+                <div class="kpi-sep"></div>
+                <div class="kpi-item">
+                    <div class="kpi-title">Controvalore</div>
+                    <div class="kpi-value">${s} ${Calc.fmt(totAtt)}</div>
+                </div>
+                <div class="kpi-sep"></div>
+                <div class="kpi-item">
+                    <div class="kpi-title">Commissioni Pagate</div>
+                    <div class="kpi-value text-warning">${s} ${Calc.fmt(totComm)}</div>
+                </div>
+            </div>
         </div>
-        <div class="stat-card c-accent">
-            <h3>Controvalore Attuale</h3>
-            <div class="value">${s} ${Calc.fmt(totAtt)}</div>
-        </div>
-        <div class="stat-card ${pnl >= 0 ? 'c-success' : 'c-danger'}">
-            <h3>P&L Non Realizzato</h3>
-            <div class="value ${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnl)}</div>
-            <div class="sub">${Calc.fmtSign(pnlP)}%</div>
-        </div>
-        <div class="stat-card c-purple">
-            <h3>P&L Realizzato</h3>
-            <div class="value">${s} ${Calc.fmt(totReal)}</div>
-        </div>
-        <div class="stat-card c-warning">
-            <h3>Controvalore After Tax</h3>
-            <div class="value">${s} ${Calc.fmt(atTax)}</div>
-            <div class="sub">Tasse stimate: ${s} ${Calc.fmt(totTax)}</div>
-        </div>
-                <div class="stat-card ${atTax - totInv + totReal >= 0 ? 'c-success' : 'c-danger'}">
-            <h3>P&L After Tax</h3>
-            <div class="value ${atTax - totInv + totReal >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(atTax - totInv + totReal)}</div>
-            <div class="sub">(controvalore after tax − investito) + realizzato</div>
-        </div>
-        <div class="stat-card c-warning">
-            <h3>Commissioni Pagate</h3>
-            <div class="value">${s} ${Calc.fmt(totComm)}</div>
-            <div class="sub">totale su tutte le posizioni</div>
+
+        <div class="kpi-group">
+            <div class="kpi-label">📈 Performance</div>
+            <div class="kpi-row">
+                <div class="kpi-item">
+                    <div class="kpi-title">P&L Non Realizzato</div>
+                    <div class="kpi-value ${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnl)}</div>
+                    <div class="kpi-sub">${Calc.fmtSign(pnlP)}%</div>
+                </div>
+                <div class="kpi-sep"></div>
+                <div class="kpi-item">
+                    <div class="kpi-title">P&L After Tax</div>
+                    <div class="kpi-value ${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlAfterTax)}</div>
+                    <div class="kpi-sub">${Calc.fmtSign(pnlAfterTaxP)}% &nbsp;·&nbsp; tasse: ${s} ${Calc.fmt(totTax)}</div>
+                </div>
+                <div class="kpi-sep"></div>
+                <div class="kpi-item">
+                    <div class="kpi-title">P&L Realizzato</div>
+                    <div class="kpi-value ${totReal >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(totReal)}</div>
+                </div>
+                <div class="kpi-sep"></div>
+                <div class="kpi-item">
+                    <div class="kpi-title">P&L Totale After Tax</div>
+                    <div class="kpi-value ${totNetto >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(totNetto)}</div>
+                    <div class="kpi-sub">realizzato + non realizzato</div>
+                </div>
+            </div>
         </div>`;
 }
-
