@@ -17,7 +17,7 @@ export function renderPage(container) {
 
     <div class="dashboard" id="dashboard"></div>
 
-    <div class="card">
+        <div class="card">
         <div class="card-title">➕ Aggiungi Titolo</div>
         <div class="form-row">
             <div class="form-field" style="flex:2; min-width:150px; position:relative;">
@@ -25,16 +25,9 @@ export function renderPage(container) {
                 <input type="text" id="input-titolo" placeholder="Cerca per nome o ticker: Apple, RACE, BTC..." autocomplete="off">
                 <div id="ticker-suggestions" class="ticker-suggestions"></div>
             </div>
-            <div class="form-field" style="min-width:180px;">
+            <div class="form-field" style="min-width:220px;">
                 <label>Titolo Selezionato</label>
                 <div id="ticker-selected" class="ticker-selected-box">— nessuno selezionato —</div>
-            </div>
-            <div class="form-field">
-                <label>Tipo Asset</label>
-                <select id="input-tipo-asset">
-                    <option value="stock">Azione / ETF (26%)</option>
-                    <option value="bond">Titolo di Stato (12.5%)</option>
-                </select>
             </div>
             <div class="form-field" style="min-width:120px;">
                 <label>Commissione Default (€)</label>
@@ -44,8 +37,8 @@ export function renderPage(container) {
         </div>
         <input type="hidden" id="input-ticker-final">
         <input type="hidden" id="input-valuta">
+        <input type="hidden" id="input-tipo-asset">
     </div>
-
 
     <div class="card">
         <div class="card-title">💼 Posizioni</div>
@@ -251,6 +244,7 @@ export function renderKPI({ portfolio, prices, currency }) {
             </div>
         </div>`;
 }
+
 
 
 
