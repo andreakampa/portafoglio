@@ -325,5 +325,8 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
     background: var(--success-dim);
 }
 
+.badge-crypto { background: var(--warning-dim); color: var(--warning); border-color: var(--warning); }
+
+
 
 
