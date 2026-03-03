@@ -19,6 +19,12 @@ const ASSET_TYPE_MAP = {
     'OPTION':         { tipo: 'stock',  label: 'Opzione (26%)' },
 };
 
+function buildLogoUrl(ticker) {
+    // Pulisce il ticker da suffissi borsa (.MI, .DE, -USD, ecc.)
+    const base = ticker.split('.')[0].split('-')[0].toUpperCase();
+    return `https://img.logo.dev/ticker/${base}?token=pk_free`;
+}
+
 export const Search = {
     async query(q) {
         if (!q || q.length < 1) return [];
@@ -41,7 +47,7 @@ export const Search = {
                             currency:  CURRENCY_MAP[q.currency] || (q.currency?.startsWith('EUR') ? 'EUR' : 'USD'),
                             tipoAsset: assetInfo.tipo,
                             tipoLabel: assetInfo.label,
-                            logoUrl:   q.logoUrl || q.iconUrl || null,
+                            logoUrl:   q.logoUrl || q.iconUrl || buildLogoUrl(q.symbol),
                         };
                     });
             } catch (e) { /* prova proxy successivo */ }
