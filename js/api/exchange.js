@@ -29,12 +29,7 @@ export const Exchange = {
         return from === 'EUR' ? value * this.rate : value / this.rate;
     },
 
-    // Usa sempre il tasso attuale — l'API storica non è disponibile gratuitamente
     async getRateForDate(dateStr) {
-        const cache = this._loadFxCache();
-        if (cache[dateStr]) return cache[dateStr];
-        cache[dateStr] = this.rate;
-        this._saveFxCache(cache);
         return this.rate;
     },
 
