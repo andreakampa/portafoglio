@@ -26,10 +26,11 @@ export const Calc = {
     },
 
     taxOnGain(unrealizedPnL, tipoAsset) {
-        if (unrealizedPnL <= 0) return 0;
-        const rate = tipoAsset === 'bond' ? 0.125 : 0.26;
-        return unrealizedPnL * rate;
-    },
+    if (unrealizedPnL <= 0) return 0;
+    const rates = { bond: 0.125, crypto: 0.33, stock: 0.26 };
+    const rate = rates[tipoAsset] ?? 0.26;
+    return unrealizedPnL * rate;
+},
 
     // Calcola % P&L tenendo conto del cambio storico alla data acquisto
     // Se il titolo è in valuta diversa da quella di visualizzazione,
@@ -80,3 +81,4 @@ export const Calc = {
         return (n >= 0 ? '+' : '-') + formatted;
     }
 };
+
