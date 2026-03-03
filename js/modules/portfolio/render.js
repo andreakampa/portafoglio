@@ -38,6 +38,7 @@ export function renderPage(container) {
         <input type="hidden" id="input-ticker-final">
         <input type="hidden" id="input-valuta">
         <input type="hidden" id="input-tipo-asset">
+        <input type="hidden" id="input-logo-url">
     </div>
 
     <div class="card desktop-only">
@@ -354,3 +355,4 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
         container.appendChild(card);
     }
 }
+
