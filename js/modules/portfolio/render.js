@@ -2,6 +2,11 @@ import { Calc } from './calc.js';
 import { Exchange } from '../../api/exchange.js';
 import { Search } from '../../api/search.js';
 
+function logoImg(nome, cssClass) {
+    const base = (nome || '').split('.')[0].split('-')[0].toUpperCase();
+    return `<img src="https://img.logo.dev/ticker/${base}?token=pk_free" class="${cssClass}" alt="" onerror="this.style.display='none'">`;
+}
+
 export function renderPage(container) {
     container.innerHTML = `
     <div class="controls-bar">
@@ -130,7 +135,7 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><div class="ticker-cell">
-                ${p.logoUrl ? `<img src="${p.logoUrl}" class="ticker-logo" alt="">` : ''}
+                ${logoImg(p.nome, 'ticker-logo')}
                 <span class="ticker-name">${p.nome}</span>
                 <span class="badge">${v}</span>${assetBadge}
             </div></td>
@@ -288,7 +293,7 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
         card.innerHTML = `
             <div class="mobile-card-header" data-id="${id}">
                 <div class="mobile-card-left">
-                    ${p.logoUrl ? `<img src="${p.logoUrl}" class="ticker-logo" alt="">` : ''}
+                    ${logoImg(p.nome, 'ticker-logo')}
                     <span class="ticker-name">${p.nome}</span>
                     <span class="badge">${v}</span>${assetBadge}
                 </div>
