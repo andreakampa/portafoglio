@@ -127,10 +127,11 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
             <td><b>${Calc.fmt(prLive)}</b></td>
             <td>${varHtml}</td>
             <td>${s} ${Calc.fmt(cv(att))}</td>
-            <td class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">
+             <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                 ${s} ${Calc.fmt(cv(pnl))}
                 <br><span class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>
             </td>
+
             <td>
                 <span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAfterTax))}</span>
                 <br><span class="text-muted fs-xs">tasse: ${s} ${Calc.fmt(cv(tax))}</span>
@@ -236,3 +237,4 @@ export function renderKPI({ portfolio, prices, currency }) {
             </div>
         </div>`;
 }
+
