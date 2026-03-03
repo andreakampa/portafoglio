@@ -3,6 +3,7 @@ import { Cache } from '../../core/cache.js';
 import { Toast } from '../../core/toast.js';
 import { Exchange } from '../../api/exchange.js';
 import { Yahoo } from '../../api/yahoo.js';
+import { Search } from '../../api/search.js';
 import { renderPage, renderTable, renderKPI, renderSkeleton } from './render.js';
 import { openTransactionModal, openHistoryModal, openSimModal } from './ui.js';
 
@@ -114,7 +115,7 @@ export class PortfolioPage {
             `Agg. ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     }
 
-    _bindStaticEvents() {
+        _bindStaticEvents() {
         document.getElementById('btn-refresh')?.addEventListener('click', async () => {
             await Exchange.update();
             this._updateExchangeLabel();
@@ -125,11 +126,71 @@ export class PortfolioPage {
         document.getElementById('btn-eur')?.addEventListener('click', () => this._setValuta('EUR'));
         document.getElementById('btn-usd')?.addEventListener('click', () => this._setValuta('USD'));
 
-        document.getElementById('btn-add-titolo')?.addEventListener('click', () => this._aggiungiTitolo());
-        document.getElementById('input-titolo')?.addEventListener('keydown', e => {
-            if (e.key === 'Enter') this._aggiungiTitolo();
+        // ── AUTO SUGGEST ──────────────────────────────
+        let _suggestTimer = null;
+        const inputTitolo  = document.getElementById('input-titolo');
+        const suggestBox   = document.getElementById('ticker-suggestions');
+        const selectedBox  = document.getElementById('ticker-selected');
+        const btnAdd       = document.getElementById('btn-add-titolo');
+        const hiddenTicker = document.getElementById('input-ticker-final');
+        const hiddenValuta = document.getElementById('input-valuta');
+
+        const clearSelection = () => {
+            hiddenTicker.value = '';
+            hiddenValuta.value = '';
+            btnAdd.disabled = true;
+            selectedBox.textContent = '— nessuno selezionato —';
+            selectedBox.className = 'ticker-selected-box';
+        };
+
+        inputTitolo.addEventListener('input', () => {
+            clearSelection();
+            clearTimeout(_suggestTimer);
+            const q = inputTitolo.value.trim();
+            if (q.length < 1) { suggestBox.innerHTML = ''; suggestBox.classList.remove('visible'); return; }
+            suggestBox.innerHTML = '<div class="suggest-loading">Ricerca...</div>';
+            suggestBox.classList.add('visible');
+            _suggestTimer = setTimeout(async () => {
+                const results = await Search.query(q);
+                if (!results.length) {
+                    suggestBox.innerHTML = '<div class="suggest-empty">Nessun risultato</div>';
+                    return;
+                }
+                suggestBox.innerHTML = results.map(r => `
+                    <div class="suggest-item" data-ticker="${r.ticker}" data-currency="${r.currency}" data-name="${r.name}">
+                        <span class="suggest-ticker">${r.ticker}</span>
+                        <span class="suggest-name">${r.name}</span>
+                        <span class="suggest-meta">${r.exchange} · ${r.currency}</span>
+                    </div>`).join('');
+
+                suggestBox.querySelectorAll('.suggest-item').forEach(el => {
+                    el.addEventListener('click', () => {
+                        const ticker   = el.dataset.ticker;
+                        const currency = el.dataset.currency;
+                        const name     = el.dataset.name;
+                        hiddenTicker.value = ticker;
+                        hiddenValuta.value = currency;
+                        inputTitolo.value  = ticker;
+                        suggestBox.innerHTML = '';
+                        suggestBox.classList.remove('visible');
+                        btnAdd.disabled = false;
+                        selectedBox.innerHTML =
+                            `<b>${ticker}</b> — ${name} <span class="badge">${currency}</span>`;
+                        selectedBox.className = 'ticker-selected-box selected';
+                    });
+                });
+            }, 350);
         });
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('#input-titolo') && !e.target.closest('#ticker-suggestions')) {
+                suggestBox.classList.remove('visible');
+            }
+        });
+
+        document.getElementById('btn-add-titolo')?.addEventListener('click', () => this._aggiungiTitolo());
     }
+
 
     _setValuta(v) {
         this.currency = v;
@@ -149,24 +210,31 @@ export class PortfolioPage {
         };
     }
 
-    async _aggiungiTitolo() {
-        const nome = document.getElementById('input-titolo').value.toUpperCase().trim();
-        if (!nome) { Toast.show('Inserisci un ticker', 'err'); return; }
+      async _aggiungiTitolo() {
+        const nome   = document.getElementById('input-ticker-final').value.toUpperCase().trim();
+        const valuta = document.getElementById('input-valuta').value || 'EUR';
+        if (!nome) { Toast.show('Seleziona un titolo dalla lista', 'err'); return; }
         if (Object.values(this.portfolio).find(p => p.nome === nome)) {
             Toast.show(`${nome} già presente`, 'err'); return;
         }
         const id = 'T' + Date.now();
         this.portfolio[id] = {
-            nome, valuta: document.getElementById('input-valuta').value,
-            tipoAsset:    document.getElementById('input-tipo-asset').value,
-            commDefault:  parseFloat(document.getElementById('input-comm-default').value) || 7,
+            nome, valuta,
+            tipoAsset:   document.getElementById('input-tipo-asset').value,
+            commDefault: parseFloat(document.getElementById('input-comm-default').value) || 7,
             transactions: []
         };
-        document.getElementById('input-titolo').value = '';
+        document.getElementById('input-titolo').value       = '';
+        document.getElementById('input-ticker-final').value = '';
+        document.getElementById('input-valuta').value       = '';
+        document.getElementById('btn-add-titolo').disabled  = true;
+        document.getElementById('ticker-selected').textContent = '— nessuno selezionato —';
+        document.getElementById('ticker-selected').className   = 'ticker-selected-box';
         await this._save();
         this._refreshPrices(id);
-        Toast.show(`${nome} aggiunto`, 'ok');
+        Toast.show(`${nome} aggiunto (${valuta})`, 'ok');
     }
+
 
     async _elimina(id) {
         const nome = this.portfolio[id]?.nome;
@@ -178,3 +246,4 @@ export class PortfolioPage {
         Toast.show(`${nome} rimosso`, 'ok');
     }
 }
+
