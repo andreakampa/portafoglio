@@ -22,7 +22,7 @@ const ASSET_TYPE_MAP = {
 function buildLogoUrl(ticker) {
     // Pulisce il ticker da suffissi borsa (.MI, .DE, -USD, ecc.)
     const base = ticker.split('.')[0].split('-')[0].toUpperCase();
-    return `https://img.logo.dev/ticker/${base}?token=pk_free`;
+    return `https://financialmodelingprep.com/image-stock/${base}.png`;
 }
 
 export const Search = {
@@ -55,3 +55,4 @@ export const Search = {
         return [];
     }
 };
+
