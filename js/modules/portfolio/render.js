@@ -119,13 +119,16 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
             ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'}">${Calc.fmtSign(varDay)}%</span>`
             : '<span class="text-muted">—</span>';
 
-        const bondBadge = p.tipoAsset === 'bond' ? '<span class="badge badge-bond">BTP</span>' : '';
+                const assetBadge =
+            p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>' :
+            p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>' : '';
+
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><div class="ticker-cell">
                 <span class="ticker-name">${p.nome}</span>
-                <span class="badge">${v}</span>${bondBadge}
+                <span class="badge">${v}</span>${assetBadge}
             </div></td>
             <td>${Calc.fmt(qta, 4)}</td>
             <td>${Calc.fmt(pmc)}</td>
@@ -244,6 +247,7 @@ export function renderKPI({ portfolio, prices, currency }) {
             </div>
         </div>`;
 }
+
 
 
 
