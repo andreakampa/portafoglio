@@ -15,24 +15,19 @@
     <div class="auth-box">
         <div class="auth-logo">📈</div>
         <h2>Prima Configurazione</h2>
-        <p>Inserisci l'URL del tuo Firebase Realtime Database e crea una password.</p>
-        <input type="url" id="setup-db-url" placeholder="https://PROGETTO-default-rtdb.firebaseio.com/">
-        <input type="password" id="setup-password" placeholder="Crea password (min. 4 caratteri)">
-        <input type="password" id="setup-password2" placeholder="Conferma password">
+        <p>Inserisci i dati del tuo progetto Firebase per iniziare.</p>
+        <input type="url"  id="setup-db-url"     placeholder="https://PROGETTO-default-rtdb.firebaseio.com/">
+        <input type="text" id="setup-fb-apikey"  placeholder="Firebase API Key">
+        <input type="text" id="setup-fb-domain"  placeholder="PROGETTO.firebaseapp.com">
+        <input type="text" id="setup-fb-project" placeholder="Project ID">
         <div class="auth-error" id="setup-error"></div>
         <button class="btn btn-success btn-full" id="btn-setup-save">Salva e Continua</button>
     </div>
 </div>
 
 <div id="login-overlay" class="auth-overlay">
-    <div class="auth-box">
-        <div class="auth-logo">🔐</div>
-        <h2>Portafoglio Tracker</h2>
-        <p>Inserisci la password per accedere.</p>
-        <input type="password" id="login-password" placeholder="Password">
-        <div class="auth-error" id="login-error"></div>
-        <button class="btn btn-accent btn-full" id="btn-login">Sblocca Portafoglio</button>
-        <a class="reset-link" id="btn-reset-config">Riconfigura database</a>
+    <div class="auth-box" id="login-box">
+        <!-- contenuto iniettato da auth.js -->
     </div>
 </div>
 
@@ -46,14 +41,10 @@
         </div>
         <button class="navbar-logout" id="btn-logout" title="Esci">⏻</button>
     </nav>
-
-    <main class="main-content" id="page-container">
-        <!-- Pages injected here by router -->
-    </main>
+    <main class="main-content" id="page-container"></main>
 </div>
 
 <div id="toast"></div>
-
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
