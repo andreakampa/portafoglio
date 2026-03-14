@@ -6,7 +6,7 @@ const FB_AUTH_URL = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js
 
 // ── CONFIG HARDCODATA ──────────────────────────────────────────────
 const FIREBASE_CONFIG = {
-    dbUrl:        'https://calcolo-pmc-default-rtdb.europe-west1.firebasedatabase.app',
+    dbUrl:        'https://calcolo-pmc-default-rtdb.europe-west1.firebasedatabase.app/',
     fbApiKey:     'AIzaSyBQ3mSc6sH3dgwvpagi7yaQlDigqyFJRX4',
     fbAuthDomain: 'calcolo-pmc.firebaseapp.com',
     fbProjectId:  'calcolo-pmc',
