@@ -5,13 +5,18 @@ import { Search } from '../../api/search.js';
 function logoImg(nome, cssClass) {
     const base = (nome || '').split('.')[0].split('-')[0].toUpperCase();
     const letters = base.slice(0, 3);
-    // Colore deterministico basato sul nome
     const colors = ['#2a7f5e','#1a6fa0','#7b4fa0','#a05c1a','#1a8a6a','#6a3fa0','#a03a3a','#2a5fa0'];
-    const colorIndex = base.charCodeAt(0) % colors.length;
-    const bg = colors[colorIndex];
-    const id = `logo-${base}`;
-    return `<span class="${cssClass} ticker-logo-text" style="background:${bg};" title="${base}">${letters}</span>`;
+    const bg = colors[base.charCodeAt(0) % colors.length];
+    const fallbackSvg = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><rect width='28' height='28' rx='6' fill='${encodeURIComponent(bg)}'/><text x='14' y='19' text-anchor='middle' font-size='9' font-weight='700' fill='white' font-family='Arial'>${letters}</text></svg>`;
+
+    return `<img 
+        src="https://financialmodelingprep.com/image-stock/${base}.png"
+        class="${cssClass}"
+        alt="${base}"
+        onerror="this.src='https://assets.parqet.com/logos/symbol/${base}?format=jpg'; this.onerror=function(){this.src='https://eodhd.com/img/logos/US/${base}.png'; this.onerror=function(){this.src='${fallbackSvg}'; this.onerror=null;}}"
+    >`;
 }
+
 
 export function renderPage(container) {
     container.innerHTML = `
