@@ -1,46 +1,67 @@
-async load(path) {
-    const uid = getUid();
-    if (!uid) { Toast.show('Utente non autenticato', 'err'); return {}; }
-    try {
-        const token = await this._getToken();
-        if (!token) { Toast.show('Token non disponibile, riprova', 'err'); return {}; }
-        const url = `${getDbUrl()}users/${uid}/${path}.json?auth=${token}`;
-        const r   = await fetch(url);
-        if (!r.ok) {
-            const errText = await r.text();
-            console.error(`DB.load error (${r.status}):`, errText);
-            Toast.show(`Errore DB: ${r.status}`, 'err');
+import { Toast } from './toast.js';
+
+function getDbUrl() {
+    return window.__CONFIG__?.dbUrl || '';
+}
+
+function getUid() {
+    return window.__UID__ || null;
+}
+
+export const DB = {
+    async load(path) {
+        const uid = getUid();
+        if (!uid) { Toast.show('Utente non autenticato', 'err'); return {}; }
+        try {
+            const token = await this._getToken();
+            if (!token) { Toast.show('Token non disponibile, riprova', 'err'); return {}; }
+            const url = `${getDbUrl()}users/${uid}/${path}.json?auth=${token}`;
+            const r   = await fetch(url);
+            if (!r.ok) {
+                const errText = await r.text();
+                console.error(`DB.load error (${r.status}):`, errText);
+                Toast.show(`Errore DB: ${r.status}`, 'err');
+                return {};
+            }
+            const data = await r.json();
+            return data || {};
+        } catch (e) {
+            Toast.show('Errore caricamento dati', 'err');
             return {};
         }
-        const data = await r.json();
-        return data || {};
-    } catch (e) {
-        Toast.show('Errore caricamento dati', 'err');
-        return {};
-    }
-},
+    },
 
-async save(path, data) {
-    const uid = getUid();
-    if (!uid) { Toast.show('Utente non autenticato', 'err'); return false; }
-    try {
-        const token = await this._getToken();
-        if (!token) { Toast.show('Token non disponibile, riprova', 'err'); return false; }
-        const url = `${getDbUrl()}users/${uid}/${path}.json?auth=${token}`;
-        const r   = await fetch(url, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!r.ok) {
-            const errText = await r.text();
-            console.error(`DB.save error (${r.status}):`, errText);
-            Toast.show(`Errore salvataggio: ${r.status}`, 'err');
+    async save(path, data) {
+        const uid = getUid();
+        if (!uid) { Toast.show('Utente non autenticato', 'err'); return false; }
+        try {
+            const token = await this._getToken();
+            if (!token) { Toast.show('Token non disponibile, riprova', 'err'); return false; }
+            const url = `${getDbUrl()}users/${uid}/${path}.json?auth=${token}`;
+            const r   = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!r.ok) {
+                const errText = await r.text();
+                console.error(`DB.save error (${r.status}):`, errText);
+                Toast.show(`Errore salvataggio: ${r.status}`, 'err');
+                return false;
+            }
+            return true;
+        } catch (e) {
+            Toast.show('Errore salvataggio', 'err');
             return false;
         }
-        return true;
-    } catch (e) {
-        Toast.show('Errore salvataggio', 'err');
-        return false;
+    },
+
+    async _getToken() {
+        try {
+            const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+            const user = getAuth().currentUser;
+            if (!user) return null;
+            return await user.getIdToken();
+        } catch (e) { return null; }
     }
-},
+};
