@@ -1,8 +1,9 @@
 const RATE_CACHE_KEY = 'ptpro_fx_history';
 const FX_TTL = 24 * 60 * 60 * 1000;
+const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';
 
 const LATEST_PROXIES = [
-    `https://corsproxy.io/?${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
+    `${PROXY}?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
     `https://api.allorigins.win/get?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
 ];
 
