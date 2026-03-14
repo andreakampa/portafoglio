@@ -4,14 +4,13 @@ import { Search } from '../../api/search.js';
 
 function logoImg(nome, cssClass) {
     const base = (nome || '').split('.')[0].split('-')[0].toUpperCase();
-    const primary   = `https://img.logo.dev/ticker/${base}?token=pk_free&size=32`;
-    const secondary = `https://financialmodelingprep.com/image-stock/${base}.png`;
-    return `<img 
-        src="${primary}" 
-        class="${cssClass}" 
-        alt=""
-        onerror="this.src='${secondary}'; this.onerror=function(){this.style.display='none';}"
-    >`;
+    const letters = base.slice(0, 3);
+    // Colore deterministico basato sul nome
+    const colors = ['#2a7f5e','#1a6fa0','#7b4fa0','#a05c1a','#1a8a6a','#6a3fa0','#a03a3a','#2a5fa0'];
+    const colorIndex = base.charCodeAt(0) % colors.length;
+    const bg = colors[colorIndex];
+    const id = `logo-${base}`;
+    return `<span class="${cssClass} ticker-logo-text" style="background:${bg};" title="${base}">${letters}</span>`;
 }
 
 export function renderPage(container) {
