@@ -2,30 +2,25 @@ import { Calc } from './calc.js';
 import { Exchange } from '../../api/exchange.js';
 import { Search } from '../../api/search.js';
 
-function logoImg(nome, cssClass) {
-    const base = (nome || '').split('.')[0].split('-')[0].toUpperCase();
-    const letters = base.slice(0, 3);
+window._logoFallback = function(el, base) {
     const colors = ['#2a7f5e','#1a6fa0','#7b4fa0','#a05c1a','#1a8a6a','#6a3fa0','#a03a3a','#2a5fa0'];
     const bg = colors[base.charCodeAt(0) % colors.length];
-    const fallbackSvg = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><rect width='28' height='28' rx='6' fill='${encodeURIComponent(bg)}'/><text x='14' y='19' text-anchor='middle' font-size='9' font-weight='700' fill='white' font-family='Arial'>${letters}</text></svg>`;
+    const letters = base.slice(0, 3);
+    const svg = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><rect width='28' height='28' rx='6' fill='${encodeURIComponent(bg)}'/><text x='14' y='19' text-anchor='middle' font-size='9' font-weight='700' fill='white' font-family='Arial'>${letters}</text></svg>`;
+    el.src = svg;
+    el.onerror = null;
+};
 
-    const img = document.createElement('img');
-    img.src = `https://financialmodelingprep.com/image-stock/${base}.png`;
-    img.className = cssClass;
-    img.alt = base;
-    img.onerror = function() {
-        this.src = `https://assets.parqet.com/logos/symbol/${base}?format=jpg`;
-        this.onerror = function() {
-            this.src = `https://eodhd.com/img/logos/US/${base}.png`;
-            this.onerror = function() {
-                this.src = fallbackSvg;
-                this.onerror = null;
-            };
-        };
-    };
-    return img.outerHTML;
+
+function logoImg(nome, cssClass) {
+    const base = (nome || '').split('.')[0].split('-')[0].toUpperCase();
+    return `<img
+        src="https://financialmodelingprep.com/image-stock/${base}.png"
+        class="${cssClass}"
+        alt="${base}"
+        onerror="this.src='https://assets.parqet.com/logos/symbol/${base}?format=jpg'; this.onerror=function(){this.src='https://eodhd.com/img/logos/US/${base}.png'; this.onerror=function(){window._logoFallback(this,'${base}');};};"
+    >`;
 }
-
 
 
 export function renderPage(container) {
