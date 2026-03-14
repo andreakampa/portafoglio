@@ -9,13 +9,23 @@ function logoImg(nome, cssClass) {
     const bg = colors[base.charCodeAt(0) % colors.length];
     const fallbackSvg = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><rect width='28' height='28' rx='6' fill='${encodeURIComponent(bg)}'/><text x='14' y='19' text-anchor='middle' font-size='9' font-weight='700' fill='white' font-family='Arial'>${letters}</text></svg>`;
 
-    return `<img 
-        src="https://financialmodelingprep.com/image-stock/${base}.png"
-        class="${cssClass}"
-        alt="${base}"
-        onerror="this.src='https://assets.parqet.com/logos/symbol/${base}?format=jpg'; this.onerror=function(){this.src='https://eodhd.com/img/logos/US/${base}.png'; this.onerror=function(){this.src='${fallbackSvg}'; this.onerror=null;}}"
-    >`;
+    const img = document.createElement('img');
+    img.src = `https://financialmodelingprep.com/image-stock/${base}.png`;
+    img.className = cssClass;
+    img.alt = base;
+    img.onerror = function() {
+        this.src = `https://assets.parqet.com/logos/symbol/${base}?format=jpg`;
+        this.onerror = function() {
+            this.src = `https://eodhd.com/img/logos/US/${base}.png`;
+            this.onerror = function() {
+                this.src = fallbackSvg;
+                this.onerror = null;
+            };
+        };
+    };
+    return img.outerHTML;
 }
+
 
 
 export function renderPage(container) {
