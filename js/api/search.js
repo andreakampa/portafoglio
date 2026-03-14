@@ -1,6 +1,8 @@
+const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';
+
 const SEARCH_PROXIES = [
+    q => `${PROXY}?url=${encodeURIComponent('https://query1.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(q) + '&lang=it-IT&region=IT&quotesCount=8&newsCount=0')}`,
     q => `https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(q) + '&lang=it-IT&region=IT&quotesCount=8&newsCount=0')}`,
-    q => `https://corsproxy.io/?${encodeURIComponent('https://query1.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(q) + '&lang=it-IT&region=IT&quotesCount=8&newsCount=0')}`
 ];
 
 const CURRENCY_MAP = {
@@ -20,9 +22,8 @@ const ASSET_TYPE_MAP = {
 };
 
 function buildLogoUrl(ticker) {
-    // Pulisce il ticker da suffissi borsa (.MI, .DE, -USD, ecc.)
     const base = ticker.split('.')[0].split('-')[0].toUpperCase();
-    return `https://financialmodelingprep.com/image-stock/${base}.png`;
+    return `https://img.logo.dev/ticker/${base}?token=pk_free&size=32`;
 }
 
 export const Search = {
@@ -32,13 +33,14 @@ export const Search = {
             try {
                 const r   = await fetch(SEARCH_PROXIES[i](q), { signal: AbortSignal.timeout(5000) });
                 const raw = await r.json();
-                const parsed = (i === 0) ? JSON.parse(raw.contents) : raw;
+                const parsed = (i === 0) ? raw : JSON.parse(raw.contents);
                 const quotes = parsed?.quotes || [];
                 return quotes
                     .filter(q => q.symbol && q.quoteType !== 'CURRENCY')
                     .map(q => {
                         const assetInfo = ASSET_TYPE_MAP[q.quoteType?.toUpperCase()]
                             ?? { tipo: 'stock', label: 'Altro (26%)' };
+                        const base = q.symbol.split('.')[0].split('-')[0].toUpperCase();
                         return {
                             ticker:    q.symbol,
                             name:      q.shortname || q.longname || q.symbol,
@@ -47,7 +49,7 @@ export const Search = {
                             currency:  CURRENCY_MAP[q.currency] || (q.currency?.startsWith('EUR') ? 'EUR' : 'USD'),
                             tipoAsset: assetInfo.tipo,
                             tipoLabel: assetInfo.label,
-                            logoUrl:   q.logoUrl || q.iconUrl || buildLogoUrl(q.symbol),
+                            logoUrl:   `https://img.logo.dev/ticker/${base}?token=pk_free&size=32`,
                         };
                     });
             } catch (e) { /* prova proxy successivo */ }
@@ -55,4 +57,3 @@ export const Search = {
         return [];
     }
 };
-
