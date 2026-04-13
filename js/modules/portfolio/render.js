@@ -103,7 +103,42 @@ export function renderSkeleton() {
     ).join('');
 }
 
-export async function renderTable({ portfolio, prices, prevClose, currency }, handlers) {
+// ── PIPELINE DATI ─────────────────────────────────────────────────────────────
+// Calcola tutte le posizioni UNA SOLA VOLTA per refresh.
+// renderTable, renderKPI e renderMobileCards ricevono `positionMap` già pronto
+// e non fanno più nessun await interno al loop.
+export async function buildPositionMap(portfolio, prices) {
+    const ids = Object.keys(portfolio);
+    const positions = await Promise.all(ids.map(id => Calc.position(portfolio[id])));
+
+    const map = {};
+    ids.forEach((id, i) => {
+        const p      = portfolio[id];
+        const pos    = positions[i];
+        const v      = p.valuta || 'EUR';
+        const prLive = prices[id] ?? pos.pmc;
+        const inv    = pos.qta * pos.pmc;
+        const att    = pos.qta * prLive;
+        const pnl    = att - inv;
+
+        map[id] = {
+            ...pos,
+            prLive,
+            inv,
+            att,
+            pnl,
+            pnlP:        inv > 0 ? (pnl / inv) * 100 : 0,
+            tax:         Calc.taxOnGain(pnl, p.tipoAsset),
+            pnlAfterTax: pnl - Calc.taxOnGain(pnl, p.tipoAsset),
+            valuta:      v,
+        };
+    });
+
+    return map;
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────────────
+export function renderTable({ portfolio, positionMap, prevClose, currency }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -115,22 +150,15 @@ export async function renderTable({ portfolio, prices, prevClose, currency }, ha
     tbody.innerHTML = '';
 
     for (const id in portfolio) {
-        const p = portfolio[id];
-        const v = p.valuta || 'EUR';
-        const { qta, pmc, pmcEur, realizedPnL } = await Calc.position(p);
-        const prLive = prices[id] ?? pmc;
+        const p   = portfolio[id];
+        const pos = positionMap[id];
+        const { qta, pmc, pmcEur, realizedPnL, prLive, att, pnl, pnlP, tax, pnlAfterTax, valuta: v } = pos;
         const prPrev = prevClose[id] ?? null;
+        const cv     = x => Exchange.convert(x, v, currency);
+        const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
 
-        const inv         = qta * pmc;
-        const att         = qta * prLive;
-        const pnl         = att - inv;
-        const tax         = Calc.taxOnGain(pnl, p.tipoAsset);
-        const pnlAfterTax = pnl - tax;
-        const varDay      = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
-        const cv          = x => Exchange.convert(x, v, currency);
-
-        const pnlP = inv > 0 ? (pnl / inv) * 100 : 0;
         const rowId = `row-pnlp-${id}`;
+        // P&L% con FX storico: rimane async ma è solo UI secondaria, non blocca il render
         Calc.pnlPercentWithFx(p, prLive, currency).then(pct => {
             const el = document.getElementById(rowId);
             if (el) {
@@ -148,8 +176,8 @@ export async function renderTable({ portfolio, prices, prevClose, currency }, ha
             : '<span class="text-muted">—</span>';
 
         const assetBadge =
-            p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>' :
-            p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>' : '';
+            p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>'  :
+            p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>'  : '';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -197,20 +225,17 @@ export async function renderTable({ portfolio, prices, prevClose, currency }, ha
     };
 }
 
-export async function renderKPI({ portfolio, prices, currency }) {
+// ── KPI ───────────────────────────────────────────────────────────────────────
+export function renderKPI({ portfolio, positionMap, currency }) {
     const s = currency === 'EUR' ? '€' : '$';
     let totInv = 0, totAtt = 0, totReal = 0, totTax = 0, totComm = 0;
     let totInvEur = 0, totAttEur = 0;
 
     for (const id in portfolio) {
-        const p = portfolio[id];
-        const v = p.valuta || 'EUR';
-        const { qta, pmc, pmcEur, realizedPnL, totalComm } = await Calc.position(p);
-        const prLive  = prices[id] ?? pmc;
-        const inv     = qta * pmc;
-        const att     = qta * prLive;
-        const tax     = Calc.taxOnGain(att - inv, p.tipoAsset);
-        const cv      = x => Exchange.convert(x, v, currency);
+        const p   = portfolio[id];
+        const pos = positionMap[id];
+        const { qta, pmcEur, realizedPnL, totalComm, inv, att, tax, valuta: v } = pos;
+        const cv  = x => Exchange.convert(x, v, currency);
 
         totInv  += cv(inv);
         totAtt  += cv(att);
@@ -227,11 +252,11 @@ export async function renderKPI({ portfolio, prices, currency }) {
         }
     }
 
-    const pnl          = totAtt - totInv;
-    const pnlP         = totInv > 0 ? (pnl / totInv) * 100 : 0;
-    const pnlAfterTax  = pnl - totTax;
-    const pnlAfterTaxP = totInv > 0 ? (pnlAfterTax / totInv) * 100 : 0;
-    const totNetto     = pnlAfterTax + totReal;
+    const pnl            = totAtt - totInv;
+    const pnlP           = totInv > 0 ? (pnl / totInv) * 100 : 0;
+    const pnlAfterTax    = pnl - totTax;
+    const pnlAfterTaxP   = totInv > 0 ? (pnlAfterTax / totInv) * 100 : 0;
+    const totNetto       = pnlAfterTax + totReal;
     const pnlEurStorico  = totAttEur - totInvEur;
     const pnlEurStoricoP = totInvEur > 0 ? (pnlEurStorico / totInvEur) * 100 : 0;
 
@@ -293,7 +318,8 @@ export async function renderKPI({ portfolio, prices, currency }) {
         </div>`;
 }
 
-export async function renderMobileCards({ portfolio, prices, prevClose, currency }, handlers) {
+// ── MOBILE CARDS ──────────────────────────────────────────────────────────────
+export function renderMobileCards({ portfolio, positionMap, prevClose, currency }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -305,27 +331,18 @@ export async function renderMobileCards({ portfolio, prices, prevClose, currency
 
     container.innerHTML = '';
     for (const id in portfolio) {
-        const p = portfolio[id];
-        const v = p.valuta || 'EUR';
-        const { qta, pmc, pmcEur, realizedPnL } = await Calc.position(p);
-        const prLive = prices[id] ?? pmc;
+        const p   = portfolio[id];
+        const pos = positionMap[id];
+        const { qta, pmc, pmcEur, realizedPnL, prLive, att, pnl, pnlP, tax, pnlAfterTax, valuta: v } = pos;
         const prPrev = prevClose[id] ?? null;
-        const inv    = qta * pmc;
-        const att    = qta * prLive;
-        const pnl    = att - inv;
-        const pnlP   = inv > 0 ? (pnl / inv) * 100 : 0;
-        const tax    = Calc.taxOnGain(pnl, p.tipoAsset);
-        const pnlAT  = pnl - tax;
-        const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
         const cv     = x => Exchange.convert(x, v, currency);
+        const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
 
-        const pmcEurHtml = v === 'USD'
-            ? `€ ${Calc.fmt(pmcEur)}`
-            : '—';
+        const pmcEurHtml = v === 'USD' ? `€ ${Calc.fmt(pmcEur)}` : '—';
 
         const assetBadge =
-            p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>' :
-            p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>' : '';
+            p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>'  :
+            p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>'  : '';
 
         const varHtml = varDay !== null
             ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${Calc.fmtSign(varDay)}%</span>`
@@ -367,7 +384,7 @@ export async function renderMobileCards({ portfolio, prices, prevClose, currency
             <div class="mobile-card-detail" id="detail-${id}" style="display:none;">
                 <div class="mobile-card-row">
                     <span class="text-muted">P&L After Tax</span>
-                    <span class="${pnlAT >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAT))}</span>
+                    <span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAfterTax))}</span>
                 </div>
                 <div class="mobile-card-row">
                     <span class="text-muted">Tasse stimate</span>
@@ -378,11 +395,11 @@ export async function renderMobileCards({ portfolio, prices, prevClose, currency
                     <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(cv(realizedPnL))}</span>
                 </div>
                 <div class="mobile-card-actions">
-                    <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
-                    <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
-                    <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
-                    <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
-                    <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
+                    <button class="btn btn-dark btn-sm"    data-action="history" data-id="${id}">📜 Storico</button>
+                    <button class="btn btn-success btn-sm" data-action="buy"     data-id="${id}">＋ Compra</button>
+                    <button class="btn btn-purple btn-sm"  data-action="sell"    data-id="${id}">－ Vendi</button>
+                    <button class="btn btn-sm"             data-action="sim"     data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
+                    <button class="btn btn-danger btn-sm"  data-action="delete"  data-id="${id}">🗑 Elimina</button>
                 </div>
             </div>`;
 
@@ -399,10 +416,10 @@ export async function renderMobileCards({ portfolio, prices, prevClose, currency
                 e.stopPropagation();
                 const { action, id } = btn.dataset;
                 if (action === 'history') handlers.onHistory(id);
-                if (action === 'buy') handlers.onTransaction(id, 'buy');
-                if (action === 'sell') handlers.onTransaction(id, 'sell');
-                if (action === 'sim') handlers.onSimulation(id);
-                if (action === 'delete') handlers.onDelete(id);
+                if (action === 'buy')     handlers.onTransaction(id, 'buy');
+                if (action === 'sell')    handlers.onTransaction(id, 'sell');
+                if (action === 'sim')     handlers.onSimulation(id);
+                if (action === 'delete')  handlers.onDelete(id);
             });
         });
 
