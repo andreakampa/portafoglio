@@ -33,11 +33,10 @@ export class PortfolioPage {
 
         await Promise.all([Exchange.update(), this._loadData()]);
         this._updateExchangeLabel();
-        renderTable(this._state(), this._handlers());
-        renderKPI(this._state());
-        renderMobileCards(this._state(), this._handlers());
+        await renderTable(this._state(), this._handlers());
+        await renderKPI(this._state());
+        await renderMobileCards(this._state(), this._handlers());
 
-        // ── Inizializza il pannello carrello ──
         CartPanel.init();
 
         this._refreshPrices();
@@ -77,9 +76,9 @@ export class PortfolioPage {
 
     async _save() {
         await DB.save('portafoglio', this.portfolio);
-        renderTable(this._state(), this._handlers());
-        renderKPI(this._state());
-        renderMobileCards(this._state(), this._handlers());
+        await renderTable(this._state(), this._handlers());
+        await renderKPI(this._state());
+        await renderMobileCards(this._state(), this._handlers());
     }
 
     async _refreshPrices(soloId = null) {
@@ -97,9 +96,9 @@ export class PortfolioPage {
 
         if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Aggiorna'; }
         this._updateTimestamp();
-        renderTable(this._state(), this._handlers());
-        renderKPI(this._state());
-        renderMobileCards(this._state(), this._handlers());
+        await renderTable(this._state(), this._handlers());
+        await renderKPI(this._state());
+        await renderMobileCards(this._state(), this._handlers());
     }
 
     async _backgroundRefresh() {
@@ -132,7 +131,6 @@ export class PortfolioPage {
         document.getElementById('btn-eur')?.addEventListener('click', () => this._setValuta('EUR'));
         document.getElementById('btn-usd')?.addEventListener('click', () => this._setValuta('USD'));
 
-        // ── AUTO SUGGEST ──────────────────────────────
         let _suggestTimer = null;
         const inputTitolo  = document.getElementById('input-titolo');
         const suggestBox   = document.getElementById('ticker-suggestions');
@@ -214,12 +212,13 @@ export class PortfolioPage {
         document.getElementById('btn-add-titolo')?.addEventListener('click', () => this._aggiungiTitolo());
     }
 
-    _setValuta(v) {
+    async _setValuta(v) {
         this.currency = v;
         document.getElementById('btn-eur')?.classList.toggle('active', v === 'EUR');
         document.getElementById('btn-usd')?.classList.toggle('active', v === 'USD');
-        renderTable(this._state(), this._handlers());
-        renderKPI(this._state());
+        await renderTable(this._state(), this._handlers());
+        await renderKPI(this._state());
+        await renderMobileCards(this._state(), this._handlers());
     }
 
     _handlers() {
