@@ -5,7 +5,7 @@ import { Exchange } from '../../api/exchange.js';
 import { Yahoo } from '../../api/yahoo.js';
 import { Search } from '../../api/search.js';
 import { renderPage, renderTable, renderKPI, renderSkeleton, renderMobileCards } from './render.js';
-import { openTransactionModal, openHistoryModal, openSimModal } from './ui.js';
+import { openTransactionModal, openHistoryModal, openSimModal, CartPanel } from './ui.js';
 
 export class PortfolioPage {
     constructor(container) {
@@ -36,6 +36,9 @@ export class PortfolioPage {
         renderTable(this._state(), this._handlers());
         renderKPI(this._state());
         renderMobileCards(this._state(), this._handlers());
+
+        // ── Inizializza il pannello carrello ──
+        CartPanel.init();
 
         this._refreshPrices();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
