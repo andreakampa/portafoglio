@@ -4,23 +4,21 @@ import { Toast } from '../../core/toast.js';
 import { Exchange } from '../../api/exchange.js';
 import { Yahoo } from '../../api/yahoo.js';
 import { Search } from '../../api/search.js';
-import { renderPage, renderTable, renderKPI, renderSkeleton, renderMobileCards } from './render.js';
+import { Calc } from './calc.js';
+import {
+    renderPage, renderTable, renderKPI, renderSkeleton,
+    renderMobileCards, buildPositionMap
+} from './render.js';
 import { openTransactionModal, openHistoryModal, openSimModal, CartPanel } from './ui.js';
 
 export class PortfolioPage {
     constructor(container) {
-        this.container   = container;
-        this.portfolio   = {};
-        this.prices      = {};
-        this.prevClose   = {};
-        this.currency    = 'EUR';
-        this._autoTimer  = null;
-        this._state = () => ({
-            portfolio: this.portfolio,
-            prices:    this.prices,
-            prevClose: this.prevClose,
-            currency:  this.currency,
-        });
+        this.container  = container;
+        this.portfolio  = {};
+        this.prices     = {};
+        this.prevClose  = {};
+        this.currency   = 'EUR';
+        this._autoTimer = null;
     }
 
     async mount() {
@@ -33,18 +31,31 @@ export class PortfolioPage {
 
         await Promise.all([Exchange.update(), this._loadData()]);
         this._updateExchangeLabel();
-        await renderTable(this._state(), this._handlers());
-        await renderKPI(this._state());
-        await renderMobileCards(this._state(), this._handlers());
+
+        await this._render();
 
         CartPanel.init();
-
         this._refreshPrices();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
     }
 
     destroy() {
         clearInterval(this._autoTimer);
+    }
+
+    // ── RENDER CENTRALIZZATO ─────────────────────────────────────────────────
+    // Unico punto dove viene chiamata buildPositionMap.
+    // renderKPI, renderTable e renderMobileCards ricevono positionMap già pronto.
+    async _render() {
+        const { portfolio, prices, prevClose, currency } = this;
+
+        const positionMap = await buildPositionMap(portfolio, prices);
+
+        const state = { portfolio, positionMap, prices, prevClose, currency };
+
+        renderKPI(state);
+        renderTable(state, this._handlers());
+        renderMobileCards(state, this._handlers());
     }
 
     async _loadData() {
@@ -57,12 +68,12 @@ export class PortfolioPage {
                 p.transactions = [];
                 if (p.qta > 0) {
                     p.transactions.push({
-                        date: new Date().toISOString().slice(0,10),
+                        date: new Date().toISOString().slice(0, 10),
                         type: 'buy', qty: +p.qta, price: +(p.pmc || 0), commission: 0
                     });
                 }
-                if (p.realizedPnL) p._legacyRealizedPnL = +p.realizedPnL;
-                if (!p.tipoAsset)  p.tipoAsset = 'stock';
+                if (p.realizedPnL)  p._legacyRealizedPnL = +p.realizedPnL;
+                if (!p.tipoAsset)   p.tipoAsset = 'stock';
                 if (!p.commDefault) p.commDefault = 7;
                 delete p.qta; delete p.pmc; delete p.realizedPnL;
                 migrated = true;
@@ -76,9 +87,8 @@ export class PortfolioPage {
 
     async _save() {
         await DB.save('portafoglio', this.portfolio);
-        await renderTable(this._state(), this._handlers());
-        await renderKPI(this._state());
-        await renderMobileCards(this._state(), this._handlers());
+        Calc.clearCaches();
+        await this._render();
     }
 
     async _refreshPrices(soloId = null) {
@@ -87,7 +97,9 @@ export class PortfolioPage {
 
         const tickerMap = soloId
             ? { [soloId]: this.portfolio[soloId].nome }
-            : Object.fromEntries(Object.keys(this.portfolio).map(id => [id, this.portfolio[id].nome]));
+            : Object.fromEntries(
+                Object.keys(this.portfolio).map(id => [id, this.portfolio[id].nome])
+              );
 
         const { prices, prevs } = await Yahoo.fetchAll(tickerMap);
         Object.assign(this.prices, prices);
@@ -96,9 +108,10 @@ export class PortfolioPage {
 
         if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Aggiorna'; }
         this._updateTimestamp();
-        await renderTable(this._state(), this._handlers());
-        await renderKPI(this._state());
-        await renderMobileCards(this._state(), this._handlers());
+
+        // I prezzi sono cambiati ma le transazioni no: invalidiamo solo la
+        // cache di exchange (tassi live) lasciando intatta quella di calc.js
+        await this._render();
     }
 
     async _backgroundRefresh() {
@@ -117,7 +130,7 @@ export class PortfolioPage {
         if (!el) return;
         const d = new Date();
         el.textContent =
-            `Agg. ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            `Agg. ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
 
     _bindStaticEvents() {
@@ -196,7 +209,9 @@ export class PortfolioPage {
 
                         selectedBox.innerHTML =
                             `${logo ? `<img src="${logo}" class="ticker-logo" alt="">` : ''}
-                             <b>${ticker}</b> — ${name} <span class="badge">${currency}</span> <span class="badge">${tipoLabel}</span>`;
+                             <b>${ticker}</b> — ${name}
+                             <span class="badge">${currency}</span>
+                             <span class="badge">${tipoLabel}</span>`;
                         selectedBox.className = 'ticker-selected-box selected';
                     });
                 });
@@ -216,9 +231,8 @@ export class PortfolioPage {
         this.currency = v;
         document.getElementById('btn-eur')?.classList.toggle('active', v === 'EUR');
         document.getElementById('btn-usd')?.classList.toggle('active', v === 'USD');
-        await renderTable(this._state(), this._handlers());
-        await renderKPI(this._state());
-        await renderMobileCards(this._state(), this._handlers());
+        // Cambio valuta: dati già calcolati in cache, buildPositionMap è quasi gratuito
+        await this._render();
     }
 
     _handlers() {
@@ -238,22 +252,25 @@ export class PortfolioPage {
         if (Object.values(this.portfolio).find(p => p.nome === nome)) {
             Toast.show(`${nome} già presente`, 'err'); return;
         }
-        const id = 'T' + Date.now();
+        const id     = 'T' + Date.now();
         const logoUrl = document.getElementById('input-logo-url').value || null;
+
         this.portfolio[id] = {
             nome, valuta,
-            tipoAsset:   document.getElementById('input-tipo-asset').value,
-            commDefault: parseFloat(document.getElementById('input-comm-default').value) || 7,
+            tipoAsset:    document.getElementById('input-tipo-asset').value,
+            commDefault:  parseFloat(document.getElementById('input-comm-default').value) || 7,
             logoUrl,
             transactions: []
         };
-        document.getElementById('input-titolo').value       = '';
-        document.getElementById('input-ticker-final').value = '';
-        document.getElementById('input-valuta').value       = '';
-        document.getElementById('input-logo-url').value     = '';
-        document.getElementById('btn-add-titolo').disabled  = true;
-        document.getElementById('ticker-selected').textContent = '— nessuno selezionato —';
-        document.getElementById('ticker-selected').className   = 'ticker-selected-box';
+
+        document.getElementById('input-titolo').value           = '';
+        document.getElementById('input-ticker-final').value     = '';
+        document.getElementById('input-valuta').value           = '';
+        document.getElementById('input-logo-url').value         = '';
+        document.getElementById('btn-add-titolo').disabled      = true;
+        document.getElementById('ticker-selected').textContent  = '— nessuno selezionato —';
+        document.getElementById('ticker-selected').className    = 'ticker-selected-box';
+
         await this._save();
         this._refreshPrices(id);
         Toast.show(`${nome} aggiunto (${valuta})`, 'ok');
