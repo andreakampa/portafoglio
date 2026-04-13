@@ -142,10 +142,9 @@ export const CartPanel = {
                         <div class="cart-item-pmc">Nuovo PMC: <b>${Calc.fmt(item.newPmc)}</b> &nbsp;|&nbsp; Q.tà tot: <b>${Calc.fmt(item.newQty, 4)}</b></div>
                     </div>`;
             } else {
-                const grossReceipt = item.qty * item.price - item.commission;
-                const pnl          = (item.price - item.pmc) * item.qty - item.commission;
-                const tax          = Calc.taxOnGain(Math.max(0, pnl), item.tipoAsset);
-                const netReceipt   = grossReceipt - tax;
+                const grossReceipt = item.grossReceipt;
+                const tax          = item.tax;
+                const netReceipt   = item.netReceipt;
                 const netEur       = toEur(netReceipt);
                 totalSellNet      += netEur;
                 totalTax          += toEur(tax);
@@ -537,7 +536,13 @@ export function openSimModal(id, portfolio, prices) {
                             <input type="number" id="sim-sell-prezzo" step="any" value="${prLive}">
                         </div>
                         <div>
-                            <span class="modal-label">Quantità da Vendere</span>
+                            <span class="modal-label">
+                                Quantità da Vendere
+                                <button id="sim-sell-max" style="
+                                    margin-left:6px; padding:1px 7px; font-size:10px; font-weight:700;
+                                    background:var(--accent); color:#fff; border:none;
+                                    border-radius:4px; cursor:pointer; vertical-align:middle;">MAX</button>
+                            </span>
                             <input type="number" id="sim-sell-qty" step="any" placeholder="0" max="${qta}">
                         </div>
                         <div>
@@ -567,6 +572,10 @@ export function openSimModal(id, portfolio, prices) {
     const closeModal = () => { overlay.classList.remove('visible'); unlockScroll(); };
     document.getElementById('sim-close').onclick  = closeModal;
     document.getElementById('sim-close2').onclick = closeModal;
+    document.getElementById('sim-sell-max').onclick = () => {
+    document.getElementById('sim-sell-qty').value = qta;
+    calcSimSell();
+};
 
     let activeTab = 'buy';
     document.getElementById('sim-tab-buy').onclick = () => {
