@@ -3,9 +3,203 @@ import { Exchange } from '../../api/exchange.js';
 import { Toast } from '../../core/toast.js';
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
-
 function lockScroll()   { document.body.classList.add('modal-open'); }
 function unlockScroll() { document.body.classList.remove('modal-open'); }
+
+// ── CART STORE ─────────────────────────────────────────────────────────────
+export const Cart = {
+    items: [],
+
+    add(item) {
+        // item: { id, nome, type:'buy'|'sell', qty, price, commission, pmc, valuta, tipoAsset }
+        this.items.push({ ...item, _cartId: Date.now() + Math.random() });
+        CartPanel.render();
+        CartPanel.show();
+        Toast.show(`${item.nome} aggiunto al carrello`, 'ok');
+    },
+
+    remove(cartId) {
+        this.items = this.items.filter(i => i._cartId !== cartId);
+        CartPanel.render();
+    },
+
+    clear() {
+        this.items = [];
+        CartPanel.render();
+    }
+};
+
+// ── CART PANEL ─────────────────────────────────────────────────────────────
+export const CartPanel = {
+    _visible: false,
+
+    init() {
+        if (document.getElementById('cart-panel')) return;
+        const panel = document.createElement('div');
+        panel.id = 'cart-panel';
+        panel.innerHTML = `
+            <div class="cart-header">
+                <span>🛒 Lista della Spesa</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button id="cart-clear" title="Svuota carrello" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-muted);padding:2px 6px;border-radius:4px;">✕ Svuota</button>
+                    <button id="cart-toggle-btn" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted);">▼</button>
+                </div>
+            </div>
+            <div id="cart-body">
+                <div id="cart-items"></div>
+                <div id="cart-footer"></div>
+            </div>`;
+        document.body.appendChild(panel);
+
+        document.getElementById('cart-toggle-btn').onclick = () => this.toggle();
+        document.getElementById('cart-clear').onclick = () => {
+            if (Cart.items.length && confirm('Svuotare il carrello?')) {
+                Cart.clear();
+            }
+        };
+
+        // Floating toggle button
+        const fab = document.createElement('button');
+        fab.id = 'cart-fab';
+        fab.innerHTML = '🛒 <span id="cart-badge">0</span>';
+        fab.onclick = () => this.toggle();
+        document.body.appendChild(fab);
+
+        this.render();
+    },
+
+    show() {
+        const panel = document.getElementById('cart-panel');
+        if (panel) {
+            panel.classList.add('visible');
+            this._visible = true;
+            const body = document.getElementById('cart-body');
+            if (body) body.style.display = 'block';
+            const btn = document.getElementById('cart-toggle-btn');
+            if (btn) btn.textContent = '▼';
+        }
+    },
+
+    toggle() {
+        const body = document.getElementById('cart-body');
+        const btn  = document.getElementById('cart-toggle-btn');
+        const panel = document.getElementById('cart-panel');
+        if (!body || !panel) return;
+        const isOpen = body.style.display !== 'none';
+        body.style.display = isOpen ? 'none' : 'block';
+        if (btn) btn.textContent = isOpen ? '▲' : '▼';
+        panel.classList.toggle('visible', true);
+        this._visible = true;
+    },
+
+    render() {
+        const itemsEl  = document.getElementById('cart-items');
+        const footerEl = document.getElementById('cart-footer');
+        const badge    = document.getElementById('cart-badge');
+        const fab      = document.getElementById('cart-fab');
+        const panel    = document.getElementById('cart-panel');
+
+        if (!itemsEl) return;
+        if (badge) badge.textContent = Cart.items.length;
+        if (fab)   fab.classList.toggle('has-items', Cart.items.length > 0);
+
+        if (!Cart.items.length) {
+            itemsEl.innerHTML = `<div class="cart-empty">Nessuna simulazione aggiunta</div>`;
+            if (footerEl) footerEl.innerHTML = '';
+            return;
+        }
+
+        if (panel) panel.classList.add('visible');
+
+        let totalBuyEur  = 0;
+        let totalSellNet = 0;
+        let totalTax     = 0;
+        let html = '';
+
+        Cart.items.forEach(item => {
+            const s = item.valuta === 'USD' ? '$' : '€';
+            const rate = Exchange.rate || 1;
+            const toEur = v => item.valuta === 'USD' ? v / rate : v;
+
+            if (item.type === 'buy') {
+                const cost = item.qty * item.price + item.commission;
+                const costEur = toEur(cost);
+                totalBuyEur += costEur;
+                html += `
+                    <div class="cart-item cart-item-buy">
+                        <div class="cart-item-header">
+                            <span class="cart-item-badge buy">🟢 ACQ</span>
+                            <span class="cart-item-name">${item.nome}</span>
+                            <button class="cart-item-remove" data-cid="${item._cartId}">✕</button>
+                        </div>
+                        <div class="cart-item-detail">
+                            ${Calc.fmt(item.qty, 4)} az. × ${Calc.fmt(item.price)} + comm. ${Calc.fmt(item.commission)}
+                        </div>
+                        <div class="cart-item-total buy-color">
+                            Costo: <b>${s} ${Calc.fmt(cost)}</b>
+                            ${item.valuta === 'USD' ? `<span class="cart-eur-hint">≈ € ${Calc.fmt(costEur)}</span>` : ''}
+                        </div>
+                        <div class="cart-item-pmc">Nuovo PMC: <b>${Calc.fmt(item.newPmc)}</b> &nbsp;|&nbsp; Q.tà tot: <b>${Calc.fmt(item.newQty, 4)}</b></div>
+                    </div>`;
+            } else {
+                const grossReceipt = item.qty * item.price - item.commission;
+                const pnl          = (item.price - item.pmc) * item.qty - item.commission;
+                const tax          = Calc.taxOnGain(Math.max(0, pnl), item.tipoAsset);
+                const netReceipt   = grossReceipt - tax;
+                const netEur       = toEur(netReceipt);
+                totalSellNet      += netEur;
+                totalTax          += toEur(tax);
+                const taxPct       = item.tipoAsset === 'bond' ? '12,5%' : item.tipoAsset === 'crypto' ? '33%' : '26%';
+                html += `
+                    <div class="cart-item cart-item-sell">
+                        <div class="cart-item-header">
+                            <span class="cart-item-badge sell">🔴 VEN</span>
+                            <span class="cart-item-name">${item.nome}</span>
+                            <button class="cart-item-remove" data-cid="${item._cartId}">✕</button>
+                        </div>
+                        <div class="cart-item-detail">
+                            ${Calc.fmt(item.qty, 4)} az. × ${Calc.fmt(item.price)} − comm. ${Calc.fmt(item.commission)}
+                        </div>
+                        <div class="cart-item-total">
+                            Lordo: <b>${s} ${Calc.fmt(grossReceipt)}</b>
+                            &nbsp;−&nbsp; Tasse ${taxPct}: <b class="neg-loss">${s} ${Calc.fmt(tax)}</b>
+                        </div>
+                        <div class="cart-item-pmc sell-net">
+                            Netto: <b>${s} ${Calc.fmt(netReceipt)}</b>
+                            ${item.valuta === 'USD' ? `<span class="cart-eur-hint">≈ € ${Calc.fmt(netEur)}</span>` : ''}
+                            &nbsp;|&nbsp; Q.tà rim: <b>${Calc.fmt(item.remQty, 4)}</b>
+                        </div>
+                    </div>`;
+            }
+        });
+
+        itemsEl.innerHTML = html;
+
+        itemsEl.querySelectorAll('.cart-item-remove').forEach(btn => {
+            btn.onclick = () => Cart.remove(+btn.dataset.cid);
+        });
+
+        const balance = totalSellNet - totalBuyEur;
+        if (footerEl) {
+            footerEl.innerHTML = `
+                <div class="cart-totals">
+                    <div class="cart-total-row">
+                        <span>💸 Uscite (acquisti):</span>
+                        <span class="neg-loss"><b>− € ${Calc.fmt(totalBuyEur)}</b></span>
+                    </div>
+                    <div class="cart-total-row">
+                        <span>💰 Entrate nette (vendite):</span>
+                        <span class="pos-gain"><b>+ € ${Calc.fmt(totalSellNet)}</b></span>
+                    </div>
+                    ${totalTax > 0 ? `<div class="cart-total-row text-muted"><span>📋 Tasse totali stimate:</span><span>€ ${Calc.fmt(totalTax)}</span></div>` : ''}
+                    <div class="cart-total-row cart-grand-total ${balance >= 0 ? 'pos-gain' : 'neg-loss'}">
+                        <span>Saldo netto:</span>
+                        <span><b>${balance >= 0 ? '+' : ''}€ ${Calc.fmt(balance)}</b></span>
+                    </div>
+                </div>`;
+        }
+    }
+};
 
 // ── HISTORY MODAL ──────────────────────────────────────────────────────────
 export function openHistoryModal(id, portfolio, onSave) {
@@ -301,29 +495,68 @@ export function openSimModal(id, portfolio, prices) {
                 <button class="btn-x" id="sim-close">✕</button>
             </div>
             <div class="modal-body">
+
                 <div style="display:flex; gap:8px; margin-bottom:14px;">
-                    <button id="sim-mode-budget" class="btn-toggle active" style="flex:1;">💶 Per Budget</button>
-                    <button id="sim-mode-qty"    class="btn-toggle"        style="flex:1;">🔢 Per Quantità</button>
+                    <button id="sim-tab-buy"  class="btn-toggle active" style="flex:1;">🟢 Simula Acquisto</button>
+                    <button id="sim-tab-sell" class="btn-toggle"        style="flex:1;">🔴 Simula Vendita</button>
                 </div>
-                <div class="form-grid-2" id="sim-fields">
-                    <div>
-                        <span class="modal-label">Prezzo Simulato</span>
-                        <input type="number" id="sim-prezzo" step="any" value="${prLive}">
+
+                <div id="sim-buy-section">
+                    <div style="display:flex; gap:8px; margin-bottom:14px;">
+                        <button id="sim-mode-budget" class="btn-toggle active" style="flex:1;">💶 Per Budget</button>
+                        <button id="sim-mode-qty"    class="btn-toggle"        style="flex:1;">🔢 Per Quantità</button>
                     </div>
-                    <div>
-                        <span class="modal-label">Commissioni</span>
-                        <input type="number" id="sim-comm" step="any" value="${p.commDefault || 7}">
+                    <div class="form-grid-2" id="sim-fields">
+                        <div>
+                            <span class="modal-label">Prezzo Simulato</span>
+                            <input type="number" id="sim-prezzo" step="any" value="${prLive}">
+                        </div>
+                        <div>
+                            <span class="modal-label">Commissioni</span>
+                            <input type="number" id="sim-comm" step="any" value="${p.commDefault || 7}">
+                        </div>
+                        <div id="sim-budget-field">
+                            <span class="modal-label">Budget Disponibile</span>
+                            <input type="number" id="sim-budget" step="any" placeholder="0.00">
+                        </div>
+                        <div id="sim-qty-field" style="display:none;">
+                            <span class="modal-label">Quantità da Acquistare</span>
+                            <input type="number" id="sim-qty" step="any" placeholder="0">
+                        </div>
                     </div>
-                    <div id="sim-budget-field">
-                        <span class="modal-label">Budget Disponibile</span>
-                        <input type="number" id="sim-budget" step="any" placeholder="0.00">
-                    </div>
-                    <div id="sim-qty-field" style="display:none;">
-                        <span class="modal-label">Quantità da Acquistare</span>
-                        <input type="number" id="sim-qty" step="any" placeholder="0">
-                    </div>
+                    <div id="sim-result" class="preview-box" style="display:none; margin-top:14px;"></div>
+                    <button id="sim-add-cart-buy" class="btn btn-cart btn-full" style="margin-top:12px; display:none;">
+                        🛒 Aggiungi al Carrello
+                    </button>
                 </div>
-                <div id="sim-result" class="preview-box" style="display:none; margin-top:14px;"></div>
+
+                <div id="sim-sell-section" style="display:none;">
+                    <div class="form-grid-2">
+                        <div>
+                            <span class="modal-label">Prezzo di Vendita Simulato</span>
+                            <input type="number" id="sim-sell-prezzo" step="any" value="${prLive}">
+                        </div>
+                        <div>
+                            <span class="modal-label">Quantità da Vendere</span>
+                            <input type="number" id="sim-sell-qty" step="any" placeholder="0" max="${qta}">
+                        </div>
+                        <div>
+                            <span class="modal-label">Commissioni</span>
+                            <input type="number" id="sim-sell-comm" step="any" value="${p.commDefault || 7}">
+                        </div>
+                        <div style="display:flex; align-items:flex-end;">
+                            <div class="preview-box" style="padding:6px 10px; font-size:12px; width:100%;">
+                                PMC attuale: <b>${Calc.fmt(pmc)}</b><br>
+                                Q.tà disponibile: <b>${Calc.fmt(qta, 4)}</b>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="sim-sell-result" class="preview-box" style="display:none; margin-top:14px;"></div>
+                    <button id="sim-add-cart-sell" class="btn btn-cart btn-full" style="margin-top:12px; display:none;">
+                        🛒 Aggiungi al Carrello
+                    </button>
+                </div>
+
                 <button id="sim-close2" class="btn btn-ghost btn-full" style="margin-top:16px;">Chiudi</button>
             </div>
         </div>`;
@@ -335,33 +568,54 @@ export function openSimModal(id, portfolio, prices) {
     document.getElementById('sim-close').onclick  = closeModal;
     document.getElementById('sim-close2').onclick = closeModal;
 
-    let mode = 'budget';
+    let activeTab = 'buy';
+    document.getElementById('sim-tab-buy').onclick = () => {
+        activeTab = 'buy';
+        document.getElementById('sim-tab-buy').classList.add('active');
+        document.getElementById('sim-tab-sell').classList.remove('active');
+        document.getElementById('sim-buy-section').style.display  = '';
+        document.getElementById('sim-sell-section').style.display = 'none';
+    };
+    document.getElementById('sim-tab-sell').onclick = () => {
+        activeTab = 'sell';
+        document.getElementById('sim-tab-sell').classList.add('active');
+        document.getElementById('sim-tab-buy').classList.remove('active');
+        document.getElementById('sim-buy-section').style.display  = 'none';
+        document.getElementById('sim-sell-section').style.display = '';
+        calcSimSell();
+    };
+
+    let buyMode = 'budget';
     document.getElementById('sim-mode-budget').onclick = () => {
-        mode = 'budget';
+        buyMode = 'budget';
         document.getElementById('sim-mode-budget').classList.add('active');
         document.getElementById('sim-mode-qty').classList.remove('active');
         document.getElementById('sim-budget-field').style.display = '';
         document.getElementById('sim-qty-field').style.display = 'none';
-        calcSim();
+        calcSimBuy();
     };
     document.getElementById('sim-mode-qty').onclick = () => {
-        mode = 'qty';
+        buyMode = 'qty';
         document.getElementById('sim-mode-qty').classList.add('active');
         document.getElementById('sim-mode-budget').classList.remove('active');
         document.getElementById('sim-budget-field').style.display = 'none';
         document.getElementById('sim-qty-field').style.display = '';
-        calcSim();
+        calcSimBuy();
     };
 
-    const calcSim = () => {
+    let lastBuyResult = null;
+    const calcSimBuy = () => {
         const pr  = parseFloat(document.getElementById('sim-prezzo').value);
         const c   = parseFloat(document.getElementById('sim-comm').value) || 0;
         const box = document.getElementById('sim-result');
+        const cartBtn = document.getElementById('sim-add-cart-buy');
         const s   = p.valuta === 'USD' ? '$' : '€';
+        lastBuyResult = null;
+        cartBtn.style.display = 'none';
 
         if (isNaN(pr) || pr <= 0) { box.style.display = 'none'; return; }
 
-        if (mode === 'budget') {
+        if (buyMode === 'budget') {
             const b = parseFloat(document.getElementById('sim-budget').value);
             if (isNaN(b) || b <= 0) { box.style.display = 'none'; return; }
             const net = b - c;
@@ -380,7 +634,7 @@ export function openSimModal(id, portfolio, prices) {
                  Azioni acquistabili: <b>${Calc.fmt(aq, 4)}</b> a ${Calc.fmt(pr)}<br>
                  Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
                  Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>`;
-
+            lastBuyResult = { qty: aq, price: pr, commission: c, newPmc, newQty: qta + aq };
         } else {
             const aq = parseFloat(document.getElementById('sim-qty').value);
             if (isNaN(aq) || aq <= 0) { box.style.display = 'none'; return; }
@@ -393,10 +647,99 @@ export function openSimModal(id, portfolio, prices) {
                 `Quantità: <b>${Calc.fmt(aq, 4)}</b> × ${Calc.fmt(pr)} + comm. ${Calc.fmt(c)} = Totale: <b class="hl">${s} ${Calc.fmt(costo)}</b>${convLine}<br>
                  Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
                  Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>`;
+            lastBuyResult = { qty: aq, price: pr, commission: c, newPmc, newQty: qta + aq };
         }
+        if (lastBuyResult) cartBtn.style.display = 'block';
     };
 
-    ['sim-prezzo', 'sim-comm', 'sim-budget', 'sim-qty'].forEach(el => {
-        document.getElementById(el)?.addEventListener('input', calcSim);
+    let lastSellResult = null;
+    const calcSimSell = () => {
+        const pr  = parseFloat(document.getElementById('sim-sell-prezzo').value);
+        const sq  = parseFloat(document.getElementById('sim-sell-qty').value);
+        const c   = parseFloat(document.getElementById('sim-sell-comm').value) || 0;
+        const box = document.getElementById('sim-sell-result');
+        const cartBtn = document.getElementById('sim-add-cart-sell');
+        const s   = p.valuta === 'USD' ? '$' : '€';
+        lastSellResult = null;
+        cartBtn.style.display = 'none';
+
+        if (isNaN(pr) || pr <= 0 || isNaN(sq) || sq <= 0) { box.style.display = 'none'; return; }
+
+        if (sq > qta + 0.0001) {
+            box.style.display = 'block';
+            box.innerHTML = `<span class="text-danger">⚠️ Quantità superiore al disponibile (${Calc.fmt(qta, 4)})</span>`;
+            return;
+        }
+
+        const grossReceipt = sq * pr - c;
+        const pnl          = (pr - pmc) * sq - c;
+        const taxPct       = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
+        const taxLabel     = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
+        const tax          = pnl > 0 ? pnl * taxPct : 0;
+        const netReceipt   = grossReceipt - tax;
+        const remQty       = qta - sq;
+        const convLine     = p.valuta === 'USD'
+            ? `<br>Netto in EUR: <b>≈ € ${Calc.fmt(netReceipt / Exchange.rate)}</b>` : '';
+
+        box.style.display = 'block';
+        box.innerHTML = `
+            <div style="display:grid; gap:4px;">
+                <div>Incasso lordo: <b>${s} ${Calc.fmt(grossReceipt)}</b> &nbsp;(${Calc.fmt(sq, 4)} az. × ${Calc.fmt(pr)} − comm. ${Calc.fmt(c)})</div>
+                <div>P&L operazione: <b class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnl)}</b></div>
+                ${pnl > 0
+                    ? `<div>Tasse (${taxLabel}): <b class="neg-loss">− ${s} ${Calc.fmt(tax)}</b></div>`
+                    : `<div class="text-muted">Nessuna tassa (operazione in perdita)</div>`}
+                <div style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px;">
+                    Incasso <b>netto</b>: <b class="${netReceipt >= 0 ? 'pos-gain' : 'neg-loss'} hl">${s} ${Calc.fmt(netReceipt)}</b>${convLine}
+                </div>
+                <div>Q.tà rimanente: <b>${Calc.fmt(remQty, 4)}</b></div>
+            </div>`;
+
+        lastSellResult = { qty: sq, price: pr, commission: c, pmc, remQty, grossReceipt, netReceipt, tax };
+        cartBtn.style.display = 'block';
+    };
+
+    ['sim-prezzo', 'sim-comm', 'sim-budget', 'sim-qty'].forEach(elId => {
+        document.getElementById(elId)?.addEventListener('input', calcSimBuy);
     });
+
+    ['sim-sell-prezzo', 'sim-sell-qty', 'sim-sell-comm'].forEach(elId => {
+        document.getElementById(elId)?.addEventListener('input', calcSimSell);
+    });
+
+    document.getElementById('sim-add-cart-buy').onclick = () => {
+        if (!lastBuyResult) return;
+        Cart.add({
+            id,
+            nome:      p.nome,
+            type:      'buy',
+            qty:       lastBuyResult.qty,
+            price:     lastBuyResult.price,
+            commission: lastBuyResult.commission,
+            newPmc:    lastBuyResult.newPmc,
+            newQty:    lastBuyResult.newQty,
+            pmc,
+            valuta:    p.valuta || 'EUR',
+            tipoAsset: p.tipoAsset
+        });
+    };
+
+    document.getElementById('sim-add-cart-sell').onclick = () => {
+        if (!lastSellResult) return;
+        Cart.add({
+            id,
+            nome:        p.nome,
+            type:        'sell',
+            qty:         lastSellResult.qty,
+            price:       lastSellResult.price,
+            commission:  lastSellResult.commission,
+            pmc:         lastSellResult.pmc,
+            remQty:      lastSellResult.remQty,
+            grossReceipt: lastSellResult.grossReceipt,
+            netReceipt:  lastSellResult.netReceipt,
+            tax:         lastSellResult.tax,
+            valuta:      p.valuta || 'EUR',
+            tipoAsset:   p.tipoAsset
+        });
+    };
 }
