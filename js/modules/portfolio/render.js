@@ -11,7 +11,6 @@ window._logoFallback = function(el, base) {
     el.onerror = null;
 };
 
-
 function logoImg(nome, cssClass) {
     const base = (nome || '').split('.')[0].split('-')[0].toUpperCase();
     return `<img
@@ -21,7 +20,6 @@ function logoImg(nome, cssClass) {
         onerror="this.src='https://assets.parqet.com/logos/symbol/${base}?format=jpg'; this.onerror=function(){this.src='https://eodhd.com/img/logos/US/${base}.png'; this.onerror=function(){window._logoFallback(this,'${base}');};};"
     >`;
 }
-
 
 export function renderPage(container) {
     container.innerHTML = `
@@ -71,6 +69,7 @@ export function renderPage(container) {
                         <th>Titolo</th>
                         <th>Q.tà</th>
                         <th>PMC</th>
+                        <th>PMC EUR <span class="badge" title="Calcolato con tasso BCE storico del giorno di acquisto">🏦</span></th>
                         <th>Prezzo Live</th>
                         <th>Var. Oggi</th>
                         <th>Controvalore</th>
@@ -100,17 +99,17 @@ export function renderSkeleton() {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     tbody.innerHTML = Array(3).fill(
-        `<tr>${Array(10).fill('<td><div class="skeleton" style="height:14px;width:75%;"></div></td>').join('')}</tr>`
+        `<tr>${Array(11).fill('<td><div class="skeleton" style="height:14px;width:75%;"></div></td>').join('')}</tr>`
     ).join('');
 }
 
-export function renderTable({ portfolio, prices, prevClose, currency }, handlers) {
+export async function renderTable({ portfolio, prices, prevClose, currency }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     const s = currency === 'EUR' ? '€' : '$';
 
     if (!Object.keys(portfolio).length) {
-        tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div></td></tr>`;
         return;
     }
     tbody.innerHTML = '';
@@ -118,7 +117,7 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
     for (const id in portfolio) {
         const p = portfolio[id];
         const v = p.valuta || 'EUR';
-        const { qta, pmc, realizedPnL } = Calc.position(p);
+        const { qta, pmc, pmcEur, realizedPnL } = await Calc.position(p);
         const prLive = prices[id] ?? pmc;
         const prPrev = prevClose[id] ?? null;
 
@@ -140,6 +139,10 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
             }
         });
 
+        const pmcEurHtml = v === 'USD'
+            ? `<span class="text-cyan">€ ${Calc.fmt(pmcEur)}</span>`
+            : `<span class="text-muted fs-xs">—</span>`;
+
         const varHtml = varDay !== null
             ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'}">${Calc.fmtSign(varDay)}%</span>`
             : '<span class="text-muted">—</span>';
@@ -157,6 +160,7 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
             </div></td>
             <td>${Calc.fmt(qta, 4)}</td>
             <td>${Calc.fmt(pmc)}</td>
+            <td>${pmcEurHtml}</td>
             <td><b>${Calc.fmt(prLive)}</b></td>
             <td>${varHtml}</td>
             <td>${s} ${Calc.fmt(cv(att))}</td>
@@ -193,23 +197,34 @@ export function renderTable({ portfolio, prices, prevClose, currency }, handlers
     };
 }
 
-export function renderKPI({ portfolio, prices, currency }) {
+export async function renderKPI({ portfolio, prices, currency }) {
     const s = currency === 'EUR' ? '€' : '$';
     let totInv = 0, totAtt = 0, totReal = 0, totTax = 0, totComm = 0;
+    let totInvEur = 0, totAttEur = 0;
 
     for (const id in portfolio) {
         const p = portfolio[id];
         const v = p.valuta || 'EUR';
-        const { qta, pmc, realizedPnL, totalComm } = Calc.position(p);
-        const prLive = prices[id] ?? pmc;
-        const inv = qta * pmc, att = qta * prLive;
-        const tax = Calc.taxOnGain(att - inv, p.tipoAsset);
-        const cv = x => Exchange.convert(x, v, currency);
+        const { qta, pmc, pmcEur, realizedPnL, totalComm } = await Calc.position(p);
+        const prLive  = prices[id] ?? pmc;
+        const inv     = qta * pmc;
+        const att     = qta * prLive;
+        const tax     = Calc.taxOnGain(att - inv, p.tipoAsset);
+        const cv      = x => Exchange.convert(x, v, currency);
+
         totInv  += cv(inv);
         totAtt  += cv(att);
         totReal += cv(realizedPnL);
         totTax  += cv(tax);
         totComm += cv(totalComm);
+
+        if (v === 'USD') {
+            totInvEur += pmcEur * qta;
+            totAttEur += att / Exchange.rate;
+        } else {
+            totInvEur += inv;
+            totAttEur += att;
+        }
     }
 
     const pnl          = totAtt - totInv;
@@ -217,6 +232,8 @@ export function renderKPI({ portfolio, prices, currency }) {
     const pnlAfterTax  = pnl - totTax;
     const pnlAfterTaxP = totInv > 0 ? (pnlAfterTax / totInv) * 100 : 0;
     const totNetto     = pnlAfterTax + totReal;
+    const pnlEurStorico  = totAttEur - totInvEur;
+    const pnlEurStoricoP = totInvEur > 0 ? (pnlEurStorico / totInvEur) * 100 : 0;
 
     const dash = document.getElementById('dashboard');
     if (!dash) return;
@@ -266,11 +283,17 @@ export function renderKPI({ portfolio, prices, currency }) {
                     <div class="kpi-value ${totNetto >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(totNetto)}</div>
                     <div class="kpi-sub">realizzato + non realizzato</div>
                 </div>
+                <div class="kpi-sep"></div>
+                <div class="kpi-item">
+                    <div class="kpi-title">P&L EUR storico 🏦</div>
+                    <div class="kpi-value ${pnlEurStorico >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlEurStorico)}</div>
+                    <div class="kpi-sub">${Calc.fmtSign(pnlEurStoricoP)}% · tasso BCE storico</div>
+                </div>
             </div>
         </div>`;
 }
 
-export function renderMobileCards({ portfolio, prices, prevClose, currency }, handlers) {
+export async function renderMobileCards({ portfolio, prices, prevClose, currency }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -284,8 +307,8 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
     for (const id in portfolio) {
         const p = portfolio[id];
         const v = p.valuta || 'EUR';
-        const { qta, pmc, realizedPnL } = Calc.position(p);
-        const prLive = prices[id]    ?? pmc;
+        const { qta, pmc, pmcEur, realizedPnL } = await Calc.position(p);
+        const prLive = prices[id] ?? pmc;
         const prPrev = prevClose[id] ?? null;
         const inv    = qta * pmc;
         const att    = qta * prLive;
@@ -295,6 +318,10 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
         const pnlAT  = pnl - tax;
         const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
         const cv     = x => Exchange.convert(x, v, currency);
+
+        const pmcEurHtml = v === 'USD'
+            ? `€ ${Calc.fmt(pmcEur)}`
+            : '—';
 
         const assetBadge =
             p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>' :
@@ -329,6 +356,10 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
                     <span>${Calc.fmt(qta, 4)} / ${Calc.fmt(pmc)}</span>
                 </div>
                 <div class="mobile-card-row">
+                    <span class="text-muted">PMC EUR 🏦</span>
+                    <span>${pmcEurHtml}</span>
+                </div>
+                <div class="mobile-card-row">
                     <span class="text-muted">Controvalore</span>
                     <span>${s} ${Calc.fmt(cv(att))}</span>
                 </div>
@@ -347,11 +378,11 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
                     <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(cv(realizedPnL))}</span>
                 </div>
                 <div class="mobile-card-actions">
-                    <button class="btn btn-dark btn-sm"    data-action="history" data-id="${id}">📜 Storico</button>
-                    <button class="btn btn-success btn-sm" data-action="buy"     data-id="${id}">＋ Compra</button>
-                    <button class="btn btn-purple btn-sm"  data-action="sell"    data-id="${id}">－ Vendi</button>
-                    <button class="btn btn-sm"             data-action="sim"     data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
-                    <button class="btn btn-danger btn-sm"  data-action="delete"  data-id="${id}">🗑 Elimina</button>
+                    <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
+                    <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
+                    <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
+                    <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
+                    <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
                 </div>
             </div>`;
 
@@ -367,11 +398,11 @@ export function renderMobileCards({ portfolio, prices, prevClose, currency }, ha
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 const { action, id } = btn.dataset;
-                if (action === 'history')  handlers.onHistory(id);
-                if (action === 'buy')      handlers.onTransaction(id, 'buy');
-                if (action === 'sell')     handlers.onTransaction(id, 'sell');
-                if (action === 'sim')      handlers.onSimulation(id);
-                if (action === 'delete')   handlers.onDelete(id);
+                if (action === 'history') handlers.onHistory(id);
+                if (action === 'buy') handlers.onTransaction(id, 'buy');
+                if (action === 'sell') handlers.onTransaction(id, 'sell');
+                if (action === 'sim') handlers.onSimulation(id);
+                if (action === 'delete') handlers.onDelete(id);
             });
         });
 
