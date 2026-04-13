@@ -58,7 +58,6 @@ export const CartPanel = {
             }
         };
 
-        // Floating toggle button
         const fab = document.createElement('button');
         fab.id = 'cart-fab';
         fab.innerHTML = '🛒 <span id="cart-badge">0</span>';
@@ -236,7 +235,7 @@ export function openHistoryModal(id, portfolio, onSave) {
 
 function _renderHistoryContent(id, portfolio, onSave) {
     const p = portfolio[id];
-    const { qta, pmc, realizedPnL, totalComm } = Calc.position(p);
+    const { qta, pmc, realizedPnL, totalComm } = Calc.positionSync(p);
     const s = p.valuta === 'USD' ? '$' : '€';
     const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
 
@@ -387,7 +386,7 @@ function _openEditModal(id, origTx, portfolio, onSave) {
 // ── TRANSACTION MODAL ──────────────────────────────────────────────────────
 export function openTransactionModal(id, type, portfolio, prices, onSave) {
     const p = portfolio[id];
-    const { qta, pmc } = Calc.position(p);
+    const { qta, pmc } = Calc.positionSync(p);
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-transazione');
     const isBuy = type === 'buy';
@@ -443,7 +442,7 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
         const dt = document.getElementById('tx-data').value;
         if (isNaN(q) || q <= 0 || isNaN(pr) || pr <= 0) { Toast.show('Inserisci quantità e prezzo validi', 'err'); return; }
         if (type === 'sell') {
-            const { qta } = Calc.position(portfolio[id]);
+            const { qta } = Calc.positionSync(portfolio[id]);
             if (q > qta + 0.0001) { Toast.show('Quantità superiore al disponibile', 'err'); return; }
         }
         if (!portfolio[id].transactions) portfolio[id].transactions = [];
@@ -461,7 +460,7 @@ function _txPreview(id, type, portfolio, prices) {
     const box = document.getElementById('tx-preview');
     if (isNaN(q) || isNaN(pr) || q <= 0) { box.style.display = 'none'; return; }
 
-    const { qta, pmc } = Calc.position(portfolio[id]);
+    const { qta, pmc } = Calc.positionSync(portfolio[id]);
     const p = portfolio[id];
     const s = p.valuta === 'USD' ? '$' : '€';
     box.style.display = 'block';
@@ -481,9 +480,9 @@ function _txPreview(id, type, portfolio, prices) {
 }
 
 // ── SIMULATION MODAL ───────────────────────────────────────────────────────
-export function openSimModal(id, portfolio, prices) {
+export async function openSimModal(id, portfolio, prices) {
     const p = portfolio[id];
-    const { qta, pmc } = Calc.position(p);
+    const { qta, pmc } = Calc.positionSync(p);
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-simulazione');
 
@@ -573,20 +572,17 @@ export function openSimModal(id, portfolio, prices) {
     document.getElementById('sim-close').onclick  = closeModal;
     document.getElementById('sim-close2').onclick = closeModal;
     document.getElementById('sim-sell-max').onclick = () => {
-    document.getElementById('sim-sell-qty').value = qta;
-    calcSimSell();
-};
+        document.getElementById('sim-sell-qty').value = qta;
+        calcSimSell();
+    };
 
-    let activeTab = 'buy';
     document.getElementById('sim-tab-buy').onclick = () => {
-        activeTab = 'buy';
         document.getElementById('sim-tab-buy').classList.add('active');
         document.getElementById('sim-tab-sell').classList.remove('active');
         document.getElementById('sim-buy-section').style.display  = '';
         document.getElementById('sim-sell-section').style.display = 'none';
     };
     document.getElementById('sim-tab-sell').onclick = () => {
-        activeTab = 'sell';
         document.getElementById('sim-tab-sell').classList.add('active');
         document.getElementById('sim-tab-buy').classList.remove('active');
         document.getElementById('sim-buy-section').style.display  = 'none';
