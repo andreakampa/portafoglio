@@ -1,124 +1,178 @@
 const RATE_CACHE_KEY = 'ptpro_fx_history';
-const FX_TTL  = 24 * 60 * 60 * 1000;   // 24h cache tasso live
-const HIST_TTL = 7 * 24 * 60 * 60 * 1000; // 7 giorni cache tassi storici
+const FX_TTL = 24 * 60 * 60 * 1000;
+const HIST_TTL = 7 * 24 * 60 * 60 * 1000;
 const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';
 
 const LATEST_PROXIES = [
-    `${PROXY}?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
+  `${PROXY}?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
+  `https://api.allorigins.win/get?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
 ];
 
-// ── Banca d'Italia API (tasso BCE ufficiale giornaliero) ───────────────────
-// Restituisce il fixing di fine giornata EUR/USD per una data specifica.
-// Documentazione: https://tassidicambio.bancaditalia.it
 const BDITALIA_URL = (dateStr) =>
-    `https://tassidicambio.bancaditalia.it/terzevalute-wf-ui-web/timeSeries` +
-    `?startDate=${dateStr}&endDate=${dateStr}&currencyIsoCode=USD&lang=it`;
+  `https://tassidicambio.bancaditalia.it/terzevalute-wf-ui-web/timeSeries` +
+  `?startDate=${dateStr}&endDate=${dateStr}&currencyIsoCode=USD&lang=it`;
 
 const BDITALIA_PROXIES = (dateStr) => [
-    `${PROXY}?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
+  `${PROXY}?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
+  `https://api.allorigins.win/get?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
 ];
 
+function withTimeout(ms = 6000) {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return { signal: AbortSignal.timeout(ms) };
+  }
+  return {};
+}
+
+function isFresh(ts, ttl) {
+  return Number.isFinite(ts) && (Date.now() - ts <= ttl);
+}
+
 export const Exchange = {
-    rate: 1.08,
+  rate: 1.08,
 
-    // ── Tasso live ──────────────────────────────────────────────────────────
-    async update() {
-        for (let i = 0; i < LATEST_PROXIES.length; i++) {
-            try {
-                const r   = await fetch(LATEST_PROXIES[i], { signal: AbortSignal.timeout(5000) });
-                const raw = await r.json();
-                const d   = (i === 1) ? JSON.parse(raw.contents) : raw;
-                if (d.result === 'success') {
-                    this.rate = d.rates.USD;
-                    return true;
-                }
-            } catch (e) { /* prova proxy successivo */ }
+  _memoryCache: new Map(),
+  _pendingRates: new Map(),
+  _liveRateTs: 0,
+  _storageLoaded: false,
+
+  async update(force = false) {
+    if (!force && isFresh(this._liveRateTs, FX_TTL)) return true;
+
+    for (let i = 0; i < LATEST_PROXIES.length; i++) {
+      try {
+        const r = await fetch(LATEST_PROXIES[i], withTimeout(5000));
+        const raw = await r.json();
+        const data = i === 1 ? JSON.parse(raw.contents) : raw;
+
+        if (data?.result === 'success' && data?.rates?.USD > 0) {
+          this.rate = data.rates.USD;
+          this._liveRateTs = Date.now();
+          return true;
         }
-        return false;
-    },
-
-    convert(value, from, to) {
-        if (from === to) return value;
-        return from === 'EUR' ? value * this.rate : value / this.rate;
-    },
-
-    // ── Tasso storico Banca d'Italia ────────────────────────────────────────
-    // Ritorna il fixing BCE EUR/USD del giorno specificato (es. '2023-05-12').
-    // Usa cache localStorage 7 giorni. Fallback: tasso live corrente.
-    async getRateForDate(dateStr) {
-        if (!dateStr) return this.rate;
-
-        // 1. controlla cache
-        const cache = this._loadFxCache();
-        if (cache[dateStr]) return cache[dateStr];
-
-        // 2. Chiama Banca d'Italia via proxy
-        const proxies = BDITALIA_PROXIES(dateStr);
-        for (let i = 0; i < proxies.length; i++) {
-            try {
-                const r   = await fetch(proxies[i], { signal: AbortSignal.timeout(6000) });
-                const raw = await r.json();
-                const txt = i === 1 ? raw.contents : await (async () => {
-                    // il proxy andrea restituisce già il json parsato
-                    return typeof raw === 'string' ? raw : JSON.stringify(raw);
-                })();
-                const data = typeof txt === 'string' ? JSON.parse(txt) : txt;
-
-                // La risposta Banca d'Italia ha struttura:
-                // { resultsInfo: {...}, rates: [ { currency:'USD', isoCode:'USD',
-                //   referenceDate:'2023-05-12', uicRate: 1.0851, ... } ] }
-                const rates = data?.rates ?? data?.timeSeries ?? [];
-                if (rates.length > 0) {
-                    // uicRate = USD per 1 EUR (quanti USD vale 1 EUR)
-                    const uicRate = parseFloat(rates[0].uicRate ?? rates[0].avgRate ?? 0);
-                    if (uicRate > 0) {
-                        cache[dateStr] = uicRate;
-                        this._saveFxCache(cache);
-                        return uicRate;
-                    }
-                }
-            } catch (e) { /* prova proxy successivo */ }
-        }
-
-        // 3. Fallback: tasso live
-        console.warn(`[Exchange] Tasso storico non trovato per ${dateStr}, uso tasso live ${this.rate}`);
-        return this.rate;
-    },
-
-    // ── Tasso medio ponderato su più transazioni ────────────────────────────
-    // Usato per calcolare il PMC in EUR tenendo conto del cambio storico.
-    async getWeightedHistoricRate(transactions, fromCurrency, toCurrency) {
-        if (fromCurrency === toCurrency) return 1;
-        const buys = (transactions || []).filter(t => t.type === 'buy');
-        if (!buys.length) return this.rate;
-
-        let totalQty  = 0;
-        let totalBase = 0;
-        for (const tx of buys) {
-            const rate = await this.getRateForDate(tx.date);
-            const qty  = +tx.qty;
-            totalQty  += qty;
-            totalBase += qty * rate;  // somma ponderata per quantità
-        }
-        return totalQty > 0 ? totalBase / totalQty : this.rate;
-    },
-
-    // ── Cache localStorage ──────────────────────────────────────────────────
-    _loadFxCache() {
-        try {
-            const raw = localStorage.getItem(RATE_CACHE_KEY);
-            if (!raw) return {};
-            const { data, ts } = JSON.parse(raw);
-            if (Date.now() - ts > HIST_TTL) return {};
-            return data || {};
-        } catch (e) { return {}; }
-    },
-
-    _saveFxCache(data) {
-        try {
-            localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
-        } catch (e) {}
+      } catch (e) {}
     }
+
+    return false;
+  },
+
+  convert(value, from, to) {
+    if (from === to) return value;
+    return from === 'EUR' ? value * this.rate : value / this.rate;
+  },
+
+  async getRateForDate(dateStr) {
+    if (!dateStr) return this.rate;
+
+    this._ensureStorageLoaded();
+
+    const memEntry = this._memoryCache.get(dateStr);
+    if (memEntry && isFresh(memEntry.ts, HIST_TTL)) {
+      return memEntry.rate;
+    }
+
+    if (this._pendingRates.has(dateStr)) {
+      return this._pendingRates.get(dateStr);
+    }
+
+    const request = this._fetchHistoricRate(dateStr)
+      .then((rate) => {
+        const finalRate = rate || this.rate;
+        this._memoryCache.set(dateStr, { rate: finalRate, ts: Date.now() });
+        this._saveFxCache();
+        return finalRate;
+      })
+      .finally(() => {
+        this._pendingRates.delete(dateStr);
+      });
+
+    this._pendingRates.set(dateStr, request);
+    return request;
+  },
+
+  async _fetchHistoricRate(dateStr) {
+    const proxies = BDITALIA_PROXIES(dateStr);
+
+    for (let i = 0; i < proxies.length; i++) {
+      try {
+        const r = await fetch(proxies[i], withTimeout(6000));
+        const raw = await r.json();
+        const data = this._normalizeProxyPayload(raw, i);
+
+        const rates = data?.rates ?? data?.timeSeries ?? [];
+        if (rates.length > 0) {
+          const uicRate = parseFloat(rates[0].uicRate ?? rates[0].avgRate ?? 0);
+          if (uicRate > 0) return uicRate;
+        }
+      } catch (e) {}
+    }
+
+    console.warn(`[Exchange] Tasso storico non trovato per ${dateStr}, uso tasso live ${this.rate}`);
+    return this.rate;
+  },
+
+  _normalizeProxyPayload(raw, proxyIndex) {
+    if (proxyIndex === 1) {
+      return typeof raw?.contents === 'string' ? JSON.parse(raw.contents) : raw?.contents;
+    }
+    return raw;
+  },
+
+  async getWeightedHistoricRate(transactions, fromCurrency, toCurrency) {
+    if (fromCurrency === toCurrency) return 1;
+
+    const buys = (transactions || []).filter(t => t.type === 'buy');
+    if (!buys.length) return this.rate;
+
+    const rates = await Promise.all(
+      buys.map(tx => this.getRateForDate(tx.date))
+    );
+
+    let totalQty = 0;
+    let totalBase = 0;
+
+    buys.forEach((tx, index) => {
+      const qty = +tx.qty || 0;
+      totalQty += qty;
+      totalBase += qty * rates[index];
+    });
+
+    return totalQty > 0 ? totalBase / totalQty : this.rate;
+  },
+
+  _ensureStorageLoaded() {
+    if (this._storageLoaded) return;
+    this._storageLoaded = true;
+
+    try {
+      const raw = localStorage.getItem(RATE_CACHE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw);
+      const data = parsed?.data || {};
+
+      for (const [dateStr, entry] of Object.entries(data)) {
+        if (entry && isFresh(entry.ts, HIST_TTL) && entry.rate > 0) {
+          this._memoryCache.set(dateStr, entry);
+        }
+      }
+    } catch (e) {}
+  },
+
+  _saveFxCache() {
+    try {
+      const data = Object.fromEntries(this._memoryCache.entries());
+      localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ data }));
+    } catch (e) {}
+  },
+
+  clearHistoricCache() {
+    this._memoryCache.clear();
+    this._pendingRates.clear();
+    this._storageLoaded = false;
+
+    try {
+      localStorage.removeItem(RATE_CACHE_KEY);
+    } catch (e) {}
+  }
 };
