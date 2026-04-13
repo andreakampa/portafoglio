@@ -393,7 +393,10 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
     flex-shrink: 0;
 }
 
-
+/* Carrello Spesa - Basso Destra Fissa */
+.cart-panel {
+    position: fixed;
+    bottom
 
 
 
