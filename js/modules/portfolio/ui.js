@@ -40,8 +40,8 @@ export const CartPanel = {
             <div class="cart-header">
                 <span>🛒 Lista della Spesa</span>
                 <div style="display:flex;gap:6px;align-items:center;">
-                    <button id="cart-clear" title="Svuota carrello" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-muted);padding:2px 6px;border-radius:4px;">✕ Svuota</button>
-                    <button id="cart-toggle-btn" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted);">▼</button>
+                    <button id="cart-clear" title="Svuota carrello" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text);padding:2px 6px;border-radius:4px;">✕ Svuota</button>
+                    <button id="cart-toggle-btn" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text);">▼</button>
                 </div>
             </div>
             <div id="cart-body">
@@ -190,7 +190,7 @@ export const CartPanel = {
                         <span>💰 Entrate nette (vendite):</span>
                         <span class="pos-gain"><b>+ € ${Calc.fmt(totalSellNet)}</b></span>
                     </div>
-                    ${totalTax > 0 ? `<div class="cart-total-row text-muted"><span>📋 Tasse totali stimate:</span><span>€ ${Calc.fmt(totalTax)}</span></div>` : ''}
+                    ${totalTax > 0 ? `<div class="cart-total-row muted"><span>📋 Tasse totali stimate:</span><span>€ ${Calc.fmt(totalTax)}</span></div>` : ''}
                     <div class="cart-total-row cart-grand-total ${balance >= 0 ? 'pos-gain' : 'neg-loss'}">
                         <span>Saldo netto:</span>
                         <span><b>${balance >= 0 ? '+' : ''}€ ${Calc.fmt(balance)}</b></span>
@@ -220,3 +220,4 @@ export function openHistoryModal(id, portfolio, onSave) {
                             <th>Prezzo</th><th>Comm.</th><th>Totale</th>
                             <th>PMC</th><th>P&L</th><th></th>
                         </tr></thead>
+                        <t
