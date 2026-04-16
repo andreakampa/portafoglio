@@ -27,7 +27,10 @@ export class PortfolioPage {
         renderSkeleton();
 
         const cached = Cache.getPrices();
-        if (cached) { this.prices = cached.prices; this.prevClose = cached.prevs; }
+        if (cached) {
+            this.prices = cached.prices;
+            this.prevClose = cached.prevs;
+        }
 
         await Promise.all([Exchange.update(), this._loadData()]);
         this._updateExchangeLabel();
@@ -43,14 +46,10 @@ export class PortfolioPage {
         clearInterval(this._autoTimer);
     }
 
-    // ── RENDER CENTRALIZZATO ─────────────────────────────────────────────────
-    // Unico punto dove viene chiamata buildPositionMap.
-    // renderKPI, renderTable e renderMobileCards ricevono positionMap già pronto.
     async _render() {
         const { portfolio, prices, prevClose, currency } = this;
 
         const positionMap = await buildPositionMap(portfolio, prices);
-
         const state = { portfolio, positionMap, prices, prevClose, currency };
 
         renderKPI(state);
@@ -61,6 +60,7 @@ export class PortfolioPage {
     async _loadData() {
         const raw = await DB.load('portafoglio');
         this.portfolio = raw || {};
+
         let migrated = false;
         for (const id in this.portfolio) {
             const p = this.portfolio[id];
@@ -69,16 +69,23 @@ export class PortfolioPage {
                 if (p.qta > 0) {
                     p.transactions.push({
                         date: new Date().toISOString().slice(0, 10),
-                        type: 'buy', qty: +p.qta, price: +(p.pmc || 0), commission: 0
+                        type: 'buy',
+                        qty: +p.qta,
+                        price: +(p.pmc || 0),
+                        commission: 0
                     });
                 }
                 if (p.realizedPnL)  p._legacyRealizedPnL = +p.realizedPnL;
                 if (!p.tipoAsset)   p.tipoAsset = 'stock';
                 if (!p.commDefault) p.commDefault = 7;
-                delete p.qta; delete p.pmc; delete p.realizedPnL;
+
+                delete p.qta;
+                delete p.pmc;
+                delete p.realizedPnL;
                 migrated = true;
             }
         }
+
         if (migrated) {
             await DB.save('portafoglio', this.portfolio);
             Toast.show('📦 Dati migrati al nuovo formato', 'info');
@@ -93,24 +100,28 @@ export class PortfolioPage {
 
     async _refreshPrices(soloId = null) {
         const btn = document.getElementById('btn-refresh');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Aggiornamento...'; }
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>Aggiornamento...';
+        }
 
         const tickerMap = soloId
             ? { [soloId]: this.portfolio[soloId].nome }
             : Object.fromEntries(
                 Object.keys(this.portfolio).map(id => [id, this.portfolio[id].nome])
-              );
+            );
 
         const { prices, prevs } = await Yahoo.fetchAll(tickerMap);
         Object.assign(this.prices, prices);
         Object.assign(this.prevClose, prevs);
         Cache.savePrices(this.prices, this.prevClose);
 
-        if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Aggiorna'; }
-        this._updateTimestamp();
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🔄 Aggiorna';
+        }
 
-        // I prezzi sono cambiati ma le transazioni no: invalidiamo solo la
-        // cache di exchange (tassi live) lasciando intatta quella di calc.js
+        this._updateTimestamp();
         await this._render();
     }
 
@@ -122,7 +133,9 @@ export class PortfolioPage {
 
     _updateExchangeLabel() {
         const el = document.getElementById('exchange-info');
-        if (el) el.innerHTML = `Cambio Real-Time: <span>1 EUR = ${Exchange.rate.toFixed(4)} USD</span>`;
+        if (el) {
+            el.innerHTML = `Cambio Real-Time: <span>1 EUR = ${Exchange.rate.toFixed(4)} USD</span>`;
+        }
     }
 
     _updateTimestamp() {
@@ -163,16 +176,25 @@ export class PortfolioPage {
         inputTitolo.addEventListener('input', () => {
             clearSelection();
             clearTimeout(_suggestTimer);
+
             const q = inputTitolo.value.trim();
-            if (q.length < 1) { suggestBox.innerHTML = ''; suggestBox.classList.remove('visible'); return; }
+            if (q.length < 1) {
+                suggestBox.innerHTML = '';
+                suggestBox.classList.remove('visible');
+                return;
+            }
+
             suggestBox.innerHTML = '<div class="suggest-loading">Ricerca...</div>';
             suggestBox.classList.add('visible');
+
             _suggestTimer = setTimeout(async () => {
                 const results = await Search.query(q);
+
                 if (!results.length) {
                     suggestBox.innerHTML = '<div class="suggest-empty">Nessun risultato</div>';
                     return;
                 }
+
                 suggestBox.innerHTML = results.map(r => `
                     <div class="suggest-item"
                          data-ticker="${r.ticker}"
@@ -185,7 +207,8 @@ export class PortfolioPage {
                         <span class="suggest-ticker">${r.ticker}</span>
                         <span class="suggest-name">${r.name}</span>
                         <span class="suggest-meta">${r.exchange} · ${r.currency} · ${r.tipoLabel}</span>
-                    </div>`).join('');
+                    </div>
+                `).join('');
 
                 suggestBox.querySelectorAll('.suggest-item').forEach(el => {
                     el.addEventListener('click', () => {
@@ -200,6 +223,7 @@ export class PortfolioPage {
                         hiddenValuta.value = currency;
                         inputTitolo.value  = ticker;
                         document.getElementById('input-logo-url').value = logo;
+
                         suggestBox.innerHTML = '';
                         suggestBox.classList.remove('visible');
                         btnAdd.disabled = false;
@@ -231,45 +255,57 @@ export class PortfolioPage {
         this.currency = v;
         document.getElementById('btn-eur')?.classList.toggle('active', v === 'EUR');
         document.getElementById('btn-usd')?.classList.toggle('active', v === 'USD');
-        // Cambio valuta: dati già calcolati in cache, buildPositionMap è quasi gratuito
         await this._render();
     }
 
     _handlers() {
         return {
-            onHistory:     id => openHistoryModal(id, this.portfolio, () => this._save()),
-            onTransaction: (id, type) => openTransactionModal(id, type, this.portfolio, this.prices,
-                async () => { await this._save(); }),
-            onSimulation:  id => openSimModal(id, this.portfolio, this.prices),
-            onDelete:      id => this._elimina(id),
+            onHistory: id => openHistoryModal(id, this.portfolio, () => this._save()),
+            onTransaction: (id, type) => openTransactionModal(
+                id,
+                type,
+                this.portfolio,
+                this.prices,
+                async () => { await this._save(); }
+            ),
+            onSimulation: id => openSimModal(id, this.portfolio, this.prices),
+            onDelete: id => this._elimina(id),
         };
     }
 
     async _aggiungiTitolo() {
         const nome   = document.getElementById('input-ticker-final').value.toUpperCase().trim();
         const valuta = document.getElementById('input-valuta').value || 'EUR';
-        if (!nome) { Toast.show('Seleziona un titolo dalla lista', 'err'); return; }
-        if (Object.values(this.portfolio).find(p => p.nome === nome)) {
-            Toast.show(`${nome} già presente`, 'err'); return;
+
+        if (!nome) {
+            Toast.show('Seleziona un titolo dalla lista', 'err');
+            return;
         }
-        const id     = 'T' + Date.now();
+
+        if (Object.values(this.portfolio).find(p => p.nome === nome)) {
+            Toast.show(`${nome} già presente`, 'err');
+            return;
+        }
+
+        const id = 'T' + Date.now();
         const logoUrl = document.getElementById('input-logo-url').value || null;
 
         this.portfolio[id] = {
-            nome, valuta,
-            tipoAsset:    document.getElementById('input-tipo-asset').value,
-            commDefault:  parseFloat(document.getElementById('input-comm-default').value) || 7,
+            nome,
+            valuta,
+            tipoAsset: document.getElementById('input-tipo-asset').value,
+            commDefault: parseFloat(document.getElementById('input-comm-default').value) || 7,
             logoUrl,
             transactions: []
         };
 
-        document.getElementById('input-titolo').value           = '';
-        document.getElementById('input-ticker-final').value     = '';
-        document.getElementById('input-valuta').value           = '';
-        document.getElementById('input-logo-url').value         = '';
-        document.getElementById('btn-add-titolo').disabled      = true;
-        document.getElementById('ticker-selected').textContent  = '— nessuno selezionato —';
-        document.getElementById('ticker-selected').className    = 'ticker-selected-box';
+        document.getElementById('input-titolo').value          = '';
+        document.getElementById('input-ticker-final').value    = '';
+        document.getElementById('input-valuta').value          = '';
+        document.getElementById('input-logo-url').value        = '';
+        document.getElementById('btn-add-titolo').disabled     = true;
+        document.getElementById('ticker-selected').textContent = '— nessuno selezionato —';
+        document.getElementById('ticker-selected').className   = 'ticker-selected-box';
 
         await this._save();
         this._refreshPrices(id);
@@ -279,9 +315,11 @@ export class PortfolioPage {
     async _elimina(id) {
         const nome = this.portfolio[id]?.nome;
         if (!confirm(`Eliminare ${nome} e tutto il suo storico?`)) return;
+
         delete this.portfolio[id];
         delete this.prices[id];
         delete this.prevClose[id];
+
         await this._save();
         Toast.show(`${nome} rimosso`, 'ok');
     }
