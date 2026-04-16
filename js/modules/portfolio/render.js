@@ -18,22 +18,14 @@ window._logoFallback = function(el, base) {
 };
 
 function logoImg(p, cssClass = 'asset-logo') {
-    const baseName = (p.nome || '?');
-    const ticker = String(p.ticker || p.symbol || p.simbolo || '').trim().toUpperCase();
-    const src = p.logoUrl
-        ? p.logoUrl
-        : (ticker
-            ? `https://img.logo.dev/ticker/${encodeURIComponent(ticker)}?token=pk_free`
-            : 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
-
-    return `<img
-        src="${src}"
-        class="${cssClass}"
-        alt=""
-        loading="lazy"
-        style="width:40px;height:40px;min-width:40px;max-width:40px;object-fit:contain;display:block;border-radius:12px;"
-        onerror="_logoFallback(this, ${JSON.stringify(baseName)})"
-    >`;
+    if (p.logoUrl) {
+        return `<img src="${p.logoUrl}" class="${cssClass}" alt="" loading="lazy"
+                    onerror="_logoFallback(this,'${p.nome.replace(/'/g, "\\'")}')">`;
+    }
+    const base = (p.nome || '?').replace(/'/g, "\\'");
+    return `<img src="https://img.logo.dev/ticker/${encodeURIComponent(p.nome)}?token=pk_free"
+                class="${cssClass}" alt="" loading="lazy"
+                onerror="_logoFallback(this,'${base}')">`;
 }
 
 export function renderPage(container) {
@@ -81,31 +73,32 @@ export function renderPage(container) {
 
             <div id="portfolio-kpi" class="kpi-grid"></div>
 
-                                   <div class="desktop-only">
-                <div class="table-panel">
-                    <div class="table-wrapper">
-                        <table class="portfolio-table">
-                            <thead>
-                                <tr>
-                                    <th>Titolo</th>
-                                    <th>Prezzo</th>
-                                    <th>Q.tà</th>
-                                    <th>PMC</th>
-                                    <th>PMC EUR 🏦</th>
-                                    <th>P&L %</th>
-                                    <th>P&L</th>
-                                    <th>Azioni</th>
-                                </tr>
-                            </thead>
-                            <tbody id="portfolio-body"></tbody>
-                        </table>
-                    </div>
+            <div class="table-panel">
+                <div class="table-wrapper">
+                    <table class="portfolio-table">
+                        <thead>
+                            <tr>
+                                <th>Titolo</th>
+                                <th>Prezzo</th>
+                                <th>Q.tà</th>
+                                <th>PMC</th>
+                                <th>PMC EUR 🏦</th>
+                                <th>P&L %</th>
+                                <th>P&L</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="portfolio-body"></tbody>
+                    </table>
                 </div>
             </div>
 
-            <div class="mobile-only">
-                <div id="portfolio-mobile" class="mobile-cards"></div>
-            </div>
+            <div id="portfolio-mobile" class="mobile-cards"></div>
+
+            <div id="modal-transazione" class="overlay"></div>
+            <div id="modal-history" class="overlay"></div>
+            <div id="modal-simulazione" class="overlay"></div>
+        </div>`;
 }
 
 export function renderSkeleton() {
