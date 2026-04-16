@@ -103,10 +103,6 @@ export function renderSkeleton() {
     ).join('');
 }
 
-// ── PIPELINE DATI ─────────────────────────────────────────────────────────────
-// Calcola tutte le posizioni UNA SOLA VOLTA per refresh.
-// renderTable, renderKPI e renderMobileCards ricevono `positionMap` già pronto
-// e non fanno più nessun await interno al loop.
 export async function buildPositionMap(portfolio, prices) {
     const ids = Object.keys(portfolio);
     const positions = await Promise.all(ids.map(id => Calc.position(portfolio[id])));
@@ -137,7 +133,6 @@ export async function buildPositionMap(portfolio, prices) {
     return map;
 }
 
-// ── TABLE ─────────────────────────────────────────────────────────────────────
 export function renderTable({ portfolio, positionMap, prevClose, currency }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
@@ -158,7 +153,6 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
         const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
 
         const rowId = `row-pnlp-${id}`;
-        // P&L% con FX storico: rimane async ma è solo UI secondaria, non blocca il render
         Calc.pnlPercentWithFx(p, prLive, currency).then(pct => {
             const el = document.getElementById(rowId);
             if (el) {
@@ -167,8 +161,9 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
             }
         });
 
-        const pmcEurHtml = v === 'USD'
-            ? `<span class="text-cyan">€ ${Calc.fmt(pmcEur)}</span>`
+        const pmcEurValue = pmcEur > 0 ? pmcEur : (v === 'EUR' ? pmc : 0);
+        const pmcEurHtml = pmcEurValue > 0
+            ? `<span class="${v === 'EUR' ? 'text-muted' : 'text-cyan'}">€ ${Calc.fmt(pmcEurValue)}</span>`
             : `<span class="text-muted fs-xs">—</span>`;
 
         const varHtml = varDay !== null
@@ -225,7 +220,6 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
     };
 }
 
-// ── KPI ───────────────────────────────────────────────────────────────────────
 export function renderKPI({ portfolio, positionMap, currency }) {
     const s = currency === 'EUR' ? '€' : '$';
     let totInv = 0, totAtt = 0, totReal = 0, totTax = 0, totComm = 0;
@@ -318,7 +312,6 @@ export function renderKPI({ portfolio, positionMap, currency }) {
         </div>`;
 }
 
-// ── MOBILE CARDS ──────────────────────────────────────────────────────────────
 export function renderMobileCards({ portfolio, positionMap, prevClose, currency }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
@@ -338,7 +331,8 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency 
         const cv     = x => Exchange.convert(x, v, currency);
         const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
 
-        const pmcEurHtml = v === 'USD' ? `€ ${Calc.fmt(pmcEur)}` : '—';
+        const pmcEurValue = pmcEur > 0 ? pmcEur : (v === 'EUR' ? pmc : 0);
+        const pmcEurHtml = pmcEurValue > 0 ? `€ ${Calc.fmt(pmcEurValue)}` : '—';
 
         const assetBadge =
             p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>'  :
