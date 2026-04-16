@@ -18,26 +18,22 @@ window._logoFallback = function(el, base) {
 };
 
 function logoImg(p, cssClass = 'asset-logo') {
-    const baseName = (p.nome || '?').replace(/'/g, "\\'");
-    const tickerRaw = p.ticker || p.symbol || p.simbolo || '';
-    const ticker = String(tickerRaw || '').trim().toUpperCase();
+    const baseName = (p.nome || '?');
+    const ticker = String(p.ticker || p.symbol || p.simbolo || '').trim().toUpperCase();
+    const src = p.logoUrl
+        ? p.logoUrl
+        : (ticker
+            ? `https://img.logo.dev/ticker/${encodeURIComponent(ticker)}?token=pk_free`
+            : 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
 
-    const safeStyle = `style="width:40px;height:40px;min-width:40px;max-width:40px;object-fit:contain;display:block;border-radius:12px;"`;
-
-    if (p.logoUrl) {
-        return `<img src="${p.logoUrl}" class="${cssClass}" alt="" loading="lazy" ${safeStyle}
-                    onerror="_logoFallback(this,'${baseName}')">`;
-    }
-
-    if (ticker) {
-        return `<img src="https://img.logo.dev/ticker/${encodeURIComponent(ticker)}?token=pk_free"
-                    class="${cssClass}" alt="" loading="lazy" ${safeStyle}
-                    onerror="_logoFallback(this,'${baseName}')">`;
-    }
-
-    return `<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" class="${cssClass}" alt="" loading="lazy" ${safeStyle}
-                onerror="_logoFallback(this,'${baseName}')"
-                onload="_logoFallback(this,'${baseN\ame}')">`;
+    return `<img
+        src="${src}"
+        class="${cssClass}"
+        alt=""
+        loading="lazy"
+        style="width:40px;height:40px;min-width:40px;max-width:40px;object-fit:contain;display:block;border-radius:12px;"
+        onerror="_logoFallback(this, ${JSON.stringify(baseName)})"
+    >`;
 }
 
 export function renderPage(container) {
