@@ -6,32 +6,12 @@ function todayISO() { return new Date().toISOString().slice(0, 10); }
 function lockScroll()   { document.body.classList.add('modal-open'); }
 function unlockScroll() { document.body.classList.remove('modal-open'); }
 
-async function _fillTxExchangeRate(id, silent = false) {
-    const p = window.__portfolioCache?.[id] || null;
-    const input = document.getElementById('tx-exchange');
-    const wrap = document.getElementById('tx-exchange-wrap');
-    if (!p || p.valuta !== 'USD' || !input || !wrap) return null;
-
-    const dt = document.getElementById('tx-data')?.value;
-    if (!dt) return null;
-
-    try {
-        const rate = await Exchange.getRateForDate(dt);
-        if (rate && isFinite(rate) && rate > 0) {
-            if (!input.value || !silent) input.value = rate;
-            return rate;
-        }
-    } catch (e) {}
-
-    if (!silent) input.placeholder = 'auto';
-    return Exchange.rate || null;
-}
-
 // ── CART STORE ─────────────────────────────────────────────────────────────
 export const Cart = {
     items: [],
 
     add(item) {
+        // item: { id, nome, type:'buy'|'sell', qty, price, commission, pmc, valuta, tipoAsset }
         this.items.push({ ...item, _cartId: Date.now() + Math.random() });
         CartPanel.render();
         CartPanel.show();
@@ -393,8 +373,7 @@ function _openEditModal(id, origTx, portfolio, onSave) {
         if (realIdx > -1) {
             portfolio[id].transactions[realIdx] = {
                 date: newDate, type: newType,
-                qty: newQty, price: newPr, commission: newComm,
-                exchangeRate: origTx.exchangeRate || null
+                qty: newQty, price: newPr, commission: newComm
             };
         }
         close();
@@ -407,9 +386,6 @@ function _openEditModal(id, origTx, portfolio, onSave) {
 // ── TRANSACTION MODAL ──────────────────────────────────────────────────────
 export function openTransactionModal(id, type, portfolio, prices, onSave) {
     const p = portfolio[id];
-    window.__portfolioCache = window.__portfolioCache || {};
-    window.__portfolioCache[id] = p;
-
     const { qta, pmc } = Calc.positionSync(p);
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-transazione');
@@ -439,13 +415,6 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
                         <span class="modal-label">Commissione (€)</span>
                         <input type="number" id="tx-comm" step="any" value="${p.commDefault || 7}">
                     </div>
-                    <div id="tx-exchange-wrap" style="display:${p.valuta === 'USD' ? 'block' : 'none'};">
-                        <span class="modal-label">Cambio storico EUR/USD</span>
-                        <input type="number" id="tx-exchange" step="0.000001" placeholder="auto">
-                    </div>
-                    <div id="tx-exchange-note" style="display:${p.valuta === 'USD' ? 'block' : 'none'}; align-self:end;" class="preview-box">
-                        Verrà salvato il cambio del giorno della data scelta.
-                    </div>
                 </div>
                 <div id="tx-preview" class="preview-box" style="display:none; margin-top:14px;"></div>
                 <button id="tx-confirm" class="btn ${isBuy ? 'btn-success' : 'btn-purple'} btn-full" style="margin-top:16px;">
@@ -465,41 +434,19 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
     document.getElementById('tx-qta').oninput    = preview;
     document.getElementById('tx-prezzo').oninput = preview;
     document.getElementById('tx-comm').oninput   = preview;
-    document.getElementById('tx-data').onchange  = async () => {
-        await _fillTxExchangeRate(id);
-        preview();
-    };
-    document.getElementById('tx-exchange')?.addEventListener('input', preview);
-    _fillTxExchangeRate(id);
 
     document.getElementById('tx-confirm').onclick = async () => {
         const q  = parseFloat(document.getElementById('tx-qta').value);
         const pr = parseFloat(document.getElementById('tx-prezzo').value);
         const c  = parseFloat(document.getElementById('tx-comm').value) || 0;
         const dt = document.getElementById('tx-data').value;
-        const ex = parseFloat(document.getElementById('tx-exchange')?.value);
-        const txExchangeRate = p.valuta === 'USD'
-            ? (isFinite(ex) && ex > 0 ? ex : await _fillTxExchangeRate(id, true))
-            : null;
-
-        if (isNaN(q) || q <= 0 || isNaN(pr) || pr <= 0) {
-            Toast.show('Inserisci quantità e prezzo validi', 'err');
-            return;
-        }
-
+        if (isNaN(q) || q <= 0 || isNaN(pr) || pr <= 0) { Toast.show('Inserisci quantità e prezzo validi', 'err'); return; }
         if (type === 'sell') {
             const { qta } = Calc.positionSync(portfolio[id]);
-            if (q > qta + 0.0001) {
-                Toast.show('Quantità superiore al disponibile', 'err');
-                return;
-            }
+            if (q > qta + 0.0001) { Toast.show('Quantità superiore al disponibile', 'err'); return; }
         }
-
         if (!portfolio[id].transactions) portfolio[id].transactions = [];
-        const tx = { date: dt, type, qty: q, price: pr, commission: c };
-        if (p.valuta === 'USD') tx.exchangeRate = txExchangeRate;
-        portfolio[id].transactions.push(tx);
-
+        portfolio[id].transactions.push({ date: dt, type, qty: q, price: pr, commission: c });
         closeModal();
         await onSave();
         Toast.show(`${isBuy ? 'Acquisto' : 'Vendita'} di ${p.nome} registrata`, 'ok');
@@ -787,16 +734,16 @@ export async function openSimModal(id, portfolio, prices) {
         if (!lastBuyResult) return;
         Cart.add({
             id,
-            nome:       p.nome,
-            type:       'buy',
-            qty:        lastBuyResult.qty,
-            price:      lastBuyResult.price,
+            nome:      p.nome,
+            type:      'buy',
+            qty:       lastBuyResult.qty,
+            price:     lastBuyResult.price,
             commission: lastBuyResult.commission,
-            newPmc:     lastBuyResult.newPmc,
-            newQty:     lastBuyResult.newQty,
+            newPmc:    lastBuyResult.newPmc,
+            newQty:    lastBuyResult.newQty,
             pmc,
-            valuta:     p.valuta || 'EUR',
-            tipoAsset:  p.tipoAsset
+            valuta:    p.valuta || 'EUR',
+            tipoAsset: p.tipoAsset
         });
     };
 
@@ -804,18 +751,18 @@ export async function openSimModal(id, portfolio, prices) {
         if (!lastSellResult) return;
         Cart.add({
             id,
-            nome:         p.nome,
-            type:         'sell',
-            qty:          lastSellResult.qty,
-            price:        lastSellResult.price,
-            commission:   lastSellResult.commission,
-            pmc:          lastSellResult.pmc,
-            remQty:       lastSellResult.remQty,
+            nome:        p.nome,
+            type:        'sell',
+            qty:         lastSellResult.qty,
+            price:       lastSellResult.price,
+            commission:  lastSellResult.commission,
+            pmc:         lastSellResult.pmc,
+            remQty:      lastSellResult.remQty,
             grossReceipt: lastSellResult.grossReceipt,
-            netReceipt:   lastSellResult.netReceipt,
-            tax:          lastSellResult.tax,
-            valuta:       p.valuta || 'EUR',
-            tipoAsset:    p.tipoAsset
+            netReceipt:  lastSellResult.netReceipt,
+            tax:         lastSellResult.tax,
+            valuta:      p.valuta || 'EUR',
+            tipoAsset:   p.tipoAsset
         });
     };
 }
