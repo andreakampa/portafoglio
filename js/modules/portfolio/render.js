@@ -18,14 +18,26 @@ window._logoFallback = function(el, base) {
 };
 
 function logoImg(p, cssClass = 'asset-logo') {
+    const baseName = (p.nome || '?').replace(/'/g, "\\'");
+    const tickerRaw = p.ticker || p.symbol || p.simbolo || '';
+    const ticker = String(tickerRaw || '').trim().toUpperCase();
+
+    const safeStyle = `style="width:40px;height:40px;min-width:40px;max-width:40px;object-fit:contain;display:block;border-radius:12px;"`;
+
     if (p.logoUrl) {
-        return `<img src="${p.logoUrl}" class="${cssClass}" alt="" loading="lazy"
-                    onerror="_logoFallback(this,'${p.nome.replace(/'/g, "\\'")}')">`;
+        return `<img src="${p.logoUrl}" class="${cssClass}" alt="" loading="lazy" ${safeStyle}
+                    onerror="_logoFallback(this,'${baseName}')">`;
     }
-    const base = (p.nome || '?').replace(/'/g, "\\'");
-    return `<img src="https://img.logo.dev/ticker/${encodeURIComponent(p.nome)}?token=pk_free"
-                class="${cssClass}" alt="" loading="lazy"
-                onerror="_logoFallback(this,'${base}')">`;
+
+    if (ticker) {
+        return `<img src="https://img.logo.dev/ticker/${encodeURIComponent(ticker)}?token=pk_free"
+                    class="${cssClass}" alt="" loading="lazy" ${safeStyle}
+                    onerror="_logoFallback(this,'${baseName}')">`;
+    }
+
+    return `<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" class="${cssClass}" alt="" loading="lazy" ${safeStyle}
+                onerror="_logoFallback(this,'${baseName}')"
+                onload="_logoFallback(this,'${baseN\ame}')">`;
 }
 
 export function renderPage(container) {
