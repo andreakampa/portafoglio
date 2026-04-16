@@ -41,7 +41,7 @@ export const Calc = {
                 .slice()
                 .sort((a, b) => a.date.localeCompare(b.date));
 
-            const v = holding.valuta || 'EUR';
+            const v = (holding.valuta || 'EUR').toUpperCase();
 
             let qta = 0;
             let pmcCost = 0;
@@ -49,18 +49,18 @@ export const Calc = {
             let totalComm = 0;
             let totalCostEur = 0;
 
-            const usdBuyDates = [...new Set(
+            const fxBuyDates = [...new Set(
                 txs
-                    .filter(tx => tx.type === 'buy' && v === 'USD' && !tx.exchangeRate && tx.date)
+                    .filter(tx => tx.type === 'buy' && v !== 'EUR' && !tx.exchangeRate && tx.date)
                     .map(tx => tx.date)
             )];
 
             const rateMap = new Map();
-            if (usdBuyDates.length) {
+            if (fxBuyDates.length) {
                 const rates = await Promise.all(
-                    usdBuyDates.map(date => Exchange.getRateForDate(date))
+                    fxBuyDates.map(date => Exchange.getRateForDate(date).catch(() => null))
                 );
-                usdBuyDates.forEach((date, index) => {
+                fxBuyDates.forEach((date, index) => {
                     rateMap.set(date, rates[index]);
                 });
             }
@@ -76,20 +76,19 @@ export const Calc = {
                     qta += q;
                     pmcCost = qta > 0 ? newCost / qta : 0;
 
-                    if (v === 'USD') {
-                        const rate = tx.exchangeRate
-                            ? parseFloat(tx.exchangeRate)
-                            : (rateMap.get(tx.date) || Exchange.rate);
-
-                        totalCostEur += (q * pr + c) / rate;
-                    } else {
+                    if (v === 'EUR') {
                         totalCostEur += (q * pr + c);
+                    } else {
+                        let rate = tx.exchangeRate ? parseFloat(tx.exchangeRate) : rateMap.get(tx.date);
+                        if (!rate || !isFinite(rate) || rate <= 0) rate = Exchange.rate;
+                        if (!rate || !isFinite(rate) || rate <= 0) rate = 1;
+                        totalCostEur += (q * pr + c) / rate;
                     }
                 } else {
                     realizedPnL += (pr - pmcCost) * q - c;
 
                     if (qta > 0) {
-                        const ratio = q / qta;
+                        const ratio = Math.min(q / qta, 1);
                         totalCostEur -= totalCostEur * ratio;
                     }
 
@@ -97,14 +96,25 @@ export const Calc = {
 
                     if (qta < 0.00001) {
                         qta = 0;
+                        pmcCost = 0;
                         totalCostEur = 0;
                     }
                 }
             }
 
-            const pmcEur = qta > 0 ? totalCostEur / qta : 0;
+            const pmc = qta > 0 ? pmcCost : 0;
+            const pmcEur = qta > 0
+                ? (v === 'EUR' ? pmc : totalCostEur / qta)
+                : 0;
 
-            return { qta, pmc: pmcCost, pmcEur, totalCostEur, realizedPnL, totalComm };
+            return {
+                qta,
+                pmc,
+                pmcEur,
+                totalCostEur,
+                realizedPnL,
+                totalComm
+            };
         })();
 
         this._positionCache.set(sig, promise);
@@ -145,11 +155,14 @@ export const Calc = {
             } else {
                 realizedPnL += (pr - pmcCost) * q - c;
                 qta -= q;
-                if (qta < 0.00001) qta = 0;
+                if (qta < 0.00001) {
+                    qta = 0;
+                    pmcCost = 0;
+                }
             }
         }
 
-        const result = { qta, pmc: pmcCost, realizedPnL, totalComm };
+        const result = { qta, pmc: qta > 0 ? pmcCost : 0, realizedPnL, totalComm };
         this._positionSyncCache.set(sig, result);
         return result;
     },
@@ -162,7 +175,7 @@ export const Calc = {
     },
 
     async pnlPercentWithFx(holding, prLive, displayCurrency) {
-        const v = holding.valuta || 'EUR';
+        const v = (holding.valuta || 'EUR').toUpperCase();
         const pos = await this.position(holding);
         const { qta, pmc, pmcEur } = pos;
 
@@ -172,11 +185,12 @@ export const Calc = {
             return ((prLive - pmc) / pmc) * 100;
         }
 
-        if (v === 'USD' && displayCurrency === 'EUR') {
+        if (v !== 'EUR' && displayCurrency === 'EUR') {
             if (pmcEur <= 0) return 0;
-            const valueEur = (prLive * qta) / Exchange.rate;
+            const fx = Exchange.rate || 1;
+            const valueEur = (prLive * qta) / fx;
             const costEur = pmcEur * qta;
-            return ((valueEur - costEur) / costEur) * 100;
+            return costEur > 0 ? ((valueEur - costEur) / costEur) * 100 : 0;
         }
 
         const historicRate = await Exchange.getWeightedHistoricRate(
@@ -186,7 +200,7 @@ export const Calc = {
         );
 
         const costInDisplay = v === 'EUR' ? pmc * historicRate : pmc / historicRate;
-        const valueInDisplay = v === 'EUR' ? prLive * Exchange.rate : prLive / Exchange.rate;
+        const valueInDisplay = v === 'EUR' ? prLive * (Exchange.rate || 1) : prLive / (Exchange.rate || 1);
 
         return costInDisplay > 0
             ? ((valueInDisplay - costInDisplay) / costInDisplay) * 100
