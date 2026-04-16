@@ -81,32 +81,31 @@ export function renderPage(container) {
 
             <div id="portfolio-kpi" class="kpi-grid"></div>
 
-            <div class="table-panel">
-                <div class="table-wrapper">
-                    <table class="portfolio-table">
-                        <thead>
-                            <tr>
-                                <th>Titolo</th>
-                                <th>Prezzo</th>
-                                <th>Q.tà</th>
-                                <th>PMC</th>
-                                <th>PMC EUR 🏦</th>
-                                <th>P&L %</th>
-                                <th>P&L</th>
-                                <th>Azioni</th>
-                            </tr>
-                        </thead>
-                        <tbody id="portfolio-body"></tbody>
-                    </table>
+                                   <div class="desktop-only">
+                <div class="table-panel">
+                    <div class="table-wrapper">
+                        <table class="portfolio-table">
+                            <thead>
+                                <tr>
+                                    <th>Titolo</th>
+                                    <th>Prezzo</th>
+                                    <th>Q.tà</th>
+                                    <th>PMC</th>
+                                    <th>PMC EUR 🏦</th>
+                                    <th>P&L %</th>
+                                    <th>P&L</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="portfolio-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <div id="portfolio-mobile" class="mobile-cards"></div>
-
-            <div id="modal-transazione" class="overlay"></div>
-            <div id="modal-history" class="overlay"></div>
-            <div id="modal-simulazione" class="overlay"></div>
-        </div>`;
+            <div class="mobile-only">
+                <div id="portfolio-mobile" class="mobile-cards"></div>
+            </div>
 }
 
 export function renderSkeleton() {
