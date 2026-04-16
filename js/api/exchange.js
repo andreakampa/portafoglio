@@ -28,6 +28,11 @@ function isFresh(ts, ttl) {
   return Number.isFinite(ts) && (Date.now() - ts <= ttl);
 }
 
+function parseMaybeJson(value) {
+  if (typeof value !== 'string') return value;
+  try { return JSON.parse(value); } catch (_) { return value; }
+}
+
 export const Exchange = {
   rate: 1.08,
 
@@ -43,7 +48,7 @@ export const Exchange = {
       try {
         const r = await fetch(LATEST_PROXIES[i], withTimeout(5000));
         const raw = await r.json();
-        const data = i === 1 ? JSON.parse(raw.contents) : raw;
+        const data = i === 1 ? parseMaybeJson(raw.contents) : raw;
 
         if (data?.result === 'success' && data?.rates?.USD > 0) {
           this.rate = data.rates.USD;
@@ -98,10 +103,11 @@ export const Exchange = {
         const r = await fetch(proxies[i], withTimeout(6000));
         const raw = await r.json();
         const data = this._normalizeProxyPayload(raw, i);
+        const rows = this._extractHistoricRows(data);
 
-        const rates = data?.rates ?? data?.timeSeries ?? [];
-        if (rates.length > 0) {
-          const uicRate = parseFloat(rates[0].uicRate ?? rates[0].avgRate ?? 0);
+        if (rows.length > 0) {
+          const first = rows[0];
+          const uicRate = parseFloat(first?.uicRate ?? first?.avgRate ?? first?.exchangeRate ?? 0);
           if (uicRate > 0) return uicRate;
         }
       } catch (e) {}
@@ -113,9 +119,23 @@ export const Exchange = {
 
   _normalizeProxyPayload(raw, proxyIndex) {
     if (proxyIndex === 1) {
-      return typeof raw?.contents === 'string' ? JSON.parse(raw.contents) : raw?.contents;
+      return parseMaybeJson(raw?.contents);
     }
     return raw;
+  },
+
+  _extractHistoricRows(data) {
+    if (!data) return [];
+    if (Array.isArray(data?.rates)) return data.rates;
+    if (Array.isArray(data?.timeSeries)) return data.timeSeries;
+    if (Array.isArray(data?.items)) return data.items;
+    if (Array.isArray(data)) return data;
+    if (data?.data) {
+      if (Array.isArray(data.data?.rates)) return data.data.rates;
+      if (Array.isArray(data.data?.timeSeries)) return data.data.timeSeries;
+      if (Array.isArray(data.data)) return data.data;
+    }
+    return [];
   },
 
   async getWeightedHistoricRate(transactions, fromCurrency, toCurrency) {
@@ -125,7 +145,11 @@ export const Exchange = {
     if (!buys.length) return this.rate;
 
     const rates = await Promise.all(
-      buys.map(tx => this.getRateForDate(tx.date))
+      buys.map(async tx => {
+        const manual = parseFloat(tx.exchangeRate);
+        if (manual && isFinite(manual) && manual > 0) return manual;
+        return this.getRateForDate(tx.date);
+      })
     );
 
     let totalQty = 0;
