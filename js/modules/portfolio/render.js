@@ -75,7 +75,8 @@ export function renderPage(container) {
                                                 <th>Controvalore</th>
                         <th>P&L Lordo</th>
                         <th>P&L Netto (After Tax)</th>
-                        <th>P&L Realizzato</th>
+                                                <th>P&L Realizzato Lordo</th>
+                        <th>P&L Realizzato Netto</th>
                         <th>Azioni</th>
                 </thead>
                 <tbody id="portfolio-tbody"></tbody>
@@ -98,7 +99,7 @@ export function renderSkeleton() {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     tbody.innerHTML = Array(3).fill(
-        `<tr>${Array(11).fill('<td><div class="skeleton" style="height:14px;width:75%;"></div></td>').join('')}</tr>`
+        `<tr>${Array(12).fill('<td><div class="skeleton" style="height:14px;width:75%;"></div></td>').join('')}</tr>`
     ).join('');
 }
 
@@ -138,7 +139,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
     const s = currency === 'EUR' ? '€' : '$';
 
     if (!Object.keys(portfolio).length) {
-        tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div></td></tr>`;
         return;
     }
     tbody.innerHTML = '';
@@ -194,7 +195,14 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
                 <span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAfterTax))}</span>
                 <br><span class="text-muted fs-xs">tasse stimate: ${s} ${Calc.fmt(cv(tax))}</span>
             </td>
-            <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(cv(realizedPnL))}</td>
+                        <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(cv(realizedPnL))}</td>
+            <td>${(() => {
+                const realTax = Calc.taxOnGain(realizedPnL, p.tipoAsset);
+                const realNet = realizedPnL - realTax;
+                const taxLbl  = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
+                return `<span class="${realNet >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(realNet))}</span>
+                        <br><span class="text-muted fs-xs">tasse (${taxLbl}): ${s} ${Calc.fmt(cv(realTax))}</span>`;
+            })()}</td>
             <td>
                 <div class="action-btns">
                     <button class="btn-action btn-action-history"  data-action="history" data-id="${id}" title="Storico">📜</button>
