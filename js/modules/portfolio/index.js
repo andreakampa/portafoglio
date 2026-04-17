@@ -237,7 +237,7 @@ export class PortfolioPage {
 
     _handlers() {
         return {
-            onHistory:     id => openHistoryModal(id, this.portfolio, () => this._save()),
+                        onHistory:     id => openHistoryModal(id, this.portfolio, () => this._save(), this.currency),
             onTransaction: (id, type) => openTransactionModal(id, type, this.portfolio, this.prices,
                 async () => { await this._save(); }),
             onSimulation:  id => openSimModal(id, this.portfolio, this.prices),

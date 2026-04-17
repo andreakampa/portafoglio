@@ -200,7 +200,7 @@ export const CartPanel = {
 };
 
 // ── HISTORY MODAL ──────────────────────────────────────────────────────────
-export function openHistoryModal(id, portfolio, onSave) {
+export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
     const p = portfolio[id];
     const overlay = document.getElementById('modal-history');
 
@@ -230,20 +230,21 @@ export function openHistoryModal(id, portfolio, onSave) {
         overlay.classList.remove('visible');
         unlockScroll();
     };
-    _renderHistoryContent(id, portfolio, onSave);
+        _renderHistoryContent(id, portfolio, onSave, currency);
 }
 
-function _renderHistoryContent(id, portfolio, onSave) {
+function _renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
     const p = portfolio[id];
     const { qta, pmc, realizedPnL, totalComm } = Calc.positionSync(p);
-    const s = p.valuta === 'USD' ? '$' : '€';
+    const s = currency === 'USD' ? '$' : '€';
+    const rate = Exchange.rate || 1;
+    const toDisplay = v => (p.valuta === 'USD' && currency === 'EUR') ? v / rate : (p.valuta === 'EUR' && currency === 'USD') ? v * rate : v;
     const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
 
-    document.getElementById('hist-summary').innerHTML =
-        `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp; PMC: <b>${Calc.fmt(pmc)}</b> &nbsp;|&nbsp;
-         P&L Realizzato: <b class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedPnL)}</b> &nbsp;|&nbsp;
-         Commissioni tot.: <b>${s} ${Calc.fmt(totalComm)}</b>`;
-
+        document.getElementById('hist-summary').innerHTML =
+        `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp; PMC: <b>${s} ${Calc.fmt(toDisplay(pmc))}</b> &nbsp;|&nbsp;
+         P&L Realizzato: <b class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(toDisplay(realizedPnL))}</b> &nbsp;|&nbsp;
+         Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>`;
     const tbody = document.getElementById('hist-tbody');
     if (!txsSorted.length) {
         tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">Nessuna transazione</td></tr>`;
@@ -263,18 +264,18 @@ function _renderHistoryContent(id, portfolio, onSave) {
             rQta -= q;
             if (rQta < 0.00001) rQta = 0;
         }
-        const totale = tx.type === 'buy' ? q * pr + c : q * pr - c;
+                const totale = tx.type === 'buy' ? q * pr + c : q * pr - c;
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${tx.date}</td>
             <td class="${tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
             <td>${Calc.fmt(q, 4)}</td>
-            <td>${Calc.fmt(pr)}</td>
-            <td>${Calc.fmt(c)}</td>
-            <td>${s} ${Calc.fmt(totale)}</td>
-            <td>${Calc.fmt(rPmc)}</td>
+            <td>${s} ${Calc.fmt(toDisplay(pr))}</td>
+            <td>€ ${Calc.fmt(c)}</td>
+            <td>${s} ${Calc.fmt(toDisplay(totale))}</td>
+            <td>${s} ${Calc.fmt(toDisplay(rPmc))}</td>
             <td>${tradePnL !== null
-                ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(tradePnL)}</span>`
+                ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(toDisplay(tradePnL))}</span>`
                 : '—'}</td>
             <td style="display:flex; gap:4px;">
                 <button class="btn btn-dark btn-sm btn-icon btn-edit-tx" data-idx="${i}" title="Modifica">✏️</button>
@@ -403,8 +404,11 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
                         <span class="modal-label">Data</span>
                         <input type="date" id="tx-data" value="${todayISO()}">
                     </div>
-                    <div>
-                        <span class="modal-label">Quantità</span>
+                                        <div>
+                        <span class="modal-label">
+                            Quantità
+                            ${!isBuy ? `<button id="tx-qta-max" style="margin-left:6px;padding:1px 7px;font-size:10px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;vertical-align:middle;">MAX</button>` : ''}
+                        </span>
                         <input type="number" id="tx-qta" step="any" placeholder="0">
                     </div>
                     <div>
@@ -426,9 +430,15 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
     overlay.classList.add('visible');
     lockScroll();
 
-    const closeModal = () => { overlay.classList.remove('visible'); unlockScroll(); };
+        const closeModal = () => { overlay.classList.remove('visible'); unlockScroll(); };
     document.getElementById('tx-close').onclick  = closeModal;
     document.getElementById('tx-cancel').onclick = closeModal;
+    if (!isBuy) {
+        document.getElementById('tx-qta-max').onclick = () => {
+            document.getElementById('tx-qta').value = qta;
+            preview();
+        };
+    }
 
     const preview = () => _txPreview(id, type, portfolio, prices);
     document.getElementById('tx-qta').oninput    = preview;
@@ -472,10 +482,18 @@ function _txPreview(id, type, portfolio, prices) {
         box.innerHTML = `Costo operazione: <b>${s} ${Calc.fmt(q * pr + c)}</b> (comm. <b>${Calc.fmt(c)}</b>)<br>
             Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
             Nuova Q.tà: <b>${Calc.fmt(newQta, 4)}</b>`;
-    } else {
-        const pnl = (pr - pmc) * q - c;
-        box.innerHTML = `P&L questa vendita: <b class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnl)}</b><br>
-            Q.tà rimanente: <b>${Calc.fmt(qta - q, 4)}</b> &nbsp;|&nbsp; Incasso netto: <b>${s} ${Calc.fmt(q * pr - c)}</b>`;
+        } else {
+        const pnlLordo = (pr - pmc) * q - c;
+        const taxPct   = portfolio[id].tipoAsset === 'bond' ? 0.125 : portfolio[id].tipoAsset === 'crypto' ? 0.33 : 0.26;
+        const taxLabel = portfolio[id].tipoAsset === 'bond' ? '12,5%' : portfolio[id].tipoAsset === 'crypto' ? '33%' : '26%';
+        const tax      = pnlLordo > 0 ? pnlLordo * taxPct : 0;
+        const pnlNetto = pnlLordo - tax;
+        box.innerHTML = `
+            Incasso lordo: <b>${s} ${Calc.fmt(q * pr - c)}</b><br>
+            P&L lordo: <b class="${pnlLordo >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordo)}</b><br>
+            ${pnlLordo > 0 ? `Tasse (${taxLabel}): <b class="neg-loss">− ${s} ${Calc.fmt(tax)}</b><br>` : ''}
+            P&L <b>netto</b>: <b class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlNetto)}</b><br>
+            Q.tà rimanente: <b>${Calc.fmt(qta - q, 4)}</b>`;
     }
 }
 
