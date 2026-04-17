@@ -72,12 +72,11 @@ export function renderPage(container) {
                         <th>PMC EUR <span class="badge" title="Calcolato con tasso BCE storico del giorno di acquisto">🏦</span></th>
                         <th>Prezzo Live</th>
                         <th>Var. Oggi</th>
-                        <th>Controvalore</th>
-                        <th>P&L Posizione</th>
-                        <th>P&L After Tax</th>
+                                                <th>Controvalore</th>
+                        <th>P&L Lordo</th>
+                        <th>P&L Netto (After Tax)</th>
                         <th>P&L Realizzato</th>
                         <th>Azioni</th>
-                    </tr>
                 </thead>
                 <tbody id="portfolio-tbody"></tbody>
             </table>
@@ -187,13 +186,13 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
             <td><b>${Calc.fmt(prLive)}</b></td>
             <td>${varHtml}</td>
             <td>${s} ${Calc.fmt(cv(att))}</td>
-            <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
+                                    <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                 ${s} ${Calc.fmt(cv(pnl))}
                 <br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>
             </td>
             <td>
                 <span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAfterTax))}</span>
-                <br><span class="text-muted fs-xs">tasse: ${s} ${Calc.fmt(cv(tax))}</span>
+                <br><span class="text-muted fs-xs">tasse stimate: ${s} ${Calc.fmt(cv(tax))}</span>
             </td>
             <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(cv(realizedPnL))}</td>
             <td>

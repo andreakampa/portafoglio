@@ -215,9 +215,9 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
                 <div class="table-wrapper">
                     <table class="tx-table tx-table-compact">
                         <thead><tr>
-                            <th>Data</th><th>Tipo</th><th>Q.tà</th>
+                             <th>Data</th><th>Tipo</th><th>Q.tà</th>
                             <th>Prezzo</th><th>Comm.</th><th>Totale</th>
-                            <th>PMC</th><th>P&L</th><th></th>
+                            <th>PMC</th><th>P&L Lordo</th><th>P&L Netto</th><th></th>
                         </tr></thead>
                         <tbody id="hist-tbody"></tbody>
                     </table>
@@ -236,14 +236,17 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
 function _renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
     const p = portfolio[id];
     const { qta, pmc, realizedPnL, totalComm } = Calc.positionSync(p);
-    const s = currency === 'USD' ? '$' : '€';
+    const isUSD = p.valuta === 'USD';
+    const s = isUSD ? '$' : '€';
     const rate = Exchange.rate || 1;
-    const toDisplay = v => (p.valuta === 'USD' && currency === 'EUR') ? v / rate : (p.valuta === 'EUR' && currency === 'USD') ? v * rate : v;
+    const toEur = v => isUSD ? v / rate : v;
     const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
 
-        document.getElementById('hist-summary').innerHTML =
-        `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp; PMC: <b>${s} ${Calc.fmt(toDisplay(pmc))}</b> &nbsp;|&nbsp;
-         P&L Realizzato: <b class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(toDisplay(realizedPnL))}</b> &nbsp;|&nbsp;
+      const pnlEurHint = isUSD && realizedPnL !== 0
+        ? ` <span style="font-size:11px;color:var(--text-muted)">(≈ € ${Calc.fmt(toEur(realizedPnL))})</span>` : '';
+    document.getElementById('hist-summary').innerHTML =
+        `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp; PMC: <b>${s} ${Calc.fmt(pmc)}</b> &nbsp;|&nbsp;
+         P&L Realizzato: <b class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedPnL)}</b>${pnlEurHint} &nbsp;|&nbsp;
          Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>`;
     const tbody = document.getElementById('hist-tbody');
     if (!txsSorted.length) {
@@ -266,16 +269,26 @@ function _renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
         }
                 const totale = tx.type === 'buy' ? q * pr + c : q * pr - c;
         const tr = document.createElement('tr');
+                const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
+        const taxLbl  = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
+        const pnlTax  = tradePnL !== null && tradePnL > 0 ? tradePnL * taxPct : 0;
+        const pnlNetto = tradePnL !== null ? tradePnL - pnlTax : null;
         tr.innerHTML = `
             <td>${tx.date}</td>
             <td class="${tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
             <td>${Calc.fmt(q, 4)}</td>
-            <td>${s} ${Calc.fmt(toDisplay(pr))}</td>
+            <td>${s} ${Calc.fmt(pr)}</td>
             <td>€ ${Calc.fmt(c)}</td>
-            <td>${s} ${Calc.fmt(toDisplay(totale))}</td>
-            <td>${s} ${Calc.fmt(toDisplay(rPmc))}</td>
+            <td>${s} ${Calc.fmt(totale)}</td>
+            <td>${s} ${Calc.fmt(rPmc)}</td>
             <td>${tradePnL !== null
-                ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(toDisplay(tradePnL))}</span>`
+                ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(tradePnL)}</span>
+                   ${isUSD ? `<br><span style="font-size:10px;color:var(--text-muted)">≈ € ${Calc.fmt(toEur(tradePnL))}</span>` : ''}`
+                : '—'}</td>
+            <td>${pnlNetto !== null
+                ? `<span class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlNetto)}</span>
+                   ${isUSD ? `<br><span style="font-size:10px;color:var(--text-muted)">≈ € ${Calc.fmt(toEur(pnlNetto))}</span>` : ''}
+                   ${pnlTax > 0 ? `<br><span style="font-size:10px;color:var(--text-muted)">tasse: ${s} ${Calc.fmt(pnlTax)}</span>` : ''}`
                 : '—'}</td>
             <td style="display:flex; gap:4px;">
                 <button class="btn btn-dark btn-sm btn-icon btn-edit-tx" data-idx="${i}" title="Modifica">✏️</button>
