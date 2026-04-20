@@ -111,11 +111,17 @@ export async function buildPositionMap(portfolio, prices) {
     ids.forEach((id, i) => {
         const p      = portfolio[id];
         const pos    = positions[i];
-        const v      = p.valuta || 'EUR';
+        const v      = (p.valuta || 'EUR').toUpperCase();
         const prLive = prices[id] ?? pos.pmc;
-        const inv    = pos.qta * pos.pmc;
-        const att    = pos.qta * prLive;
-        const pnl    = att - inv;
+        const rate   = Exchange.rate || 1;
+
+        // FIX: usa totalCostEur per l'investito, non pmc * qta convertito al tasso live
+        const inv    = pos.qta * pos.pmc;                               // in valuta nativa
+        const att    = pos.qta * prLive;                                // in valuta nativa
+        const pnl    = att - inv;                                       // in valuta nativa
+        const invEur = v === 'EUR' ? inv : (pos.totalCostEur ?? inv / rate);
+        const attEur = v === 'EUR' ? att : att / rate;
+        const pnlEur = attEur - invEur;                                 // P&L in EUR con tassi storici
 
         map[id] = {
             ...pos,
@@ -124,6 +130,9 @@ export async function buildPositionMap(portfolio, prices) {
             att,
             pnl,
             pnlP:        inv > 0 ? (pnl / inv) * 100 : 0,
+            invEur,
+            attEur,
+            pnlEur,                                                     // nuovo — P&L EUR con tassi storici
             tax:         Calc.taxOnGain(pnl, p.tipoAsset),
             pnlAfterTax: pnl - Calc.taxOnGain(pnl, p.tipoAsset),
             valuta:      v,
@@ -235,7 +244,7 @@ export function renderKPI({ portfolio, positionMap, currency }) {
     for (const id in portfolio) {
         const p   = portfolio[id];
         const pos = positionMap[id];
-        const { qta, pmcEur, realizedPnL, totalComm, inv, att, tax, valuta: v } = pos;
+        const { inv, att, tax, realizedPnL, totalComm, invEur, attEur, valuta: v } = pos;
         const cv  = x => Exchange.convert(x, v, currency);
 
         totInv  += cv(inv);
@@ -244,13 +253,9 @@ export function renderKPI({ portfolio, positionMap, currency }) {
         totTax  += cv(tax);
         totComm += cv(totalComm);
 
-        if (v === 'USD') {
-            totInvEur += pmcEur * qta;
-            totAttEur += att / Exchange.rate;
-        } else {
-            totInvEur += inv;
-            totAttEur += att;
-        }
+        // FIX: usa invEur/attEur da buildPositionMap — già calcolati con tassi storici
+        totInvEur += invEur;
+        totAttEur += attEur;
     }
 
     const pnl            = totAtt - totInv;

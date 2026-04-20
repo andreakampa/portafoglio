@@ -235,44 +235,76 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
 
 function _renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
     const p = portfolio[id];
-    const { qta, pmc, realizedPnL, totalComm } = Calc.positionSync(p);
+    // FIX: destruttura pmcEur dal nuovo positionSync
+    const { qta, pmc, pmcEur, realizedPnL, totalComm } = Calc.positionSync(p);
     const isUSD = p.valuta === 'USD';
     const s = isUSD ? '$' : '€';
     const rate = Exchange.rate || 1;
-    const toEur = v => isUSD ? v / rate : v;
     const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
 
-      const pnlEurHint = isUSD && realizedPnL !== 0
-        ? ` <span style="font-size:11px;color:var(--text-muted)">(≈ € ${Calc.fmt(toEur(realizedPnL))})</span>` : '';
+    // FIX: mostra pmcEur calcolato con tassi storici, non conversione live
+    const pmcEurHint = isUSD && pmcEur > 0
+        ? ` <span style="font-size:11px;color:var(--text-muted)">(≈ € ${Calc.fmt(pmcEur)})</span>` : '';
+    const pnlEurHint = isUSD && realizedPnL !== 0
+        ? ` <span style="font-size:11px;color:var(--text-muted)">(≈ € ${Calc.fmt(realizedPnL)})</span>` : '';
+
     document.getElementById('hist-summary').innerHTML =
-        `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp; PMC: <b>${s} ${Calc.fmt(pmc)}</b> &nbsp;|&nbsp;
+        `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp;
+         PMC: <b>${s} ${Calc.fmt(pmc)}</b>${pmcEurHint} &nbsp;|&nbsp;
          P&L Realizzato: <b class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedPnL)}</b>${pnlEurHint} &nbsp;|&nbsp;
          Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>`;
+
     const tbody = document.getElementById('hist-tbody');
     if (!txsSorted.length) {
         tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">Nessuna transazione</td></tr>`;
         return;
     }
 
-    let rQta = 0, rPmc = 0;
+    let rQta = 0, rPmc = 0, rCostEur = 0;
     tbody.innerHTML = '';
+
     txsSorted.forEach((tx, i) => {
         const q = +tx.qty, pr = +tx.price, c = +(tx.commission || 0);
+        // FIX: usa tasso storico della transazione, non tasso live
+        const txRate = tx.exchangeRate
+            ? parseFloat(tx.exchangeRate)
+            : Exchange._memoryCache.get(tx.date)?.rate || rate;
+
         let tradePnL = null;
+        let tradePnLEur = null;
+
         if (tx.type === 'buy') {
-            rPmc = rQta + q > 0 ? ((rQta * rPmc) + (q * pr) + c) / (rQta + q) : 0;
+            const newCost = (rQta * rPmc) + (q * pr) + c;
+            rPmc = (rQta + q) > 0 ? newCost / (rQta + q) : 0;
             rQta += q;
+            if (isUSD) {
+                rCostEur += (q * pr + c) / txRate;
+            } else {
+                rCostEur += (q * pr + c);
+            }
         } else {
             tradePnL = (pr - rPmc) * q - c;
+            if (isUSD) {
+                // FIX: metodo banca per P&L EUR per riga
+                const ricavoEur = (pr * q - c) / txRate;
+                const rPmcEur = rQta > 0 ? rCostEur / rQta : 0;
+                tradePnLEur = ricavoEur - (rPmcEur * q);
+                // aggiorna costo EUR residuo
+                if (rQta > 0) rCostEur -= (rCostEur / rQta) * q;
+            } else {
+                tradePnLEur = tradePnL;
+            }
             rQta -= q;
-            if (rQta < 0.00001) rQta = 0;
+            if (rQta < 0.00001) { rQta = 0; rPmc = 0; rCostEur = 0; }
         }
-                const totale = tx.type === 'buy' ? q * pr + c : q * pr - c;
-        const tr = document.createElement('tr');
-                const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
+
+        const totale = tx.type === 'buy' ? q * pr + c : q * pr - c;
+        const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
         const taxLbl  = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
-        const pnlTax  = tradePnL !== null && tradePnL > 0 ? tradePnL * taxPct : 0;
-        const pnlNetto = tradePnL !== null ? tradePnL - pnlTax : null;
+        const pnlTax  = tradePnLEur !== null && tradePnLEur > 0 ? tradePnLEur * taxPct : 0;
+        const pnlNetto = tradePnLEur !== null ? tradePnLEur - pnlTax : null;
+
+        const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${tx.date}</td>
             <td class="${tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
@@ -283,12 +315,13 @@ function _renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
             <td>${s} ${Calc.fmt(rPmc)}</td>
             <td>${tradePnL !== null
                 ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(tradePnL)}</span>
-                   ${isUSD ? `<br><span style="font-size:10px;color:var(--text-muted)">≈ € ${Calc.fmt(toEur(tradePnL))}</span>` : ''}`
+                   ${isUSD && tradePnLEur !== null
+                       ? `<br><span style="font-size:10px;color:var(--text-muted)">€ ${Calc.fmt(tradePnLEur)}</span>`
+                       : ''}`
                 : '—'}</td>
             <td>${pnlNetto !== null
-                ? `<span class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlNetto)}</span>
-                   ${isUSD ? `<br><span style="font-size:10px;color:var(--text-muted)">≈ € ${Calc.fmt(toEur(pnlNetto))}</span>` : ''}
-                   ${pnlTax > 0 ? `<br><span style="font-size:10px;color:var(--text-muted)">tasse: ${s} ${Calc.fmt(pnlTax)}</span>` : ''}`
+                ? `<span class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNetto)}</span>
+                   ${pnlTax > 0 ? `<br><span style="font-size:10px;color:var(--text-muted)">tasse: € ${Calc.fmt(pnlTax)}</span>` : ''}`
                 : '—'}</td>
             <td style="display:flex; gap:4px;">
                 <button class="btn btn-dark btn-sm btn-icon btn-edit-tx" data-idx="${i}" title="Modifica">✏️</button>
@@ -297,10 +330,10 @@ function _renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
         tbody.appendChild(tr);
     });
 
+    // gestione click edit/delete invariata
     tbody.onclick = async e => {
         const delBtn  = e.target.closest('.btn-del-tx');
         const editBtn = e.target.closest('.btn-edit-tx');
-
         if (delBtn) {
             const origTx = txsSorted[+delBtn.dataset.idx];
             if (!confirm(`Eliminare la transazione del ${origTx.date}?`)) return;
@@ -313,7 +346,6 @@ function _renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
             _renderHistoryContent(id, portfolio, onSave);
             Toast.show('Transazione rimossa', 'ok');
         }
-
         if (editBtn) {
             const origTx = txsSorted[+editBtn.dataset.idx];
             _openEditModal(id, origTx, portfolio, onSave);
@@ -408,7 +440,7 @@ function _openEditModal(id, origTx, portfolio, onSave) {
 // ── TRANSACTION MODAL ──────────────────────────────────────────────────────
 export function openTransactionModal(id, type, portfolio, prices, onSave) {
     const p = portfolio[id];
-    const { qta, pmc } = Calc.positionSync(p);
+    const { qta, pmc, pmcEur } = Calc.positionSync(p);
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-transazione');
     const isBuy = type === 'buy';
@@ -740,51 +772,65 @@ export async function openSimModal(id, portfolio, prices) {
 
     let lastSellResult = null;
     const calcSimSell = () => {
-        const pr  = parseFloat(document.getElementById('sim-sell-prezzo').value);
-        const sq  = parseFloat(document.getElementById('sim-sell-qty').value);
-        const c   = parseFloat(document.getElementById('sim-sell-comm').value) || 0;
-        const box = document.getElementById('sim-sell-result');
-        const cartBtn = document.getElementById('sim-add-cart-sell');
-        const s   = p.valuta === 'USD' ? '$' : '€';
-        lastSellResult = null;
-        cartBtn.style.display = 'none';
+    const pr  = parseFloat(document.getElementById('sim-sell-prezzo').value);
+    const sq  = parseFloat(document.getElementById('sim-sell-qty').value);
+    const c   = parseFloat(document.getElementById('sim-sell-comm').value) || 0; // sempre in EUR
+    const box = document.getElementById('sim-sell-result');
+    const cartBtn = document.getElementById('sim-add-cart-sell');
+    const s   = p.valuta === 'USD' ? '$' : '€';
+    lastSellResult = null;
+    cartBtn.style.display = 'none';
 
-        if (isNaN(pr) || pr <= 0 || isNaN(sq) || sq <= 0) { box.style.display = 'none'; return; }
-
-        if (sq > qta + 0.0001) {
-            box.style.display = 'block';
-            box.innerHTML = `<span class="neg-loss">⚠️ Quantità superiore al disponibile (${Calc.fmt(qta, 4)})</span>`;
-            return;
-        }
-
-        const commissionNative = toNative(c);
-        const grossReceipt = sq * pr - commissionNative;
-        const pnl          = (pr - pmc) * sq - commissionNative;
-        const taxPct       = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
-        const taxLabel     = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
-        const tax          = pnl > 0 ? pnl * taxPct : 0;
-        const netReceipt   = grossReceipt - tax;
-        const remQty       = qta - sq;
-        const convLine     = isUSD
-            ? `<br>Netto in EUR: <b>≈ € ${Calc.fmt(toEur(netReceipt))}</b>` : '';
-
+    if (isNaN(pr) || pr <= 0 || isNaN(sq) || sq <= 0) { box.style.display = 'none'; return; }
+    if (sq > qta + 0.0001) {
         box.style.display = 'block';
-        box.innerHTML = `
-            <div style="display:grid; gap:4px;">
-                <div>Incasso lordo: <b>${s} ${Calc.fmt(grossReceipt)}</b> &nbsp;(${Calc.fmt(sq, 4)} az. × ${Calc.fmt(pr)} − comm. ${s} ${Calc.fmt(commissionNative)})</div>
-                <div>P&L operazione: <b class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnl)}</b></div>
-                ${pnl > 0
-                    ? `<div>Tasse (${taxLabel}): <b class="neg-loss">− ${s} ${Calc.fmt(tax)}</b></div>`
-                    : `<div class="text-muted">Nessuna tassa (operazione in perdita)</div>`}
-                <div style="border-top:1px solid var(--border); margin-top:4px; padding-top:4px;">
-                    Incasso <b>netto</b>: <b class="${netReceipt >= 0 ? 'pos-gain' : 'neg-loss'} hl">${s} ${Calc.fmt(netReceipt)}</b>${convLine}
-                </div>
-                <div>Q.tà rimanente: <b>${Calc.fmt(remQty, 4)}</b></div>
-            </div>`;
+        box.innerHTML = `<span class="neg-loss">Quantità superiore al disponibile (${Calc.fmt(qta, 4)})</span>`;
+        return;
+    }
 
-        lastSellResult = { qty: sq, price: pr, commission: c, pmc, remQty, grossReceipt, netReceipt, tax };
-        cartBtn.style.display = 'block';
-    };
+    const taxPct   = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
+    const taxLabel = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
+
+    let grossReceipt, pnl, tax, netReceipt, grossReceiptEur, netReceiptEur;
+
+    if (isUSD) {
+        // FIX: commissione in EUR, ricavo in USD — tutto convertito in EUR per P&L
+        grossReceipt    = sq * pr;                          // lordo in USD
+        grossReceiptEur = grossReceipt / rate;              // lordo in EUR
+        const costoEur = (pmcEur > 0 ? pmcEur : pmc / rate) * sq;   // costo EUR al PMC storico
+        pnl             = grossReceiptEur - costoEur - c;   // P&L tutto in EUR
+        tax             = pnl > 0 ? pnl * taxPct : 0;
+        netReceiptEur   = grossReceiptEur - c - tax;
+        netReceipt      = netReceiptEur;                    // mostra in EUR per USD
+    } else {
+        grossReceipt = sq * pr - c;
+        pnl          = (pr - pmc) * sq - c;
+        tax          = pnl > 0 ? pnl * taxPct : 0;
+        netReceipt   = grossReceipt - tax;
+        grossReceiptEur = grossReceipt;
+        netReceiptEur   = netReceipt;
+    }
+
+    const remQty = qta - sq;
+
+    box.style.display = 'block';
+    box.innerHTML = `
+        <div style="display:grid; gap:4px;">
+            <div>Incasso lordo: <b>${isUSD ? `$ ${Calc.fmt(grossReceipt)} ≈ € ${Calc.fmt(grossReceiptEur)}` : `€ ${Calc.fmt(grossReceipt)}`}</b></div>
+            <div>P&L operazione: <b class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnl)}</b></div>
+            ${pnl > 0
+                ? `<div>Tasse (${taxLabel}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b></div>`
+                : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
+            <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
+                Incasso netto: <b class="${netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(netReceiptEur)}</b>
+            </div>
+            <div>Q.tà rimanente: <b>${Calc.fmt(remQty, 4)}</b></div>
+        </div>`;
+
+    lastSellResult = { qty: sq, price: pr, commission: c, pmc, remQty,
+                       grossReceipt: grossReceiptEur, netReceipt: netReceiptEur, tax };
+    cartBtn.style.display = 'block';
+};
 
     ['sim-prezzo', 'sim-comm', 'sim-budget', 'sim-qty'].forEach(elId => {
         document.getElementById(elId)?.addEventListener('input', calcSimBuy);
