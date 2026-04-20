@@ -352,6 +352,119 @@ function _renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
         }
     };
 }
+
+// ── EDIT TRANSACTION MODAL ─────────────────────────────────────────────────
+function _openEditModal(id, origTx, portfolio, onSave) {
+    document.getElementById('modal-edit-tx')?.remove();
+
+    const wrap = document.createElement('div');
+    wrap.id = 'modal-edit-tx';
+    wrap.className = 'overlay visible';
+    wrap.innerHTML = `
+        <div class="modal" style="border-top: 3px solid var(--warning);">
+            <div class="modal-header">
+                <h3>✏️ Modifica Transazione — ${portfolio[id].nome}</h3>
+                <button class="btn-x" id="edit-tx-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid-2">
+                    <div>
+                        <span class="modal-label">Data</span>
+                        <input type="date" id="edit-tx-data" value="${origTx.date}">
+                    </div>
+                    <div>
+                        <span class="modal-label">Tipo</span>
+                        <select id="edit-tx-tipo">
+                            <option value="buy"  ${origTx.type === 'buy'  ? 'selected' : ''}>🟢 Acquisto</option>
+                            <option value="sell" ${origTx.type === 'sell' ? 'selected' : ''}>🔴 Vendita</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="modal-label">Quantità</span>
+                        <input type="number" id="edit-tx-qta" step="any" value="${origTx.qty}">
+                    </div>
+                    <div>
+                        <span class="modal-label">Prezzo</span>
+                        <input type="number" id="edit-tx-prezzo" step="any" value="${origTx.price}">
+                    </div>
+                                        <div>
+                        <span class="modal-label">Commissione</span>
+                        <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}">
+                    </div>
+                    ${portfolio[id].valuta === 'USD' ? `
+<div>
+    <span class="modal-label">Tasso EUR/USD <span class="text-muted fs-xs">(modifica se la banca differisce)</span></span>
+    <input type="number" id="edit-tx-fx" step="any" placeholder="caricamento..." value="${origTx.exchangeRate || ''}">
+</div>` : ''}
+                </div>
+                <button id="edit-tx-save" class="btn btn-warning btn-full" style="margin-top:16px;">💾 Salva Modifiche</button>
+                <button id="edit-tx-cancel" class="btn btn-ghost btn-full" style="margin-top:8px;">Annulla</button>
+            </div>
+        </div>`;
+    document.body.appendChild(wrap);
+    // Pre-compila il tasso con il valore storico reale se non già salvato
+if (portfolio[id].valuta === 'USD') {
+    const fxField = document.getElementById('edit-tx-fx');
+    if (fxField && !origTx.exchangeRate) {
+        // Nessun tasso salvato — carica quello storico dalla cache o da Banca d'Italia
+        Exchange.getRateForDate(origTx.date)
+            .then(r => {
+                if (fxField && r > 0) {
+                    fxField.value = r.toFixed(4);
+                    fxField.style.color = 'var(--text-muted)'; // grigio = auto-caricato
+                    fxField.title = 'Tasso BCE storico auto-caricato — modifica se la banca differisce';
+                }
+            })
+            .catch(() => {
+                if (fxField) fxField.placeholder = 'non disponibile';
+            });
+    } else if (fxField && origTx.exchangeRate) {
+        // Tasso già salvato manualmente — evidenzialo come tale
+        fxField.style.color = 'var(--warning)';
+        fxField.title = 'Tasso salvato manualmente';
+    }
+
+    // Quando l'utente modifica il campo, torna al colore normale
+    document.getElementById('edit-tx-fx')?.addEventListener('input', e => {
+        e.target.style.color = '';
+        e.target.title = '';
+    });
+}
+    lockScroll();
+
+    const close = () => { wrap.remove(); unlockScroll(); };
+    document.getElementById('edit-tx-close').onclick  = close;
+    document.getElementById('edit-tx-cancel').onclick = close;
+
+    document.getElementById('edit-tx-save').onclick = async () => {
+        const newDate = document.getElementById('edit-tx-data').value;
+        const newType = document.getElementById('edit-tx-tipo').value;
+        const newQty  = parseFloat(document.getElementById('edit-tx-qta').value);
+        const newPr   = parseFloat(document.getElementById('edit-tx-prezzo').value);
+        const newComm = parseFloat(document.getElementById('edit-tx-comm').value) || 0;
+        if (!newDate || isNaN(newQty) || newQty <= 0 || isNaN(newPr) || newPr <= 0) {
+            Toast.show('Compila tutti i campi correttamente', 'err'); return;
+        }
+        const realIdx = portfolio[id].transactions.findIndex(
+            t => t.date === origTx.date && t.qty === origTx.qty &&
+                 t.price === origTx.price && t.type === origTx.type
+        );
+        if (realIdx > -1) {
+                        const fxInput = document.getElementById('edit-tx-fx');
+            const fxVal = fxInput ? parseFloat(fxInput.value) : NaN;
+            portfolio[id].transactions[realIdx] = {
+                date: newDate, type: newType,
+                qty: newQty, price: newPr, commission: newComm,
+                ...(fxVal > 0 ? { exchangeRate: fxVal } : {})
+            };
+        }
+        close();
+        await onSave();
+        _renderHistoryContent(id, portfolio, onSave);
+        Toast.show('Transazione aggiornata', 'ok');
+    };
+}
+
 // ── TRANSACTION MODAL ──────────────────────────────────────────────────────
 function _openEditModal(id, origTx, portfolio, onSave) {
     document.getElementById('modal-edit-tx')?.remove();
