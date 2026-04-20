@@ -392,16 +392,44 @@ function _openEditModal(id, origTx, portfolio, onSave) {
                         <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}">
                     </div>
                     ${portfolio[id].valuta === 'USD' ? `
-                    <div>
-                        <span class="modal-label">Tasso EUR/USD <span class="text-muted fs-xs">(modifica se la banca differisce)</span></span>
-                        <input type="number" id="edit-tx-fx" step="any" placeholder="es. 1.0872" value="${origTx.exchangeRate || ''}">
-                    </div>` : ''}
+<div>
+    <span class="modal-label">Tasso EUR/USD <span class="text-muted fs-xs">(modifica se la banca differisce)</span></span>
+    <input type="number" id="edit-tx-fx" step="any" placeholder="caricamento..." value="${origTx.exchangeRate || ''}">
+</div>` : ''}
                 </div>
                 <button id="edit-tx-save" class="btn btn-warning btn-full" style="margin-top:16px;">💾 Salva Modifiche</button>
                 <button id="edit-tx-cancel" class="btn btn-ghost btn-full" style="margin-top:8px;">Annulla</button>
             </div>
         </div>`;
     document.body.appendChild(wrap);
+    // Pre-compila il tasso con il valore storico reale se non già salvato
+if (portfolio[id].valuta === 'USD') {
+    const fxField = document.getElementById('edit-tx-fx');
+    if (fxField && !origTx.exchangeRate) {
+        // Nessun tasso salvato — carica quello storico dalla cache o da Banca d'Italia
+        Exchange.getRateForDate(origTx.date)
+            .then(r => {
+                if (fxField && r > 0) {
+                    fxField.value = r.toFixed(4);
+                    fxField.style.color = 'var(--text-muted)'; // grigio = auto-caricato
+                    fxField.title = 'Tasso BCE storico auto-caricato — modifica se la banca differisce';
+                }
+            })
+            .catch(() => {
+                if (fxField) fxField.placeholder = 'non disponibile';
+            });
+    } else if (fxField && origTx.exchangeRate) {
+        // Tasso già salvato manualmente — evidenzialo come tale
+        fxField.style.color = 'var(--warning)';
+        fxField.title = 'Tasso salvato manualmente';
+    }
+
+    // Quando l'utente modifica il campo, torna al colore normale
+    document.getElementById('edit-tx-fx')?.addEventListener('input', e => {
+        e.target.style.color = '';
+        e.target.title = '';
+    });
+}
     lockScroll();
 
     const close = () => { wrap.remove(); unlockScroll(); };
