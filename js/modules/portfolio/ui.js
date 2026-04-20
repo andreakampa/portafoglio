@@ -466,106 +466,203 @@ if (portfolio[id].valuta === 'USD') {
 }
 
 // ── TRANSACTION MODAL ──────────────────────────────────────────────────────
-export function openTransactionModal(id, type, portfolio, prices, onSave) {
-    const p = portfolio[id];
-    const { qta, pmc, pmcEur } = Calc.positionSync(p);
-    const prLive = prices[id] ?? pmc;
-    const overlay = document.getElementById('modal-transazione');
-    const isBuy = type === 'buy';
+function _openEditModal(id, origTx, portfolio, onSave) {
+    document.getElementById('modal-edit-tx')?.remove();
 
-    overlay.innerHTML = `
-        <div class="modal" style="border-top: 3px solid ${isBuy ? 'var(--success)' : 'var(--purple)'}">
+    const isUSD = portfolio[id].valuta === 'USD';
+
+    const wrap = document.createElement('div');
+    wrap.id = 'modal-edit-tx';
+    wrap.className = 'overlay visible';
+    wrap.innerHTML = `
+        <div class="modal" style="border-top: 3px solid var(--warning);">
             <div class="modal-header">
-                <h3>${isBuy ? '🟢 Acquisto' : '🔴 Vendita'} — ${p.nome}</h3>
-                <button class="btn-x" id="tx-close">✕</button>
+                <h3>✏️ Modifica Transazione — ${portfolio[id].nome}</h3>
+                <button class="btn-x" id="edit-tx-close">✕</button>
             </div>
             <div class="modal-body">
                 <div class="form-grid-2">
                     <div>
                         <span class="modal-label">Data</span>
-                        <input type="date" id="tx-data" value="${todayISO()}">
+                        <input type="date" id="edit-tx-data" value="${origTx.date}">
                     </div>
-                                        <div>
+                    <div>
+                        <span class="modal-label">Tipo</span>
+                        <select id="edit-tx-tipo">
+                            <option value="buy"  ${origTx.type === 'buy'  ? 'selected' : ''}>🟢 Acquisto</option>
+                            <option value="sell" ${origTx.type === 'sell' ? 'selected' : ''}>🔴 Vendita</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="modal-label">Quantità</span>
+                        <input type="number" id="edit-tx-qta" step="any" value="${origTx.qty}">
+                    </div>
+                    <div>
+                        <span class="modal-label">Prezzo</span>
+                        <input type="number" id="edit-tx-prezzo" step="any" value="${origTx.price}">
+                    </div>
+                    <div>
+                        <span class="modal-label">Commissione</span>
+                        <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}">
+                    </div>
+                    ${isUSD ? `
+                    <div>
                         <span class="modal-label">
-                            Quantità
-                            ${!isBuy ? `<button id="tx-qta-max" style="margin-left:6px;padding:1px 7px;font-size:10px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;vertical-align:middle;">MAX</button>` : ''}
+                            Tasso EUR/USD
+                            <span class="text-muted fs-xs">(modifica se la banca differisce)</span>
                         </span>
-                        <input type="number" id="tx-qta" step="any" placeholder="0">
-                    </div>
-                    <div>
-                        <span class="modal-label">Prezzo Eseguito</span>
-                        <input type="number" id="tx-prezzo" step="any" value="${prLive}">
-                    </div>
-                                        <div>
-                        <span class="modal-label">Commissione (€)</span>
-                        <input type="number" id="tx-comm" step="any" value="${p.commDefault || 7}">
-                    </div>
-                    ${p.valuta === 'USD' ? `
-                    <div>
-                        <span class="modal-label">Tasso EUR/USD <span class="text-muted fs-xs">(auto-compilato, modificabile)</span></span>
-                        <input type="number" id="tx-fx" step="any" placeholder="caricamento...">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <input type="number" id="edit-tx-fx" step="any" placeholder="caricamento...">
+                            <button type="button" id="edit-tx-fx-reset"
+                                title="Ripristina tasso BCE automatico"
+                                style="display:none; padding:4px 10px; font-size:11px;
+                                       border:1px solid var(--border); border-radius:4px;
+                                       background:none; cursor:pointer; white-space:nowrap;
+                                       color:var(--text-muted);">↺ Auto</button>
+                        </div>
+                        <span id="edit-tx-fx-hint" style="font-size:10px; color:var(--text-muted); margin-top:2px; display:block;"></span>
                     </div>` : ''}
                 </div>
-                <div id="tx-preview" class="preview-box" style="display:none; margin-top:14px;"></div>
-                <button id="tx-confirm" class="btn ${isBuy ? 'btn-success' : 'btn-purple'} btn-full" style="margin-top:16px;">
-                    Conferma ${isBuy ? 'Acquisto' : 'Vendita'}
-                </button>
-                <button id="tx-cancel" class="btn btn-ghost btn-full" style="margin-top:8px;">Annulla</button>
+                <button id="edit-tx-save" class="btn btn-warning btn-full" style="margin-top:16px;">💾 Salva Modifiche</button>
+                <button id="edit-tx-cancel" class="btn btn-ghost btn-full" style="margin-top:8px;">Annulla</button>
             </div>
         </div>`;
-    overlay.classList.add('visible');
+    document.body.appendChild(wrap);
     lockScroll();
-    // Auto-carica tasso storico per titoli USD
-    if (p.valuta === 'USD') {
-        const fxField = document.getElementById('tx-fx');
-        if (fxField) {
-            Exchange.getRateForDate(new Date().toISOString().slice(0,10))
-                .then(r => { if (fxField && r > 0) fxField.value = r.toFixed(4); })
-                .catch(() => { if (fxField) fxField.value = (Exchange.rate || '').toFixed(4); });
-            document.getElementById('tx-data').addEventListener('change', e => {
-                fxField.value = '';
-                fxField.placeholder = 'caricamento...';
-                Exchange.getRateForDate(e.target.value)
-                    .then(r => { if (fxField && r > 0) fxField.value = r.toFixed(4); })
-                    .catch(() => { if (fxField) fxField.value = (Exchange.rate || '').toFixed(4); });
-            });
-        }
-    }
-        const closeModal = () => { overlay.classList.remove('visible'); unlockScroll(); };
-    document.getElementById('tx-close').onclick  = closeModal;
-    document.getElementById('tx-cancel').onclick = closeModal;
-    if (!isBuy) {
-        document.getElementById('tx-qta-max').onclick = () => {
-            document.getElementById('tx-qta').value = qta;
-            preview();
+
+    const close = () => { wrap.remove(); unlockScroll(); };
+    document.getElementById('edit-tx-close').onclick  = close;
+    document.getElementById('edit-tx-cancel').onclick = close;
+
+    // ── Gestione campo tasso FX ──────────────────────────────────────────
+    if (isUSD) {
+        const fxField  = document.getElementById('edit-tx-fx');
+        const fxReset  = document.getElementById('edit-tx-fx-reset');
+        const fxHint   = document.getElementById('edit-tx-fx-hint');
+        let autoRate   = null;
+        let userEdited = !!origTx.exchangeRate; // già manuale se era salvato
+
+        const setAutoMode = (rate) => {
+            autoRate = rate;
+            fxField.value = rate.toFixed(4);
+            fxField.style.color = 'var(--text-muted)';
+            fxHint.textContent  = 'Tasso BCE storico — modifica se la banca differisce';
+            fxReset.style.display = 'none';
+            userEdited = false;
         };
+
+        const setManualMode = (value, hint) => {
+            fxField.value = value;
+            fxField.style.color = 'var(--warning)';
+            fxHint.textContent  = hint || 'Tasso modificato manualmente';
+            fxReset.style.display = autoRate ? '' : 'none';
+            userEdited = true;
+        };
+
+        // Carica sempre il tasso BCE reale per questa data
+        Exchange._fetchHistoricRate(origTx.date)
+            .then(rate => {
+                if (!rate || rate <= 0) throw new Error();
+                // Aggiorna cache con valore fresco
+                Exchange._memoryCache.set(origTx.date, { rate, ts: Date.now() });
+                Exchange._saveFxCache();
+                autoRate = rate;
+
+                if (origTx.exchangeRate) {
+                    // Aveva già un tasso manuale — mostralo in arancione
+                    // con hint che mostra il BCE per confronto
+                    setManualMode(
+                        parseFloat(origTx.exchangeRate).toFixed(4),
+                        `Tasso manuale salvato · BCE per questa data: ${rate.toFixed(4)}`
+                    );
+                    fxReset.style.display = ''; // mostra subito il bottone reset
+                } else {
+                    // Nessun tasso manuale — usa BCE automatico
+                    setAutoMode(rate);
+                }
+            })
+            .catch(() => {
+                fxField.placeholder = 'non disponibile';
+                fxHint.textContent  = 'Tasso BCE non trovato per questa data';
+                if (origTx.exchangeRate) {
+                    fxField.value = parseFloat(origTx.exchangeRate).toFixed(4);
+                    fxField.style.color = 'var(--warning)';
+                }
+            });
+
+        // Quando l'utente cambia la data — ricarica il tasso BCE
+        document.getElementById('edit-tx-data').addEventListener('change', e => {
+            fxField.value = '';
+            fxField.placeholder = 'caricamento...';
+            fxField.style.color = '';
+            fxHint.textContent = '';
+            fxReset.style.display = 'none';
+            autoRate = null;
+            userEdited = false;
+
+            Exchange._fetchHistoricRate(e.target.value)
+                .then(rate => {
+                    if (!rate || rate <= 0) throw new Error();
+                    Exchange._memoryCache.set(e.target.value, { rate, ts: Date.now() });
+                    Exchange._saveFxCache();
+                    setAutoMode(rate);
+                })
+                .catch(() => {
+                    fxField.placeholder = 'non disponibile';
+                    fxHint.textContent = 'Tasso BCE non trovato per questa data';
+                });
+        });
+
+        // Quando l'utente modifica manualmente il campo
+        fxField.addEventListener('input', () => {
+            setManualMode(fxField.value, 'Tasso modificato manualmente');
+        });
+
+        // Bottone ↺ Auto — ripristina BCE
+        fxReset.addEventListener('click', () => {
+            if (autoRate) setAutoMode(autoRate);
+        });
     }
 
-    const preview = () => _txPreview(id, type, portfolio, prices);
-    document.getElementById('tx-qta').oninput    = preview;
-    document.getElementById('tx-prezzo').oninput = preview;
-    document.getElementById('tx-comm').oninput   = preview;
+    // ── Salvataggio ──────────────────────────────────────────────────────
+    document.getElementById('edit-tx-save').onclick = async () => {
+        const newDate = document.getElementById('edit-tx-data').value;
+        const newType = document.getElementById('edit-tx-tipo').value;
+        const newQty  = parseFloat(document.getElementById('edit-tx-qta').value);
+        const newPr   = parseFloat(document.getElementById('edit-tx-prezzo').value);
+        const newComm = parseFloat(document.getElementById('edit-tx-comm').value) || 0;
 
-    document.getElementById('tx-confirm').onclick = async () => {
-        const q  = parseFloat(document.getElementById('tx-qta').value);
-        const pr = parseFloat(document.getElementById('tx-prezzo').value);
-        const c  = parseFloat(document.getElementById('tx-comm').value) || 0;
-        const dt = document.getElementById('tx-data').value;
-        if (isNaN(q) || q <= 0 || isNaN(pr) || pr <= 0) { Toast.show('Inserisci quantità e prezzo validi', 'err'); return; }
-        if (type === 'sell') {
-            const { qta } = Calc.positionSync(portfolio[id]);
-            if (q > qta + 0.0001) { Toast.show('Quantità superiore al disponibile', 'err'); return; }
+        if (!newDate || isNaN(newQty) || newQty <= 0 || isNaN(newPr) || newPr <= 0) {
+            Toast.show('Compila tutti i campi correttamente', 'err');
+            return;
         }
-        if (!portfolio[id].transactions) portfolio[id].transactions = [];
-                const fxInp = document.getElementById('tx-fx');
-        const fxSave = fxInp ? parseFloat(fxInp.value) : NaN;
-        portfolio[id].transactions.push({
-            date: dt, type, qty: q, price: pr, commission: c,
-            ...(fxSave > 0 ? { exchangeRate: fxSave } : {})
-        });
-        closeModal();
+
+        const fxInput = document.getElementById('edit-tx-fx');
+        const fxVal   = fxInput ? parseFloat(fxInput.value) : NaN;
+
+        // Salva il tasso solo se è stato modificato manualmente
+        // Se è il BCE automatico, NON lo salviamo — così al prossimo
+        // apertura viene ricaricato fresco da Banca d'Italia
+        const fxHint  = document.getElementById('edit-tx-fx-hint');
+        const isManual = fxHint?.textContent?.includes('manuale') || false;
+
+        const realIdx = portfolio[id].transactions.findIndex(
+            t => t.date === origTx.date && t.qty === origTx.qty &&
+                 t.price === origTx.price && t.type === origTx.type
+        );
+
+        if (realIdx > -1) {
+            portfolio[id].transactions[realIdx] = {
+                date: newDate, type: newType,
+                qty: newQty, price: newPr, commission: newComm,
+                ...(isManual && fxVal > 0 ? { exchangeRate: fxVal } : {})
+            };
+        }
+
+        close();
         await onSave();
-        Toast.show(`${isBuy ? 'Acquisto' : 'Vendita'} di ${p.nome} registrata`, 'ok');
+        _renderHistoryContent(id, portfolio, onSave);
+        Toast.show('Transazione aggiornata', 'ok');
     };
 }
 
