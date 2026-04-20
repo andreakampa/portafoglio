@@ -84,8 +84,20 @@ export const Calc = {
                         if (!rate || !isFinite(rate) || rate <= 0) rate = 1;
                         totalCostEur += (q * pr + c) / rate;
                     }
-                } else {
-                    realizedPnL += (pr - pmcCost) * q - c;
+                                } else {
+                    const pnlNative = (pr - pmcCost) * q - c;
+
+                    if (v === 'EUR') {
+                        realizedPnL += pnlNative;
+                    } else {
+                        // Converti in EUR usando il tasso della vendita
+                        let sellRate = tx.exchangeRate ? parseFloat(tx.exchangeRate) : null;
+                        if (!sellRate || !isFinite(sellRate) || sellRate <= 0) {
+                            sellRate = await Exchange.getRateForDate(tx.date).catch(() => null);
+                        }
+                        if (!sellRate || !isFinite(sellRate) || sellRate <= 0) sellRate = Exchange.rate;
+                        realizedPnL += pnlNative / sellRate;
+                    }
 
                     if (qta > 0) {
                         const ratio = Math.min(q / qta, 1);

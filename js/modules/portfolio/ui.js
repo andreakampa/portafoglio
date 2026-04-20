@@ -355,10 +355,15 @@ function _openEditModal(id, origTx, portfolio, onSave) {
                         <span class="modal-label">Prezzo</span>
                         <input type="number" id="edit-tx-prezzo" step="any" value="${origTx.price}">
                     </div>
-                    <div>
+                                        <div>
                         <span class="modal-label">Commissione</span>
                         <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}">
                     </div>
+                    ${portfolio[id].valuta === 'USD' ? `
+                    <div>
+                        <span class="modal-label">Tasso EUR/USD <span class="text-muted fs-xs">(modifica se la banca differisce)</span></span>
+                        <input type="number" id="edit-tx-fx" step="any" placeholder="es. 1.0872" value="${origTx.exchangeRate || ''}">
+                    </div>` : ''}
                 </div>
                 <button id="edit-tx-save" class="btn btn-warning btn-full" style="margin-top:16px;">💾 Salva Modifiche</button>
                 <button id="edit-tx-cancel" class="btn btn-ghost btn-full" style="margin-top:8px;">Annulla</button>
@@ -385,9 +390,12 @@ function _openEditModal(id, origTx, portfolio, onSave) {
                  t.price === origTx.price && t.type === origTx.type
         );
         if (realIdx > -1) {
+                        const fxInput = document.getElementById('edit-tx-fx');
+            const fxVal = fxInput ? parseFloat(fxInput.value) : NaN;
             portfolio[id].transactions[realIdx] = {
                 date: newDate, type: newType,
-                qty: newQty, price: newPr, commission: newComm
+                qty: newQty, price: newPr, commission: newComm,
+                ...(fxVal > 0 ? { exchangeRate: fxVal } : {})
             };
         }
         close();
@@ -428,10 +436,15 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
                         <span class="modal-label">Prezzo Eseguito</span>
                         <input type="number" id="tx-prezzo" step="any" value="${prLive}">
                     </div>
-                    <div>
+                                        <div>
                         <span class="modal-label">Commissione (€)</span>
                         <input type="number" id="tx-comm" step="any" value="${p.commDefault || 7}">
                     </div>
+                    ${p.valuta === 'USD' ? `
+                    <div>
+                        <span class="modal-label">Tasso EUR/USD <span class="text-muted fs-xs">(auto-compilato, modificabile)</span></span>
+                        <input type="number" id="tx-fx" step="any" placeholder="caricamento...">
+                    </div>` : ''}
                 </div>
                 <div id="tx-preview" class="preview-box" style="display:none; margin-top:14px;"></div>
                 <button id="tx-confirm" class="btn ${isBuy ? 'btn-success' : 'btn-purple'} btn-full" style="margin-top:16px;">
@@ -442,7 +455,22 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
         </div>`;
     overlay.classList.add('visible');
     lockScroll();
-
+    // Auto-carica tasso storico per titoli USD
+    if (p.valuta === 'USD') {
+        const fxField = document.getElementById('tx-fx');
+        if (fxField) {
+            Exchange.getRateForDate(new Date().toISOString().slice(0,10))
+                .then(r => { if (fxField && r > 0) fxField.value = r.toFixed(4); })
+                .catch(() => { if (fxField) fxField.value = (Exchange.rate || '').toFixed(4); });
+            document.getElementById('tx-data').addEventListener('change', e => {
+                fxField.value = '';
+                fxField.placeholder = 'caricamento...';
+                Exchange.getRateForDate(e.target.value)
+                    .then(r => { if (fxField && r > 0) fxField.value = r.toFixed(4); })
+                    .catch(() => { if (fxField) fxField.value = (Exchange.rate || '').toFixed(4); });
+            });
+        }
+    }
         const closeModal = () => { overlay.classList.remove('visible'); unlockScroll(); };
     document.getElementById('tx-close').onclick  = closeModal;
     document.getElementById('tx-cancel').onclick = closeModal;
@@ -469,7 +497,12 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
             if (q > qta + 0.0001) { Toast.show('Quantità superiore al disponibile', 'err'); return; }
         }
         if (!portfolio[id].transactions) portfolio[id].transactions = [];
-        portfolio[id].transactions.push({ date: dt, type, qty: q, price: pr, commission: c });
+                const fxInp = document.getElementById('tx-fx');
+        const fxSave = fxInp ? parseFloat(fxInp.value) : NaN;
+        portfolio[id].transactions.push({
+            date: dt, type, qty: q, price: pr, commission: c,
+            ...(fxSave > 0 ? { exchangeRate: fxSave } : {})
+        });
         closeModal();
         await onSave();
         Toast.show(`${isBuy ? 'Acquisto' : 'Vendita'} di ${p.nome} registrata`, 'ok');
