@@ -8,10 +8,24 @@ const LATEST_PROXIES = [
   `https://api.allorigins.win/get?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
 ];
 
-const BDITALIA_URL = (dateStr) =>
-  `https://tassidicambio.bancaditalia.it/terzevalute-wf-ui-web/timeSeries` +
-  `?startDate=${dateStr}&endDate=${dateStr}&currencyIsoCode=USD&lang=it`;
+// Converte YYYY-DD-MM → YYYY-MM-DD per Banca d'Italia
+function toISODate(dateStr) {
+    if (!dateStr) return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [year, second, third] = parts;
+    // Se il secondo segmento è > 12, è un giorno — inverti
+    if (parseInt(second) > 12) {
+        return `${year}-${third}-${second}`;
+    }
+    return dateStr; // già YYYY-MM-DD o ambiguo, lascia stare
+}
 
+const BDITALIA_URL = (dateStr) => {
+    const iso = toISODate(dateStr);
+    return `https://tassidicambio.bancaditalia.it/terzevalute-wf-ui-web/timeSeries` +
+           `?startDate=${iso}&endDate=${iso}&currencyIsoCode=USD&lang=it`;
+};
 const BDITALIA_PROXIES = (dateStr) => [
   `${PROXY}?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
   `https://api.allorigins.win/get?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
