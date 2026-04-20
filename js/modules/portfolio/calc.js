@@ -31,128 +31,48 @@ export const Calc = {
     },
 
     async position(holding) {
-        const sig = this._holdingSignature(holding);
-        if (this._positionCache.has(sig)) {
-            return this._positionCache.get(sig);
-        }
+    const sig = this._holdingSignature(holding);
+    if (this._positionCache.has(sig)) {
+        return this._positionCache.get(sig);
+    }
 
-        const promise = (async () => {
-            const txs = (holding.transactions || [])
-                .slice()
-                .sort((a, b) => a.date.localeCompare(b.date));
-
-            const v = (holding.valuta || 'EUR').toUpperCase();
-
-            let qta = 0;
-            let pmcCost = 0;
-            let realizedPnL = parseFloat(holding._legacyRealizedPnL || 0);
-            let totalComm = 0;
-            let totalCostEur = 0;
-
-            const fxBuyDates = [...new Set(
-                txs
-                    .filter(tx => tx.type === 'buy' && v !== 'EUR' && !tx.exchangeRate && tx.date)
-                    .map(tx => tx.date)
-            )];
-
-            const rateMap = new Map();
-            if (fxBuyDates.length) {
-                const rates = await Promise.all(
-                    fxBuyDates.map(date => Exchange.getRateForDate(date).catch(() => null))
-                );
-                fxBuyDates.forEach((date, index) => {
-                    rateMap.set(date, rates[index]);
-                });
-            }
-
-            for (const tx of txs) {
-                const q = +tx.qty || 0;
-                const pr = +tx.price || 0;
-                const c = +(tx.commission || 0);
-                totalComm += c;
-
-                if (tx.type === 'buy') {
-                    const newCost = (qta * pmcCost) + (q * pr) + c;
-                    qta += q;
-                    pmcCost = qta > 0 ? newCost / qta : 0;
-
-                    if (v === 'EUR') {
-                        totalCostEur += (q * pr + c);
-                    } else {
-                        let rate = tx.exchangeRate ? parseFloat(tx.exchangeRate) : rateMap.get(tx.date);
-                        if (!rate || !isFinite(rate) || rate <= 0) rate = Exchange.rate;
-                        if (!rate || !isFinite(rate) || rate <= 0) rate = 1;
-                        totalCostEur += (q * pr + c) / rate;
-                    }
-                                } else {
-                    const pnlNative = (pr - pmcCost) * q - c;
-
-                    if (v === 'EUR') {
-                        realizedPnL += pnlNative;
-                    } else {
-                        // Converti in EUR usando il tasso della vendita
-                        let sellRate = tx.exchangeRate ? parseFloat(tx.exchangeRate) : null;
-                        if (!sellRate || !isFinite(sellRate) || sellRate <= 0) {
-                            sellRate = await Exchange.getRateForDate(tx.date).catch(() => null);
-                        }
-                        if (!sellRate || !isFinite(sellRate) || sellRate <= 0) sellRate = Exchange.rate;
-                        realizedPnL += pnlNative / sellRate;
-                    }
-
-                    if (qta > 0) {
-                        const ratio = Math.min(q / qta, 1);
-                        totalCostEur -= totalCostEur * ratio;
-                    }
-
-                    qta -= q;
-
-                    if (qta < 0.00001) {
-                        qta = 0;
-                        pmcCost = 0;
-                        totalCostEur = 0;
-                    }
-                }
-            }
-
-            const pmc = qta > 0 ? pmcCost : 0;
-            const pmcEur = qta > 0
-                ? (v === 'EUR' ? pmc : totalCostEur / qta)
-                : 0;
-
-            return {
-                qta,
-                pmc,
-                pmcEur,
-                totalCostEur,
-                realizedPnL,
-                totalComm
-            };
-        })();
-
-        this._positionCache.set(sig, promise);
-
-        try {
-            return await promise;
-        } catch (err) {
-            this._positionCache.delete(sig);
-            throw err;
-        }
-    },
-
-    positionSync(holding) {
-        const sig = this._holdingSignature(holding);
-        if (this._positionSyncCache.has(sig)) {
-            return this._positionSyncCache.get(sig);
-        }
-
+    const promise = (async () => {
         const txs = (holding.transactions || [])
             .slice()
             .sort((a, b) => a.date.localeCompare(b.date));
+
+        const v = (holding.valuta || 'EUR').toUpperCase();
 
         let qta = 0;
         let pmcCost = 0;
         let realizedPnL = parseFloat(holding._legacyRealizedPnL || 0);
         let totalComm = 0;
+        let totalCostEur = 0;
+        let totalCostNative = 0; // FIX: traccia il costo nativo per il metodo banca
+
+        // --- FIX: prefetch batch per TUTTE le date (acquisti + vendite) ---
+        const fxDatesNeeded = [...new Set(
+            txs
+                .filter(tx => v !== 'EUR' && !tx.exchangeRate && tx.date)
+                .map(tx => tx.date)
+        )];
+
+        const rateMap = new Map();
+        if (fxDatesNeeded.length) {
+            const rates = await Promise.all(
+                fxDatesNeeded.map(date =>
+                    Exchange.getRateForDate(date).catch(() => null)
+                )
+            );
+            fxDatesNeeded.forEach((date, i) => {
+                if (rates[i]) rateMap.set(date, rates[i]);
+            });
+        }
+
+        const getRate = (tx) => {
+            if (tx.exchangeRate) return parseFloat(tx.exchangeRate);
+            return rateMap.get(tx.date) || Exchange.rate || 1;
+        };
 
         for (const tx of txs) {
             const q = +tx.qty || 0;
@@ -164,20 +84,145 @@ export const Calc = {
                 const newCost = (qta * pmcCost) + (q * pr) + c;
                 qta += q;
                 pmcCost = qta > 0 ? newCost / qta : 0;
+
+                if (v === 'EUR') {
+                    totalCostEur += (q * pr + c);
+                    totalCostNative += (q * pr + c);
+                } else {
+                    const rate = getRate(tx);
+                    totalCostEur += (q * pr + c) / rate;
+                    totalCostNative += (q * pr + c);
+                }
+
             } else {
-                realizedPnL += (pr - pmcCost) * q - c;
+                // --- FIX: metodo banca per P&L realizzato FX ---
+                if (v === 'EUR') {
+                    realizedPnL += (pr - pmcCost) * q - c;
+                } else {
+                    const sellRate = getRate(tx);
+                    const ricavoEur = (pr * q - c) / sellRate;
+
+                    // PMC EUR corrente = costo medio EUR per unità detenuta
+                    const pmcEurCurrent = qta > 0 ? totalCostEur / qta : 0;
+                    const costoEur = pmcEurCurrent * q;
+
+                    // FIX: metodo banca — separa la conversione di ricavo e costo
+                    realizedPnL += ricavoEur - costoEur;
+                }
+
+                // --- FIX: rimuovi esattamente le quote al PMC EUR corrente ---
+                if (qta > 0) {
+                    const pmcEurCurrent = totalCostEur / qta;
+                    totalCostEur -= pmcEurCurrent * q;      // preciso, no ratio
+                    const pmcNativeCurrent = totalCostNative / qta;
+                    totalCostNative -= pmcNativeCurrent * q;
+                }
+
                 qta -= q;
+
                 if (qta < 0.00001) {
                     qta = 0;
                     pmcCost = 0;
+                    totalCostEur = 0;
+                    totalCostNative = 0;
                 }
             }
         }
 
-        const result = { qta, pmc: qta > 0 ? pmcCost : 0, realizedPnL, totalComm };
-        this._positionSyncCache.set(sig, result);
-        return result;
-    },
+        const pmc = qta > 0 ? pmcCost : 0;
+        const pmcEur = qta > 0
+            ? (v === 'EUR' ? pmc : totalCostEur / qta)
+            : 0;
+
+        return { qta, pmc, pmcEur, totalCostEur, totalCostNative, realizedPnL, totalComm };
+    })();
+
+    this._positionCache.set(sig, promise);
+
+    try {
+        return await promise;
+    } catch (err) {
+        this._positionCache.delete(sig);
+        throw err;
+    }
+},
+
+    positionSync(holding) {
+    const sig = this._holdingSignature(holding);
+    if (this._positionSyncCache.has(sig)) {
+        return this._positionSyncCache.get(sig);
+    }
+
+    const txs = (holding.transactions || [])
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+    const v = (holding.valuta || 'EUR').toUpperCase();
+
+    let qta = 0;
+    let pmcCost = 0;
+    let realizedPnL = parseFloat(holding._legacyRealizedPnL || 0);
+    let totalComm = 0;
+    let totalCostEur = 0;
+
+    const getRateSync = (tx) => {
+        if (tx.exchangeRate) return parseFloat(tx.exchangeRate);
+        // Legge dalla cache in-memory senza await
+        const cached = Exchange._memoryCache.get(tx.date);
+        if (cached?.rate > 0) return cached.rate;
+        return Exchange.rate || 1;
+    };
+
+    for (const tx of txs) {
+        const q = +tx.qty || 0;
+        const pr = +tx.price || 0;
+        const c = +(tx.commission || 0);
+        totalComm += c;
+
+        if (tx.type === 'buy') {
+            const newCost = (qta * pmcCost) + (q * pr) + c;
+            qta += q;
+            pmcCost = qta > 0 ? newCost / qta : 0;
+
+            if (v === 'EUR') {
+                totalCostEur += (q * pr + c);
+            } else {
+                const rate = getRateSync(tx);
+                totalCostEur += (q * pr + c) / rate;
+            }
+        } else {
+            if (v === 'EUR') {
+                realizedPnL += (pr - pmcCost) * q - c;
+            } else {
+                const sellRate = getRateSync(tx);
+                const ricavoEur = (pr * q - c) / sellRate;
+                const pmcEurCurrent = qta > 0 ? totalCostEur / qta : 0;
+                realizedPnL += ricavoEur - pmcEurCurrent * q;
+            }
+
+            if (qta > 0) {
+                const pmcEurCurrent = totalCostEur / qta;
+                totalCostEur -= pmcEurCurrent * q;
+            }
+
+            qta -= q;
+            if (qta < 0.00001) {
+                qta = 0;
+                pmcCost = 0;
+                totalCostEur = 0;
+            }
+        }
+    }
+
+    const pmc = qta > 0 ? pmcCost : 0;
+    const pmcEur = qta > 0
+        ? (v === 'EUR' ? pmc : totalCostEur / qta)
+        : 0;
+
+    const result = { qta, pmc, pmcEur, totalCostEur, realizedPnL, totalComm };
+    this._positionSyncCache.set(sig, result);
+    return result;
+},
 
     taxOnGain(unrealizedPnL, tipoAsset) {
         if (unrealizedPnL <= 0) return 0;
