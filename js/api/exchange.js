@@ -21,11 +21,10 @@ function toISODate(dateStr) {
     return dateStr; // già YYYY-MM-DD o ambiguo, lascia stare
 }
 
-const BDITALIA_URL = (dateStr) => {
-    const iso = toISODate(dateStr);
-    return `https://tassidicambio.bancaditalia.it/terzevalute-wf-ui-web/timeSeries` +
-           `?startDate=${iso}&endDate=${iso}&currencyIsoCode=USD&lang=it`;
-};
+const BDITALIA_URL = (dateStr) =>
+  `https://tassidicambio.bancaditalia.it/terzevalute-wf-web/rest/v1.0/dailyRates` +
+  `?lang=it&currencyIsoCode=USD&referenceDate=${dateStr}`;
+
 const BDITALIA_PROXIES = (dateStr) => [
   `${PROXY}?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
   `https://api.allorigins.win/get?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
@@ -113,30 +112,37 @@ export const Exchange = {
     const proxies = BDITALIA_PROXIES(dateStr);
 
     for (let i = 0; i < proxies.length; i++) {
-      try {
-        const r = await fetch(proxies[i], withTimeout(6000));
-        const raw = await r.json();
-        const data = this._normalizeProxyPayload(raw, i);
-        const rows = this._extractHistoricRows(data);
+        try {
+            const r = await fetch(proxies[i], withTimeout(6000));
+            const raw = await r.json();
+            const data = this._normalizeProxyPayload(raw, i);
 
-        if (rows.length > 0) {
-          const first = rows[0];
-          const uicRate = parseFloat(first?.uicRate ?? first?.avgRate ?? first?.exchangeRate ?? 0);
-          if (uicRate > 0) return uicRate;
-        }
-      } catch (e) {}
+            // Trova il record EUR nella lista
+            const rates = Array.isArray(data?.rates) ? data.rates : [];
+            const eurRecord = rates.find(r => r.uicCode === '242' || r.isoCode === 'EUR');
+
+            if (eurRecord) {
+                const eurPerUsd = parseFloat(eurRecord.avgRate);
+                if (eurPerUsd > 0) {
+                    // Banca d'Italia esprime EUR per 1 USD — inverti per ottenere USD per 1 EUR
+                    const usdPerEur = 1 / eurPerUsd;
+                    console.log(`[Exchange] BdI ${dateStr}: ${eurPerUsd} EUR/USD → ${usdPerEur.toFixed(4)} USD/EUR`);
+                    return usdPerEur;
+                }
+            }
+        } catch (e) {}
     }
 
     console.warn(`[Exchange] Tasso storico non trovato per ${dateStr}, uso tasso live ${this.rate}`);
-    return this.rate;
-  },
+    return null; // restituisce null invece di this.rate — il chiamante decide il fallback
+},
 
   _normalizeProxyPayload(raw, proxyIndex) {
     if (proxyIndex === 1) {
-      return parseMaybeJson(raw?.contents);
+        return parseMaybeJson(raw?.contents);
     }
-    return raw;
-  },
+    return raw; // il proxy diretto restituisce già il JSON corretto
+},
 
   _extractHistoricRows(data) {
     if (!data) return [];
