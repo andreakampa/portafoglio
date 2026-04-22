@@ -10,6 +10,7 @@ import {
     renderMobileCards, buildPositionMap
 } from './render.js';
 import { openTransactionModal, openHistoryModal, openSimModal, CartPanel } from './ui.js';
+import { initCassettoFiscale, aggiornaBadgeFiscale } from '../../api/fiscale.js';
 
 export class PortfolioPage {
     constructor(container) {
@@ -35,6 +36,12 @@ export class PortfolioPage {
         await this._render();
 
         CartPanel.init();
+
+        // Inizializza cassetto fiscale dopo il render
+        // (la controls-bar deve già esistere nel DOM)
+        initCassettoFiscale(() => this.portfolio);
+        aggiornaBadgeFiscale(this.portfolio);
+
         this._refreshPrices();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
     }
@@ -44,23 +51,23 @@ export class PortfolioPage {
     }
 
     // ── RENDER CENTRALIZZATO ─────────────────────────────────────────────────
-    // Unico punto dove viene chiamata buildPositionMap.
-    // renderKPI, renderTable e renderMobileCards ricevono positionMap già pronto.
     async _render() {
-    const { portfolio, prices, prevClose, currency } = this;
+        const { portfolio, prices, prevClose, currency } = this;
 
-    const positionMap = await buildPositionMap(portfolio, prices);
+        const positionMap = await buildPositionMap(portfolio, prices);
 
-    const state = { portfolio, positionMap, prices, prevClose, currency };
+        const state = { portfolio, positionMap, prices, prevClose, currency };
 
-    // FIX: aggancia il refresh callback prima di renderTable
-    // così i toggle "Mostra/Nascondi" gruppi chiusi/vuoti funzionano
-    renderTable._refresh = () => renderTable(state, this._handlers());
+        // Aggancia il refresh callback per i toggle gruppi chiusi/vuoti
+        renderTable._refresh = () => renderTable(state, this._handlers());
 
-    renderKPI(state);
-    renderTable(state, this._handlers());
-    renderMobileCards(state, this._handlers());
-}
+        renderKPI(state);
+        renderTable(state, this._handlers());
+        renderMobileCards(state, this._handlers());
+
+        // Aggiorna badge cassetto fiscale ad ogni render
+        aggiornaBadgeFiscale(this.portfolio);
+    }
 
     async _loadData() {
         const raw = await DB.load('portafoglio');
@@ -113,8 +120,6 @@ export class PortfolioPage {
         if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Aggiorna'; }
         this._updateTimestamp();
 
-        // I prezzi sono cambiati ma le transazioni no: invalidiamo solo la
-        // cache di exchange (tassi live) lasciando intatta quella di calc.js
         await this._render();
     }
 
@@ -235,13 +240,12 @@ export class PortfolioPage {
         this.currency = v;
         document.getElementById('btn-eur')?.classList.toggle('active', v === 'EUR');
         document.getElementById('btn-usd')?.classList.toggle('active', v === 'USD');
-        // Cambio valuta: dati già calcolati in cache, buildPositionMap è quasi gratuito
         await this._render();
     }
 
     _handlers() {
         return {
-                        onHistory:     id => openHistoryModal(id, this.portfolio, () => this._save(), this.currency),
+            onHistory:     id => openHistoryModal(id, this.portfolio, () => this._save(), this.currency),
             onTransaction: (id, type) => openTransactionModal(id, type, this.portfolio, this.prices,
                 async () => { await this._save(); }),
             onSimulation:  id => openSimModal(id, this.portfolio, this.prices),
@@ -256,7 +260,7 @@ export class PortfolioPage {
         if (Object.values(this.portfolio).find(p => p.nome === nome)) {
             Toast.show(`${nome} già presente`, 'err'); return;
         }
-        const id     = 'T' + Date.now();
+        const id      = 'T' + Date.now();
         const logoUrl = document.getElementById('input-logo-url').value || null;
 
         this.portfolio[id] = {

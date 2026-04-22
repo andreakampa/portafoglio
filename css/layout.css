@@ -25,10 +25,12 @@
 }
 .navbar-logout:hover { color: var(--danger); background: var(--danger-dim); }
 
-/* ── MAIN ──────────────────────────────────────── */
+/* ── MAIN — full width con padding contenuto ───── */
 .main-content {
-    max-width: 1400px; margin: 0 auto;
-    padding: 20px;
+    width: 100%;
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 20px 24px;
 }
 
 /* ── DASHBOARD ─────────────────────────────────── */
@@ -36,17 +38,426 @@
     margin-bottom: 18px;
 }
 
-/* ── TX TABLE (storico) — no scroll orizzontale ── */
+/* ── TX TABLE (storico) ────────────────────────── */
 .tx-table { width: 100%; border-collapse: collapse; font-size: 0.78em; }
 .tx-table th { font-size: 0.66em; padding: 6px 5px; white-space: nowrap; }
 .tx-table td { padding: 8px 5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .tx-table tr:last-child td { border-bottom: none; }
 .tx-table td:last-child { white-space: nowrap; min-width: 64px; }
-.modal-wide { max-width: 900px !important; }
+.modal-wide { max-width: 960px !important; }
 .modal-wide .table-wrapper { overflow-x: auto; }
 
+/* ── TABELLA PORTAFOGLIO — full width ──────────── */
+#card-table {
+    padding-left: 0;
+    padding-right: 0;
+}
+#card-table .card-title {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+}
+.table-scroll-wrapper {
+    position: relative;
+    width: 100%;
+}
+#table-wrapper-inner {
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-behavior: smooth;
+    padding: 0 0.5rem 6px;
+}
+/* Scrollbar orizzontale visibile e stilizzata */
+#table-wrapper-inner::-webkit-scrollbar {
+    height: 8px;
+}
+#table-wrapper-inner::-webkit-scrollbar-track {
+    background: var(--secondary);
+    border-radius: 4px;
+    margin: 0 4px;
+}
+#table-wrapper-inner::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 4px;
+    border: 2px solid var(--secondary);
+}
+#table-wrapper-inner::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+#table-wrapper-inner {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) var(--secondary);
+}
+
+/* Bottoni freccia scorrimento tabella */
+.table-scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    width: 26px;
+    height: 52px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--card);
+    color: var(--text-muted);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.9;
+    transition: opacity .15s, background .15s, color .15s;
+    padding: 0;
+}
+.table-scroll-btn:hover {
+    opacity: 1;
+    background: var(--secondary);
+    color: var(--text);
+}
+.table-scroll-left  { left: 0; }
+.table-scroll-right { right: 0; }
+
+/* Tabella compatta full-width */
+#portfolio-table {
+    width: 100%;
+    min-width: 860px;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+#portfolio-table th,
+#portfolio-table td {
+    white-space: nowrap;
+    padding: 8px 9px;
+    font-size: 0.82em;
+}
+
+/* ── SEPARATORI GRUPPI nella tabella ───────────── */
+/* FIX punto 1: sfondo neutro scuro, no hover acceso */
+.tbody-group-header td {
+    padding: 7px 10px 5px;
+    font-size: 0.68em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-muted);
+    background: var(--secondary) !important;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    cursor: default;
+    pointer-events: none;
+}
+/* Disabilita hover su righe header gruppo */
+.tbody-group-header:hover td {
+    background: var(--secondary) !important;
+}
+
+/* Toggle collassa gruppi */
+.group-toggle-row td {
+    padding: 5px 10px 7px;
+    font-size: 0.75em;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    background: var(--primary);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    letter-spacing: .02em;
+}
+.group-toggle-row:hover td {
+    color: var(--accent);
+    background: var(--primary) !important;
+}
+
+/* FIX punto 2: opacità meno aggressiva */
+.row-closed {
+    opacity: 0.72;
+}
+.row-empty {
+    opacity: 0.52;
+}
+/* Hover su righe chiuse/vuote non ripristina opacità ma schiarisce leggermente */
+.row-closed:hover td,
+.row-empty:hover td {
+    background: rgba(74,158,255,0.025) !important;
+}
+
+/* Badge stato titolo */
+.badge-stato {
+    font-size: 0.58em;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+.badge-closed {
+    background: var(--secondary);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+.badge-empty {
+    background: var(--primary);
+    color: var(--text-dim);
+    border: 1px dashed var(--border);
+}
+
+/* ── CASSETTO FISCALE — drawer laterale ────────── */
+#drawer-fiscale {
+    position: fixed;
+    top: 54px;
+    right: 0;
+    bottom: 0;
+    width: 420px;
+    max-width: 95vw;
+    background: var(--primary);
+    border-left: 1px solid var(--border);
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+    box-shadow: -8px 0 32px rgba(0,0,0,0.45);
+}
+#drawer-fiscale.open {
+    transform: translateX(0);
+}
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+    flex-shrink: 0;
+}
+.drawer-header h3 {
+    font-size: 0.92em;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.drawer-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition);
+}
+.drawer-close:hover { background: var(--secondary); color: var(--text); }
+.drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+.drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    top: 54px;
+    background: rgba(0,0,0,0.4);
+    z-index: 899;
+}
+.drawer-overlay.open { display: block; }
+
+/* Bottone cassetto fiscale nella controls-bar */
+.btn-fiscale {
+    background: var(--secondary);
+    color: var(--warning);
+    border: 1.5px solid var(--warning);
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.8em;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+.btn-fiscale:hover {
+    background: var(--warning-dim);
+    color: var(--text);
+}
+.btn-fiscale .fiscale-badge {
+    background: var(--warning);
+    color: #000;
+    border-radius: 50%;
+    min-width: 18px;
+    height: 18px;
+    font-size: 10px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+}
+
+/* Contenuto cassetto fiscale */
+.fiscale-totale {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.fiscale-totale-label {
+    font-size: 0.72em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 4px;
+}
+.fiscale-totale-value {
+    font-size: 1.4em;
+    font-weight: 700;
+}
+.fiscale-semaforo {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.semaforo-verde   { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.semaforo-giallo  { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+.semaforo-rosso   { background: var(--danger);  box-shadow: 0 0 6px var(--danger);  }
+
+.fiscale-anno {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+.fiscale-anno-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: background var(--transition);
+    user-select: none;
+}
+.fiscale-anno-header:hover { background: var(--secondary); }
+.fiscale-anno-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88em;
+    font-weight: 700;
+    color: var(--text);
+}
+.fiscale-anno-scadenza {
+    font-size: 0.68em;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+.fiscale-anno-importo {
+    font-size: 0.92em;
+    font-weight: 700;
+    color: var(--danger);
+}
+.fiscale-anno-importo.zero { color: var(--text-dim); }
+.fiscale-scadenza-bar-wrap {
+    padding: 0 14px 10px;
+    background: var(--secondary);
+}
+.fiscale-scadenza-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+.fiscale-scadenza-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .4s ease;
+}
+.scadenza-ok      { background: var(--success); }
+.scadenza-warning { background: var(--warning); }
+.scadenza-danger  { background: var(--danger); }
+.fiscale-scadenza-label {
+    font-size: 0.65em;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+/* Righe dettaglio operazioni dentro ogni anno */
+.fiscale-detail {
+    border-top: 1px solid var(--border);
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .25s ease;
+}
+.fiscale-detail.open {
+    max-height: 600px;
+}
+.fiscale-detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78em;
+    gap: 8px;
+}
+.fiscale-detail-row:last-child { border-bottom: none; }
+.fiscale-detail-titolo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 0;
+}
+.fiscale-detail-data {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+.fiscale-detail-importo {
+    color: var(--danger);
+    font-weight: 700;
+    white-space: nowrap;
+}
+.fiscale-detail-cat {
+    font-size: 0.7em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--secondary);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+}
+.fiscale-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.84em;
+}
+.fiscale-nota {
+    font-size: 0.72em;
+    color: var(--text-dim);
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-top: 12px;
+    line-height: 1.6;
+}
+.fiscale-nota b { color: var(--text-muted); }
+
 /* ── RESPONSIVE MOBILE ─────────────────────────── */
-/* ── SHOW/HIDE DESKTOP vs MOBILE ───────────────── */
 .desktop-only { display: block; }
 .mobile-only  { display: none; }
 
@@ -54,21 +465,18 @@
     .desktop-only { display: none; }
     .mobile-only  { display: block; }
 
-    .main-content { padding: 10px; }
+    .main-content { padding: 10px 12px; }
     .navbar { padding: 0 10px; }
     .navbar-brand { margin-right: 10px; font-size: 0.88em; }
 
     body.modal-open { overflow: hidden; }
 
-    /* KPI compatti: scroll orizzontale */
     .kpi-group { padding: 12px 14px; overflow-x: auto; }
     .kpi-row   { flex-wrap: nowrap; min-width: max-content; }
     .kpi-item  { min-width: 120px; }
 
-    /* Card padding ridotto */
     .card { padding: 12px; }
 
-    /* Modali dal basso */
     .overlay { align-items: flex-end; }
     .modal {
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -77,18 +485,21 @@
     }
     .modal.modal-wide { max-width: 100%; }
 
-    /* Form colonna singola */
     .form-row { flex-direction: column; }
     .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
 
-    /* Controls bar impilata */
     .controls-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
     .controls-right { flex-wrap: wrap; }
 
-    /* tabella storico compatta su mobile */
     .tx-table-compact th,
     .tx-table-compact td { padding: 6px 5px; font-size: 0.78em; }
 
+    #drawer-fiscale {
+        top: 0;
+        width: 100vw;
+        max-width: 100vw;
+    }
+    .drawer-overlay { top: 0; }
 }
 
 @media (max-width: 480px) {
@@ -98,36 +509,16 @@
     .kpi-value { font-size: 1em; }
 }
 
-
-@media (max-width: 480px) {
-    body { font-size: 15px; }
-    .navbar-brand { display: none; }
-    .nav-link { padding: 5px 10px; font-size: 0.82em; }
-    table { min-width: 600px; }
-    .kpi-value { font-size: 1em; }
+@media (min-width: 1400px) {
+    .main-content { padding: 24px 32px; }
 }
 
-/* ── RESPONSIVE VISIBILITY: desktop table / mobile cards ───────────── */
-
-.desktop-only {
-    display: block;
+@media (min-width: 1800px) {
+    .main-content { padding: 24px 48px; }
 }
 
-.mobile-only {
-    display: none;
-}
-
+/* ── SHOW/HIDE DESKTOP vs MOBILE (override) ────── */
 @media (max-width: 767px) {
-    .desktop-only {
-        display: none !important;
-    }
-
-    .mobile-only {
-        display: block !important;
-    }
+    .desktop-only { display: none !important; }
+    .mobile-only  { display: block !important; }
 }
-
-
-
-
-
