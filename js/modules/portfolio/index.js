@@ -47,16 +47,20 @@ export class PortfolioPage {
     // Unico punto dove viene chiamata buildPositionMap.
     // renderKPI, renderTable e renderMobileCards ricevono positionMap già pronto.
     async _render() {
-        const { portfolio, prices, prevClose, currency } = this;
+    const { portfolio, prices, prevClose, currency } = this;
 
-        const positionMap = await buildPositionMap(portfolio, prices);
+    const positionMap = await buildPositionMap(portfolio, prices);
 
-        const state = { portfolio, positionMap, prices, prevClose, currency };
+    const state = { portfolio, positionMap, prices, prevClose, currency };
 
-        renderKPI(state);
-        renderTable(state, this._handlers());
-        renderMobileCards(state, this._handlers());
-    }
+    // FIX: aggancia il refresh callback prima di renderTable
+    // così i toggle "Mostra/Nascondi" gruppi chiusi/vuoti funzionano
+    renderTable._refresh = () => renderTable(state, this._handlers());
+
+    renderKPI(state);
+    renderTable(state, this._handlers());
+    renderMobileCards(state, this._handlers());
+}
 
     async _loadData() {
         const raw = await DB.load('portafoglio');
