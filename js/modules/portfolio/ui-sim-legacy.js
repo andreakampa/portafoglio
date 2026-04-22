@@ -3,6 +3,12 @@ import { Exchange } from '../../api/exchange.js';
 import { Cart } from './ui/cart.js';
 import { lockScroll, unlockScroll } from './ui/helpers.js';
 
+import {
+    simulateBuyByBudget,
+    simulateBuyByQty,
+    simulateSell
+} from './ui/sim-core.js';
+
 // ── SIMULATION MODAL ───────────────────────────────────────────────────────
 export async function openSimModal(id, portfolio, prices) {
     const p = portfolio[id];
@@ -137,127 +143,164 @@ export async function openSimModal(id, portfolio, prices) {
     };
 
     let lastBuyResult = null;
-    const calcSimBuy = () => {
-        const pr  = parseFloat(document.getElementById('sim-prezzo').value);
-        const c   = parseFloat(document.getElementById('sim-comm').value) || 0;
-        const box = document.getElementById('sim-result');
-        const cartBtn = document.getElementById('sim-add-cart-buy');
-        const s   = p.valuta === 'USD' ? '$' : '€';
-        lastBuyResult = null;
-        cartBtn.style.display = 'none';
+const calcSimBuy = () => {
+    const pr = parseFloat(document.getElementById('sim-prezzo').value);
+    const c = parseFloat(document.getElementById('sim-comm').value) || 0;
+    const box = document.getElementById('sim-result');
+    const cartBtn = document.getElementById('sim-add-cart-buy');
+    const s = p.valuta === 'USD' ? '$' : '€';
 
-        if (isNaN(pr) || pr <= 0) { box.style.display = 'none'; return; }
+    lastBuyResult = null;
+    cartBtn.style.display = 'none';
 
-        if (buyMode === 'budget') {
-            const b = parseFloat(document.getElementById('sim-budget').value);
-            if (isNaN(b) || b <= 0) { box.style.display = 'none'; return; }
+    if (isNaN(pr) || pr <= 0) {
+        box.style.display = 'none';
+        return;
+    }
 
-            const budgetNative = toNative(b);
-            const commissionNative = toNative(c);
-            const netNative = budgetNative - commissionNative;
+    if (buyMode === 'budget') {
+        const b = parseFloat(document.getElementById('sim-budget').value);
+        const result = simulateBuyByBudget({
+            budget: b,
+            price: pr,
+            commission: c,
+            qta,
+            pmc,
+            isUSD,
+            rate
+        });
 
-            if (netNative <= 0) {
-                box.style.display = 'block';
-                box.innerHTML = `<span class="neg-loss">Budget insufficiente a coprire le commissioni (€ ${Calc.fmt(c)})</span>`;
-                return;
-            }
-
-            const aq = netNative / pr;
-            const newPmc = (qta + aq) > 0
-                ? ((qta * pmc) + (aq * pr) + commissionNative) / (qta + aq)
-                : 0;
-
-            const convLine = isUSD
-                ? `<br>Budget convertito: <b>$ ${Calc.fmt(budgetNative)}</b> &nbsp;|&nbsp; Comm. ≈ <b>$ ${Calc.fmt(commissionNative)}</b>`
-                : '';
-
-            box.style.display = 'block';
-            box.innerHTML = `
-                Budget: <b>€ ${Calc.fmt(b)}</b> − Commissioni: <b>€ ${Calc.fmt(c)}</b>${convLine}<br>
-                Azioni acquistabili: <b>${Calc.fmt(aq, 4)}</b> a ${s} ${Calc.fmt(pr)}<br>
-                Nuovo PMC: <b class="hl">${s} ${Calc.fmt(newPmc)}</b> (attuale: ${s} ${Calc.fmt(pmc)})<br>
-                Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>
-            `;
-            lastBuyResult = { qty: aq, price: pr, commission: c, newPmc, newQty: qta + aq };
-        } else {
-            const aq = parseFloat(document.getElementById('sim-qty').value);
-            if (isNaN(aq) || aq <= 0) { box.style.display = 'none'; return; }
-            const commissionNative = toNative(c);
-            const costoNative  = aq * pr + commissionNative;
-            const newPmc = (qta + aq) > 0 ? ((qta * pmc) + (aq * pr) + commissionNative) / (qta + aq) : 0;
-            const convLine = isUSD
-                ? `<br>Costo in EUR: <b>€ ${Calc.fmt(toEur(costoNative))}</b>` : '';
-            box.style.display = 'block';
-            box.innerHTML =
-                `Quantità: <b>${Calc.fmt(aq, 4)}</b> × ${s} ${Calc.fmt(pr)} + comm. € ${Calc.fmt(c)} = Totale: <b class="hl">${s} ${Calc.fmt(costoNative)}</b>${convLine}<br>
-                 Nuovo PMC: <b class="hl">${s} ${Calc.fmt(newPmc)}</b> (attuale: ${s} ${Calc.fmt(pmc)})<br>
-                 Nuova Q.tà totale: <b>${Calc.fmt(qta + aq, 4)}</b>`;
-            lastBuyResult = { qty: aq, price: pr, commission: c, newPmc, newQty: qta + aq };
-        }
-        if (lastBuyResult) cartBtn.style.display = 'block';
-    };
-
-    let lastSellResult = null;
-    const calcSimSell = () => {
-        const pr  = parseFloat(document.getElementById('sim-sell-prezzo').value);
-        const sq  = parseFloat(document.getElementById('sim-sell-qty').value);
-        const c   = parseFloat(document.getElementById('sim-sell-comm').value) || 0;
-        const box = document.getElementById('sim-sell-result');
-        const cartBtn = document.getElementById('sim-add-cart-sell');
-        const s   = p.valuta === 'USD' ? '$' : '€';
-        lastSellResult = null;
-        cartBtn.style.display = 'none';
-
-        if (isNaN(pr) || pr <= 0 || isNaN(sq) || sq <= 0) { box.style.display = 'none'; return; }
-        if (sq > qta + 0.0001) {
-            box.style.display = 'block';
-            box.innerHTML = `<span class="neg-loss">Quantità superiore al disponibile (${Calc.fmt(qta, 4)})</span>`;
+        if (!result) {
+            box.style.display = 'none';
             return;
         }
 
-        const taxPct   = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
-        const taxLabel = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
-
-        let grossReceipt, pnl, tax, netReceipt, grossReceiptEur, netReceiptEur;
-
-        if (isUSD) {
-            // Commissione in EUR, ricavo in USD — tutto convertito in EUR per P&L
-            grossReceipt    = sq * pr;
-            grossReceiptEur = grossReceipt / rate;
-            const costoEur  = (pmcEur > 0 ? pmcEur : pmc / rate) * sq;
-            pnl             = grossReceiptEur - costoEur - c;
-            tax             = pnl > 0 ? pnl * taxPct : 0;
-            netReceiptEur   = grossReceiptEur - c - tax;
-            netReceipt      = netReceiptEur;
-        } else {
-            grossReceipt    = sq * pr - c;
-            pnl             = (pr - pmc) * sq - c;
-            tax             = pnl > 0 ? pnl * taxPct : 0;
-            netReceipt      = grossReceipt - tax;
-            grossReceiptEur = grossReceipt;
-            netReceiptEur   = netReceipt;
+        if (result.error === 'budget_too_low') {
+            box.style.display = 'block';
+            box.innerHTML = `<span class="neg-loss">Budget insufficiente a coprire le commissioni (€ ${Calc.fmt(c)})</span>`;
+            return;
         }
 
-        const remQty = qta - sq;
+        const convLine = isUSD
+            ? `<br>Budget convertito: <b>$ ${Calc.fmt(result.budgetNative)}</b> &nbsp;|&nbsp; Comm. ≈ <b>$ ${Calc.fmt(result.commissionNative)}</b>`
+            : '';
 
         box.style.display = 'block';
         box.innerHTML = `
-            <div style="display:grid; gap:4px;">
-                <div>Incasso lordo: <b>${isUSD ? `$ ${Calc.fmt(grossReceipt)} ≈ € ${Calc.fmt(grossReceiptEur)}` : `€ ${Calc.fmt(grossReceipt)}`}</b></div>
-                <div>P&L operazione: <b class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnl)}</b></div>
-                ${pnl > 0
-                    ? `<div>Tasse (${taxLabel}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b></div>`
-                    : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
-                <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
-                    Incasso netto: <b class="${netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(netReceiptEur)}</b>
-                </div>
-                <div>Q.tà rimanente: <b>${Calc.fmt(remQty, 4)}</b></div>
-            </div>`;
+            Budget: <b>€ ${Calc.fmt(b)}</b> − Commissioni: <b>€ ${Calc.fmt(c)}</b>${convLine}<br>
+            Azioni acquistabili: <b>${Calc.fmt(result.qty, 4)}</b> a ${s} ${Calc.fmt(pr)}<br>
+            Nuovo PMC: <b class="hl">${s} ${Calc.fmt(result.newPmc)}</b> (attuale: ${s} ${Calc.fmt(pmc)})<br>
+            Nuova Q.tà totale: <b>${Calc.fmt(result.newQty, 4)}</b>
+        `;
 
-        lastSellResult = { qty: sq, price: pr, commission: c, pmc, remQty,
-                           grossReceipt: grossReceiptEur, netReceipt: netReceiptEur, tax };
-        cartBtn.style.display = 'block';
+        lastBuyResult = {
+            qty: result.qty,
+            price: result.price,
+            commission: result.commission,
+            newPmc: result.newPmc,
+            newQty: result.newQty
+        };
+    } else {
+        const aq = parseFloat(document.getElementById('sim-qty').value);
+        const result = simulateBuyByQty({
+            qty: aq,
+            price: pr,
+            commission: c,
+            qta,
+            pmc,
+            isUSD,
+            rate
+        });
+
+        if (!result) {
+            box.style.display = 'none';
+            return;
+        }
+
+        const convLine = isUSD
+            ? `<br>Costo in EUR: <b>€ ${Calc.fmt(result.totalEur)}</b>`
+            : '';
+
+        box.style.display = 'block';
+        box.innerHTML = `
+            Quantità: <b>${Calc.fmt(result.qty, 4)}</b> × ${s} ${Calc.fmt(pr)} + comm. € ${Calc.fmt(c)} = Totale: <b class="hl">${s} ${Calc.fmt(result.totalNative)}</b>${convLine}<br>
+            Nuovo PMC: <b class="hl">${s} ${Calc.fmt(result.newPmc)}</b> (attuale: ${s} ${Calc.fmt(pmc)})<br>
+            Nuova Q.tà totale: <b>${Calc.fmt(result.newQty, 4)}</b>
+        `;
+
+        lastBuyResult = {
+            qty: result.qty,
+            price: result.price,
+            commission: result.commission,
+            newPmc: result.newPmc,
+            newQty: result.newQty
+        };
+    }
+
+    if (lastBuyResult) cartBtn.style.display = 'block';
+};
+
+    let lastSellResult = null;
+const calcSimSell = () => {
+    const pr = parseFloat(document.getElementById('sim-sell-prezzo').value);
+    const sq = parseFloat(document.getElementById('sim-sell-qty').value);
+    const c = parseFloat(document.getElementById('sim-sell-comm').value) || 0;
+    const box = document.getElementById('sim-sell-result');
+    const cartBtn = document.getElementById('sim-add-cart-sell');
+
+    lastSellResult = null;
+    cartBtn.style.display = 'none';
+
+    const result = simulateSell({
+        qty: sq,
+        price: pr,
+        commission: c,
+        qta,
+        pmc,
+        pmcEur,
+        tipoAsset: p.tipoAsset,
+        isUSD,
+        rate
+    });
+
+    if (!result) {
+        box.style.display = 'none';
+        return;
+    }
+
+    if (result.error === 'qty_exceeds') {
+        box.style.display = 'block';
+        box.innerHTML = `<span class="neg-loss">Quantità superiore al disponibile (${Calc.fmt(result.availableQty, 4)})</span>`;
+        return;
+    }
+
+    box.style.display = 'block';
+    box.innerHTML = `
+        <div style="display:grid; gap:4px;">
+            <div>Incasso lordo: <b>${isUSD ? `$ ${Calc.fmt(result.grossReceipt)} ≈ € ${Calc.fmt(result.grossReceiptEur)}` : `€ ${Calc.fmt(result.grossReceipt)}`}</b></div>
+            <div>P&L operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
+            ${result.pnl > 0
+                ? `<div>Tasse (${result.taxLabel}): <b class="neg-loss">− € ${Calc.fmt(result.tax)}</b></div>`
+                : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
+            <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
+                Incasso netto: <b class="${result.netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.netReceiptEur)}</b>
+            </div>
+            <div>Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
+        </div>`;
+
+    lastSellResult = {
+        qty: result.qty,
+        price: result.price,
+        commission: result.commission,
+        pmc: result.pmc,
+        remQty: result.remQty,
+        grossReceipt: result.grossReceiptEur,
+        netReceipt: result.netReceiptEur,
+        tax: result.tax
     };
+
+    cartBtn.style.display = 'block';
+};
 
     ['sim-prezzo', 'sim-comm', 'sim-budget', 'sim-qty'].forEach(elId => {
         document.getElementById(elId)?.addEventListener('input', calcSimBuy);
