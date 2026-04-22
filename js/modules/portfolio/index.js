@@ -31,9 +31,11 @@ export class PortfolioPage {
         if (cached) { this.prices = cached.prices; this.prevClose = cached.prevs; }
 
         await Promise.all([Exchange.update(), this._loadData()]);
-        this._updateExchangeLabel();
+this._updateExchangeLabel();
 
-        await this._render();
+await Exchange.prefetchRatesForPortfolio(this.portfolio);
+
+await this._render();
 
         CartPanel.init();
 

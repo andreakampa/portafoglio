@@ -8,17 +8,17 @@ const LATEST_PROXIES = [
   `https://api.allorigins.win/get?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,
 ];
 
-// Converte YYYY-DD-MM → YYYY-MM-DD per Banca d'Italia
+// Converte YYYY-DD-MM -> YYYY-MM-DD se serve
 function toISODate(dateStr) {
-    if (!dateStr) return dateStr;
-    const parts = dateStr.split('-');
-    if (parts.length !== 3) return dateStr;
-    const [year, second, third] = parts;
-    // Se il secondo segmento è > 12, è un giorno — inverti
-    if (parseInt(second) > 12) {
-        return `${year}-${third}-${second}`;
-    }
-    return dateStr; // già YYYY-MM-DD o ambiguo, lascia stare
+  if (!dateStr || typeof dateStr !== 'string') return dateStr;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+
+  const [year, second, third] = parts;
+  if (parseInt(second, 10) > 12) {
+    return `${year}-${third}-${second}`;
+  }
+  return dateStr;
 }
 
 const BDITALIA_URL = (dateStr) =>
@@ -43,7 +43,11 @@ function isFresh(ts, ttl) {
 
 function parseMaybeJson(value) {
   if (typeof value !== 'string') return value;
-  try { return JSON.parse(value); } catch (_) { return value; }
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return value;
+  }
 }
 
 export const Exchange = {
@@ -53,6 +57,7 @@ export const Exchange = {
   _pendingRates: new Map(),
   _liveRateTs: 0,
   _storageLoaded: false,
+  _lastSaveTs: 0,
 
   async update(force = false) {
     if (!force && isFresh(this._liveRateTs, FX_TTL)) return true;
@@ -84,65 +89,63 @@ export const Exchange = {
 
     this._ensureStorageLoaded();
 
-    const memEntry = this._memoryCache.get(dateStr);
+    const key = toISODate(dateStr);
+    const memEntry = this._memoryCache.get(key);
+
     if (memEntry && isFresh(memEntry.ts, HIST_TTL)) {
       return memEntry.rate;
     }
 
-    if (this._pendingRates.has(dateStr)) {
-      return this._pendingRates.get(dateStr);
+    if (this._pendingRates.has(key)) {
+      return this._pendingRates.get(key);
     }
 
-    const request = this._fetchHistoricRate(dateStr)
+    const request = this._fetchHistoricRate(key)
       .then((rate) => {
         const finalRate = rate || this.rate;
-        this._memoryCache.set(dateStr, { rate: finalRate, ts: Date.now() });
-        this._saveFxCache();
+        this._memoryCache.set(key, { rate: finalRate, ts: Date.now() });
+        this._saveFxCacheThrottled();
         return finalRate;
       })
       .finally(() => {
-        this._pendingRates.delete(dateStr);
+        this._pendingRates.delete(key);
       });
 
-    this._pendingRates.set(dateStr, request);
+    this._pendingRates.set(key, request);
     return request;
   },
 
   async _fetchHistoricRate(dateStr) {
-    const proxies = BDITALIA_PROXIES(dateStr);
+    const key = toISODate(dateStr);
+    const proxies = BDITALIA_PROXIES(key);
 
     for (let i = 0; i < proxies.length; i++) {
-        try {
-            const r = await fetch(proxies[i], withTimeout(6000));
-            const raw = await r.json();
-            const data = this._normalizeProxyPayload(raw, i);
+      try {
+        const r = await fetch(proxies[i], withTimeout(6000));
+        const raw = await r.json();
+        const data = this._normalizeProxyPayload(raw, i);
+        const rates = Array.isArray(data?.rates) ? data.rates : [];
+        const eurRecord = rates.find(row => row.uicCode === '242' || row.isoCode === 'EUR');
 
-            // Trova il record EUR nella lista
-            const rates = Array.isArray(data?.rates) ? data.rates : [];
-            const eurRecord = rates.find(r => r.uicCode === '242' || r.isoCode === 'EUR');
-
-            if (eurRecord) {
-                const eurPerUsd = parseFloat(eurRecord.avgRate);
-                if (eurPerUsd > 0) {
-                    // Banca d'Italia esprime EUR per 1 USD — inverti per ottenere USD per 1 EUR
-                    const usdPerEur = 1 / eurPerUsd;
-                    console.log(`[Exchange] BdI ${dateStr}: ${eurPerUsd} EUR/USD → ${usdPerEur.toFixed(4)} USD/EUR`);
-                    return usdPerEur;
-                }
-            }
-        } catch (e) {}
+        if (eurRecord) {
+          const eurPerUsd = parseFloat(eurRecord.avgRate);
+          if (eurPerUsd > 0) {
+            const usdPerEur = 1 / eurPerUsd;
+            return usdPerEur;
+          }
+        }
+      } catch (e) {}
     }
 
-    console.warn(`[Exchange] Tasso storico non trovato per ${dateStr}, uso tasso live ${this.rate}`);
-    return null; // restituisce null invece di this.rate — il chiamante decide il fallback
-},
+    return null;
+  },
 
   _normalizeProxyPayload(raw, proxyIndex) {
     if (proxyIndex === 1) {
-        return parseMaybeJson(raw?.contents);
+      return parseMaybeJson(raw?.contents);
     }
-    return raw; // il proxy diretto restituisce già il JSON corretto
-},
+    return raw;
+  },
 
   _extractHistoricRows(data) {
     if (!data) return [];
@@ -158,14 +161,59 @@ export const Exchange = {
     return [];
   },
 
+  async prefetchRatesForDates(dates = []) {
+    this._ensureStorageLoaded();
+
+    const normalized = [...new Set(
+      (dates || [])
+        .map(d => toISODate(d))
+        .filter(Boolean)
+    )];
+
+    const missing = normalized.filter((dateStr) => {
+      const cached = this._memoryCache.get(dateStr);
+      return !(cached && isFresh(cached.ts, HIST_TTL));
+    });
+
+    if (!missing.length) return true;
+
+    await Promise.all(
+      missing.map(dateStr => this.getRateForDate(dateStr))
+    );
+
+    return true;
+  },
+
+  async prefetchRatesForPortfolio(portfolio = {}) {
+    const dates = [];
+
+    Object.values(portfolio || {}).forEach((asset) => {
+      if (!asset || asset.valuta !== 'USD') return;
+      (asset.transactions || []).forEach((tx) => {
+        if (tx?.date) dates.push(tx.date);
+      });
+    });
+
+    return this.prefetchRatesForDates(dates);
+  },
+
   async getWeightedHistoricRate(transactions, fromCurrency, toCurrency) {
     if (fromCurrency === toCurrency) return 1;
 
     const buys = (transactions || []).filter(t => t.type === 'buy');
     if (!buys.length) return this.rate;
 
+    await this.prefetchRatesForDates(
+      buys
+        .filter(tx => {
+          const manual = parseFloat(tx.exchangeRate);
+          return !(manual && isFinite(manual) && manual > 0);
+        })
+        .map(tx => tx.date)
+    );
+
     const rates = await Promise.all(
-      buys.map(async tx => {
+      buys.map(async (tx) => {
         const manual = parseFloat(tx.exchangeRate);
         if (manual && isFinite(manual) && manual > 0) return manual;
         return this.getRateForDate(tx.date);
@@ -196,8 +244,9 @@ export const Exchange = {
       const data = parsed?.data || {};
 
       for (const [dateStr, entry] of Object.entries(data)) {
+        const key = toISODate(dateStr);
         if (entry && isFresh(entry.ts, HIST_TTL) && entry.rate > 0) {
-          this._memoryCache.set(dateStr, entry);
+          this._memoryCache.set(key, { rate: entry.rate, ts: entry.ts });
         }
       }
     } catch (e) {}
@@ -205,15 +254,28 @@ export const Exchange = {
 
   _saveFxCache() {
     try {
-      const data = Object.fromEntries(this._memoryCache.entries());
-      localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ data }));
+      const cleaned = {};
+      for (const [dateStr, entry] of this._memoryCache.entries()) {
+        if (entry && isFresh(entry.ts, HIST_TTL) && entry.rate > 0) {
+          cleaned[dateStr] = entry;
+        }
+      }
+      localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ data: cleaned }));
     } catch (e) {}
+  },
+
+  _saveFxCacheThrottled() {
+    const now = Date.now();
+    if (now - this._lastSaveTs < 1000) return;
+    this._lastSaveTs = now;
+    this._saveFxCache();
   },
 
   clearHistoricCache() {
     this._memoryCache.clear();
     this._pendingRates.clear();
     this._storageLoaded = false;
+    this._lastSaveTs = 0;
 
     try {
       localStorage.removeItem(RATE_CACHE_KEY);
