@@ -1,7 +1,7 @@
-import { Calc } from '../calc.js';
-import { Exchange } from '../../../api/exchange.js';
-import { Cart } from './cart.js';
-import { lockScroll, unlockScroll } from './helpers.js';
+import { Calc } from './calc.js';
+import { Exchange } from '../../api/exchange.js';
+import { Cart } from './ui/cart.js';
+import { lockScroll, unlockScroll } from './ui/helpers.js';
 
 // ── SIMULATION MODAL ───────────────────────────────────────────────────────
 export async function openSimModal(id, portfolio, prices) {
