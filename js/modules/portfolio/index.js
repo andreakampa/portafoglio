@@ -101,7 +101,7 @@ export class PortfolioPage {
 
         CartPanel.init();
 
-        initCassettoFiscale(() => this.portfolio);
+        initCassettoFiscale(() => this._getActivePortfolio());
         aggiornaBadgeFiscale(this.portfolio);
 
         this._refreshPrices();

@@ -1,13 +1,16 @@
 import { Calc } from '../modules/portfolio/calc.js';
 import { Exchange } from '../api/exchange.js';
 
+
 // ── CASSETTO FISCALE ────────────────────────────────────────────────────────
 // Calcola e mostra le minusvalenze compensabili per anno fiscale.
 // Le minus sono compensabili nei 4 anni successivi a quello di realizzo.
 // Importante: in regime amministrato, minus su crypto NON compensano
 // plus su azioni/bond e viceversa. Qui le separiamo per categoria.
 
+
 const ANNI_COMPENSAZIONE = 4;
+
 
 // Calcola tutte le minusvalenze realizzate dal portafoglio
 // Restituisce array di { anno, data, titolo, tipoAsset, categoria, minus }
@@ -17,19 +20,25 @@ export function calcolaMinusvalenze(portfolio) {
     const annoCorrente = oggi.getFullYear();
     const annoMinimo = annoCorrente - ANNI_COMPENSAZIONE;
 
-    for (const id in portfolio) {
-        const p = portfolio[id];
+
+    const assets = portfolio && portfolio.assets ? portfolio.assets : portfolio || {};
+
+    for (const id in assets) {
+        const p = assets[id];
         const txs = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
         if (!txs.length) continue;
+
 
         // Ricalcola PMC progressivo per ogni vendita (stesso algoritmo di positionSync)
         let rQta = 0, rPmc = 0;
         const isUSD = (p.valuta || 'EUR').toUpperCase() === 'USD';
 
+
         for (const tx of txs) {
             const q  = +tx.qty  || 0;
             const pr = +tx.price || 0;
             const c  = +(tx.commission || 0);
+
 
             if (tx.type === 'buy') {
                 const newCost = (rQta * rPmc) + (q * pr) + c;
@@ -40,6 +49,7 @@ export function calcolaMinusvalenze(portfolio) {
                 const pnlNativo = (pr - rPmc) * q - c;
                 let pnlEur;
 
+
                 if (isUSD) {
                     const txRate = tx.exchangeRate
                         ? parseFloat(tx.exchangeRate)
@@ -49,15 +59,18 @@ export function calcolaMinusvalenze(portfolio) {
                     pnlEur = pnlNativo;
                 }
 
+
                 // Solo le minusvalenze (pnlEur < 0)
                 if (pnlEur < -0.01) {
                     const dataVendita = new Date(tx.date);
                     const annoVendita = dataVendita.getFullYear();
 
+
                     // Includi solo se ancora compensabile (entro 4 anni)
                     if (annoVendita >= annoMinimo) {
                         // Categoria fiscale: crypto separata da stock/bond
                         const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
+
 
                         righe.push({
                             anno:      annoVendita,
@@ -71,16 +84,19 @@ export function calcolaMinusvalenze(portfolio) {
                     }
                 }
 
+
                 rQta -= q;
                 if (rQta < 0.00001) { rQta = 0; rPmc = 0; }
             }
         }
     }
 
+
     // Ordina per data decrescente
     righe.sort((a, b) => b.data.localeCompare(a.data));
     return righe;
 }
+
 
 // Raggruppa per anno fiscale
 export function raggruppaPerAnno(righe) {
@@ -92,29 +108,53 @@ export function raggruppaPerAnno(righe) {
     return mappa;
 }
 
+
 // ── UI: apri/chiudi drawer ──────────────────────────────────────────────────
 let _portfolio = null;
+let _getPortfolio = null;
+
+
+function getActivePortfolioData() {
+    const pf = typeof _getPortfolio === 'function' ? _getPortfolio() : null;
+    if (!pf || typeof pf !== 'object') {
+        return {
+            name: 'Portafoglio',
+            taxRegime: 'amministrato',
+            assets: {},
+            fiscal: { manualLosses: [] }
+        };
+    }
+
+    return {
+        name: pf.name || 'Portafoglio',
+        taxRegime: pf.taxRegime || 'amministrato',
+        assets: pf.assets || {},
+        fiscal: pf.fiscal || { manualLosses: [] }
+    };
+}
+
 
 export function initCassettoFiscale(getPortfolio) {
-    // Inietta il bottone nella controls-bar
+    _getPortfolio = getPortfolio;
     const bar = document.querySelector('.controls-right');
     if (!bar || document.getElementById('btn-cassetto-fiscale')) return;
+
 
     const btn = document.createElement('button');
     btn.id = 'btn-cassetto-fiscale';
     btn.className = 'btn-fiscale';
     btn.innerHTML = `📂 Cassetto fiscale <span class="fiscale-badge" id="fiscale-badge">0</span>`;
-    btn.addEventListener('click', () => apriFiscale(getPortfolio()));
+    btn.addEventListener('click', () => apriFiscale(_getPortfolio ? _getPortfolio() : null));
     bar.prepend(btn);
 
-    // Overlay
+
     const overlay = document.createElement('div');
     overlay.id = 'drawer-overlay-fiscale';
     overlay.className = 'drawer-overlay';
     overlay.addEventListener('click', chiudiFiscale);
     document.body.appendChild(overlay);
 
-    // Drawer
+
     const drawer = document.createElement('div');
     drawer.id = 'drawer-fiscale';
     drawer.innerHTML = `
@@ -127,9 +167,11 @@ export function initCassettoFiscale(getPortfolio) {
         </div>`;
     document.body.appendChild(drawer);
 
+
     document.getElementById('drawer-fiscale-close')
         .addEventListener('click', chiudiFiscale);
 }
+
 
 export function aggiornaBadgeFiscale(portfolio) {
     const righe = calcolaMinusvalenze(portfolio);
@@ -141,34 +183,52 @@ export function aggiornaBadgeFiscale(portfolio) {
     }
 }
 
+
 function apriFiscale(portfolio) {
     _portfolio = portfolio;
     const drawer  = document.getElementById('drawer-fiscale');
     const overlay = document.getElementById('drawer-overlay-fiscale');
     if (!drawer) return;
 
+
     renderDrawerFiscale(portfolio);
+
 
     drawer.classList.add('open');
     overlay?.classList.add('open');
 }
+
 
 function chiudiFiscale() {
     document.getElementById('drawer-fiscale')?.classList.remove('open');
     document.getElementById('drawer-overlay-fiscale')?.classList.remove('open');
 }
 
+
 function renderDrawerFiscale(portfolio) {
     const body = document.getElementById('drawer-fiscale-body');
     if (!body) return;
 
-    const righe   = calcolaMinusvalenze(portfolio);
+
+    const data = portfolio && portfolio.assets ? portfolio : { assets: portfolio || {} };
+    const { name, taxRegime } = getActivePortfolioData();
+    const righe   = calcolaMinusvalenze(data);
     const perAnno = raggruppaPerAnno(righe);
     const oggi    = new Date();
     const annoCorrente = oggi.getFullYear();
+    const regimeLabel = taxRegime === 'dichiarativo' ? 'Dichiarativo' : 'Amministrato';
+    const regimeNote = taxRegime === 'dichiarativo'
+        ? 'Modalità dichiarativa: i calcoli mostrati sono una stima utile al monitoraggio fiscale e alla dichiarazione.'
+        : 'Modalità amministrata: il cassetto fiscale del portafoglio viene usato per stimare la compensazione interna delle minusvalenze.';
+
 
     if (!righe.length) {
         body.innerHTML = `
+            <div class="fiscale-subhead">
+                <div><strong>Portafoglio:</strong> ${name}</div>
+                <div><strong>Regime:</strong> ${regimeLabel}</div>
+            </div>
+            <div class="fiscale-regime-note">${regimeNote}</div>
             <div class="fiscale-empty">
                 <div style="font-size:2em;margin-bottom:8px;">🎉</div>
                 Nessuna minusvalenza compensabile nei 4 anni precedenti.
@@ -181,12 +241,12 @@ function renderDrawerFiscale(portfolio) {
         return;
     }
 
-    // Totale compensabile
+
     const totaleStrumenti = righe.filter(r => r.categoria === 'strumenti').reduce((s, r) => s + r.minus, 0);
     const totaleCrypto    = righe.filter(r => r.categoria === 'crypto').reduce((s, r) => s + r.minus, 0);
     const totaleAssoluto  = totaleStrumenti + totaleCrypto;
 
-    // Semaforo: verde = nessuna in scadenza quest'anno, giallo = qualcosa scade, rosso = scade presto
+
     const anniConScadenza = Object.keys(perAnno)
         .map(Number)
         .filter(a => (a + ANNI_COMPENSAZIONE) === annoCorrente);
@@ -196,7 +256,13 @@ function renderDrawerFiscale(portfolio) {
             ? 'semaforo-giallo'
             : 'semaforo-verde';
 
+
     let html = `
+        <div class="fiscale-subhead">
+            <div><strong>Portafoglio:</strong> ${name}</div>
+            <div><strong>Regime:</strong> ${regimeLabel}</div>
+        </div>
+        <div class="fiscale-regime-note">${regimeNote}</div>
         <div class="fiscale-totale">
             <div class="fiscale-semaforo ${semaforoClass}"></div>
             <div style="flex:1;">
@@ -205,7 +271,7 @@ function renderDrawerFiscale(portfolio) {
             </div>
         </div>`;
 
-    // Se ci sono entrambe le categorie, mostra il breakdown
+
     if (totaleStrumenti > 0 && totaleCrypto > 0) {
         html += `
         <div style="display:flex;gap:8px;margin-bottom:16px;">
@@ -220,8 +286,9 @@ function renderDrawerFiscale(portfolio) {
         </div>`;
     }
 
-    // Anni fiscali dal più recente al più vecchio
+
     const anni = Object.keys(perAnno).map(Number).sort((a, b) => b - a);
+
 
     for (const anno of anni) {
         const scadenza = anno + ANNI_COMPENSAZIONE;
@@ -233,10 +300,12 @@ function renderDrawerFiscale(portfolio) {
             : percScaduta > 40 ? 'scadenza-warning'
             : 'scadenza-ok';
 
+
         const righeAnno = [
             ...(perAnno[anno].strumenti || []),
             ...(perAnno[anno].crypto    || [])
         ].sort((a, b) => b.data.localeCompare(a.data));
+
 
         const totaleAnno = righeAnno.reduce((s, r) => s + r.minus, 0);
         const isScaduto  = scadenza < annoCorrente;
@@ -246,7 +315,9 @@ function renderDrawerFiscale(portfolio) {
                 ? `⚠️ Scade tra ${giorniRimasti} giorni (31/12/${scadenza})`
                 : `Scade il 31/12/${scadenza}`;
 
+
         const annoId = `fiscale-anno-${anno}`;
+
 
         html += `
         <div class="fiscale-anno" id="${annoId}">
@@ -267,12 +338,13 @@ function renderDrawerFiscale(portfolio) {
             </div>
             <div class="fiscale-detail" id="${annoId}-detail">`;
 
+
         if (!righeAnno.length) {
             html += `<div class="fiscale-detail-row" style="color:var(--text-muted);font-size:0.8em;">Nessuna minusvalenza per quest'anno</div>`;
         } else {
-            // Raggruppa per categoria se entrambe presenti
             const hasStrumenti = righeAnno.some(r => r.categoria === 'strumenti');
             const hasCrypto    = righeAnno.some(r => r.categoria === 'crypto');
+
 
             if (hasStrumenti && hasCrypto) {
                 html += `<div style="padding:6px 14px 4px;font-size:0.68em;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;background:var(--secondary);">Azioni / Bond</div>`;
@@ -290,8 +362,10 @@ function renderDrawerFiscale(portfolio) {
             }
         }
 
+
         html += `</div></div>`;
     }
+
 
     html += `
         <div class="fiscale-nota">
@@ -301,14 +375,16 @@ function renderDrawerFiscale(portfolio) {
             al realizzo. Verifica sempre con il tuo intermediario o consulente fiscale.
         </div>`;
 
+
     body.innerHTML = html;
 
-    // Apri automaticamente l'anno corrente e quello precedente
+
     for (const anno of anni.slice(0, 2)) {
         const el = document.getElementById(`fiscale-anno-${anno}-detail`);
         if (el) el.classList.add('open');
     }
 }
+
 
 function rigaDettaglio(r) {
     const tipoLabel = r.tipoAsset === 'bond' ? 'Bond'
@@ -325,11 +401,12 @@ function rigaDettaglio(r) {
         </div>`;
 }
 
+
 function fmt(n) {
     return Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Esposta globalmente per onclick inline nei template HTML
+
 window.toggleAnnoFiscale = function(annoId) {
     const detail = document.getElementById(`${annoId}-detail`);
     if (detail) detail.classList.toggle('open');
