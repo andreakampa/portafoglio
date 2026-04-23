@@ -623,3 +623,140 @@
 .portfolio-switcher-actions button:hover {
     background: var(--secondary);
 }
+
+#portfolio-delete-btn {
+    color: #a12c2c;
+}
+
+#portfolio-delete-btn:hover {
+    background: rgba(161, 44, 44, 0.08);
+}
+
+/* ── CREATE PORTFOLIO MODAL ───────────────────────────────────────── */
+
+.portfolio-create-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.portfolio-create-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.portfolio-create-dialog {
+    position: relative;
+    width: min(100%, 460px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    z-index: 1;
+}
+
+.portfolio-create-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.portfolio-create-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.portfolio-create-close {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.portfolio-create-body {
+    padding: 18px;
+}
+
+.portfolio-create-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.portfolio-create-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+}
+
+.portfolio-regime-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.portfolio-regime-btn {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.portfolio-regime-btn.active {
+    background: rgba(1, 105, 111, 0.12);
+    border-color: rgba(1, 105, 111, 0.45);
+    color: var(--text);
+}
+
+.portfolio-create-help {
+    margin-top: 10px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.portfolio-create-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 18px;
+    border-top: 1px solid var(--border);
+}
+
+.portfolio-create-cancel,
+.portfolio-create-submit {
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border);
+}
+
+.portfolio-create-cancel {
+    background: var(--bg);
+    color: var(--text);
+}
+
+.portfolio-create-submit {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}

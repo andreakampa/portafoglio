@@ -92,6 +92,7 @@ export class PortfolioPage {
         await Promise.all([Exchange.update(), this._loadData()]);
         this._updateExchangeLabel();
         this._ensurePortfolioSwitcher();
+        this._ensurePortfolioModal();
 
         await Exchange.prefetchRatesForPortfolio(this.portfolio);
         this._syncActivePortfolio();
@@ -105,6 +106,7 @@ export class PortfolioPage {
 
         this._refreshPrices();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
+        
     }
 
     destroy() {
@@ -233,6 +235,7 @@ export class PortfolioPage {
                     <div class="portfolio-switcher-actions">
                         <button id="portfolio-new-btn" type="button">＋ Nuovo portafoglio</button>
                         <button id="portfolio-rename-btn" type="button">✎ Rinomina attivo</button>
+                        <button id="portfolio-delete-btn" type="button">🗑 Elimina portafoglio</button>
                     </div>
                 </div>
             `;
@@ -260,31 +263,8 @@ export class PortfolioPage {
             }
         });
 
-        document.getElementById('portfolio-new-btn')?.addEventListener('click', async () => {
-            const name = prompt('Nome del nuovo portafoglio?');
-            if (!name || !name.trim()) return;
-
-            const regime = prompt('Regime fiscale? Scrivi: amministrato oppure dichiarativo', 'amministrato');
-            const normalizedRegime = (regime || '').trim().toLowerCase() === 'dichiarativo'
-                ? 'dichiarativo'
-                : 'amministrato';
-
-            const id = makePortfolioId();
-            this.portfolioState.portfolios[id] = {
-                id,
-                name: name.trim(),
-                taxRegime: normalizedRegime,
-                assets: {},
-                fiscal: { manualLosses: [] }
-            };
-            this.portfolioState.activePortfolioId = id;
-            this.activePortfolioId = id;
-            this._syncActivePortfolio();
-
-            await DB.save('portfolio_state', this.portfolioState);
-            this._renderPortfolioSwitcher();
-            await this._render();
-            Toast.show(`Creato portafoglio "${name.trim()}"`, 'ok');
+                document.getElementById('portfolio-new-btn')?.addEventListener('click', () => {
+            this._openCreatePortfolioModal();
         });
 
         document.getElementById('portfolio-rename-btn')?.addEventListener('click', async () => {
@@ -298,6 +278,49 @@ export class PortfolioPage {
             await DB.save('portfolio_state', this.portfolioState);
             this._renderPortfolioSwitcher();
             Toast.show('Portafoglio rinominato', 'ok');
+        });
+
+                document.getElementById('portfolio-delete-btn')?.addEventListener('click', async () => {
+            const portfolios = Object.values(this.portfolioState?.portfolios || {});
+            if (portfolios.length <= 1) {
+                Toast.show('Devi mantenere almeno un portafoglio', 'err');
+                return;
+            }
+
+            const active = this._getActivePortfolio();
+            if (!active) return;
+
+            const positions = Object.values(active.assets || {});
+            const names = positions.map(p => p.nome).filter(Boolean);
+            const listHtml = names.length
+                ? names.map(n => `• ${n}`).join('\n')
+                : '• Nessuna posizione';
+
+            const msg =
+                `Stai per eliminare il portafoglio "${active.name}".\n` +
+                `Regime: ${active.taxRegime === 'dichiarativo' ? 'dichiarativo' : 'amministrato'}\n` +
+                `Posizioni presenti: ${positions.length}\n\n` +
+                `Titoli coinvolti:\n${listHtml}\n\n` +
+                `Questa azione eliminerà anche storico transazioni, dati fiscali e contenuto del portafoglio.`;
+
+            const ok = confirm(msg);
+            if (!ok) return;
+
+            const ids = Object.keys(this.portfolioState.portfolios);
+            const idx = ids.indexOf(this.activePortfolioId);
+            delete this.portfolioState.portfolios[this.activePortfolioId];
+
+            const remaining = Object.keys(this.portfolioState.portfolios);
+            this.activePortfolioId = remaining[0];
+            this.portfolioState.activePortfolioId = this.activePortfolioId;
+            this._syncActivePortfolio();
+
+            await DB.save('portfolio_state', this.portfolioState);
+            this._renderPortfolioSwitcher();
+            await Exchange.prefetchRatesForPortfolio(this.portfolio);
+            await this._render();
+
+            Toast.show('Portafoglio eliminato', 'ok');
         });
     }
 
@@ -348,6 +371,142 @@ export class PortfolioPage {
                 Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, 'ok');
             });
         });
+    }
+
+        _ensurePortfolioModal() {
+        let modal = document.getElementById('portfolio-create-modal');
+        if (modal) return;
+
+        modal = document.createElement('div');
+        modal.id = 'portfolio-create-modal';
+        modal.className = 'portfolio-create-modal';
+        modal.style.display = 'none';
+
+        modal.innerHTML = `
+            <div class="portfolio-create-backdrop" data-close="1"></div>
+            <div class="portfolio-create-dialog">
+                <div class="portfolio-create-header">
+                    <h3>Nuovo portafoglio</h3>
+                    <button type="button" class="portfolio-create-close" id="portfolio-create-close">✕</button>
+                </div>
+
+                <div class="portfolio-create-body">
+                    <label class="portfolio-create-label" for="portfolio-create-name">
+                        Nome portafoglio
+                    </label>
+                    <input
+                        id="portfolio-create-name"
+                        class="portfolio-create-input"
+                        type="text"
+                        placeholder="Es. Degiro lungo termine"
+                        maxlength="60"
+                    />
+
+                    <div class="portfolio-create-label" style="margin-top: 14px;">
+                        Regime fiscale
+                    </div>
+
+                    <div class="portfolio-regime-toggle" id="portfolio-regime-toggle">
+                        <button
+                            type="button"
+                            class="portfolio-regime-btn active"
+                            data-regime="amministrato">
+                            Amministrato
+                        </button>
+                        <button
+                            type="button"
+                            class="portfolio-regime-btn"
+                            data-regime="dichiarativo">
+                            Dichiarativo
+                        </button>
+                    </div>
+
+                    <div class="portfolio-create-help">
+                        Scegli il regime del nuovo portafoglio prima di crearlo.
+                    </div>
+                </div>
+
+                <div class="portfolio-create-footer">
+                    <button type="button" class="portfolio-create-cancel" id="portfolio-create-cancel">
+                        Annulla
+                    </button>
+                    <button type="button" class="portfolio-create-submit" id="portfolio-create-submit">
+                        Crea portafoglio
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelectorAll('[data-close], #portfolio-create-close, #portfolio-create-cancel')
+            .forEach(el => {
+                el.addEventListener('click', () => this._closeCreatePortfolioModal());
+            });
+
+        modal.querySelectorAll('.portfolio-regime-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                modal.querySelectorAll('.portfolio-regime-btn')
+                    .forEach(x => x.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        document.getElementById('portfolio-create-submit')?.addEventListener('click', async () => {
+            const nameInput = document.getElementById('portfolio-create-name');
+            const activeBtn = modal.querySelector('.portfolio-regime-btn.active');
+
+            const name = (nameInput?.value || '').trim();
+            const regime = activeBtn?.dataset?.regime || 'amministrato';
+
+            if (!name) {
+                Toast.show('Inserisci un nome per il nuovo portafoglio', 'err');
+                nameInput?.focus();
+                return;
+            }
+
+            const id = makePortfolioId();
+            this.portfolioState.portfolios[id] = {
+                id,
+                name,
+                taxRegime: regime,
+                assets: {},
+                fiscal: { manualLosses: [] }
+            };
+
+            this.portfolioState.activePortfolioId = id;
+            this.activePortfolioId = id;
+            this._syncActivePortfolio();
+
+            await DB.save('portfolio_state', this.portfolioState);
+            this._renderPortfolioSwitcher();
+            this._closeCreatePortfolioModal();
+            await this._render();
+
+            Toast.show(`Creato portafoglio "${name}"`, 'ok');
+        });
+    }
+
+    _openCreatePortfolioModal() {
+        const modal = document.getElementById('portfolio-create-modal');
+        if (!modal) return;
+
+        modal.style.display = 'flex';
+
+        const input = document.getElementById('portfolio-create-name');
+        if (input) input.value = '';
+
+        modal.querySelectorAll('.portfolio-regime-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.regime === 'amministrato');
+        });
+
+        setTimeout(() => input?.focus(), 0);
+    }
+
+    _closeCreatePortfolioModal() {
+        const modal = document.getElementById('portfolio-create-modal');
+        if (!modal) return;
+        modal.style.display = 'none';
     }
 
     _bindStaticEvents() {
