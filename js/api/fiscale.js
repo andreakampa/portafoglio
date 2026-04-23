@@ -23,21 +23,21 @@ export function calcolaMinusvalenze(portfolio) {
 
     const assets = portfolio && portfolio.assets ? portfolio.assets : portfolio || {};
 
+
     for (const id in assets) {
         const p = assets[id];
         const txs = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
         if (!txs.length) continue;
 
 
-        // Ricalcola PMC progressivo per ogni vendita (stesso algoritmo di positionSync)
         let rQta = 0, rPmc = 0;
         const isUSD = (p.valuta || 'EUR').toUpperCase() === 'USD';
 
 
         for (const tx of txs) {
-            const q  = +tx.qty  || 0;
+            const q = +tx.qty || 0;
             const pr = +tx.price || 0;
-            const c  = +(tx.commission || 0);
+            const c = +(tx.commission || 0);
 
 
             if (tx.type === 'buy') {
@@ -45,7 +45,6 @@ export function calcolaMinusvalenze(portfolio) {
                 rQta += q;
                 rPmc = rQta > 0 ? newCost / rQta : 0;
             } else {
-                // Calcola P&L di questa vendita in EUR
                 const pnlNativo = (pr - rPmc) * q - c;
                 let pnlEur;
 
@@ -60,25 +59,18 @@ export function calcolaMinusvalenze(portfolio) {
                 }
 
 
-                // Solo le minusvalenze (pnlEur < 0)
                 if (pnlEur < -0.01) {
                     const dataVendita = new Date(tx.date);
                     const annoVendita = dataVendita.getFullYear();
-
-
-                    // Includi solo se ancora compensabile (entro 4 anni)
                     if (annoVendita >= annoMinimo) {
-                        // Categoria fiscale: crypto separata da stock/bond
                         const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
-
-
                         righe.push({
-                            anno:      annoVendita,
-                            data:      tx.date,
-                            titolo:    p.nome,
+                            anno: annoVendita,
+                            data: tx.date,
+                            titolo: p.nome,
                             tipoAsset: p.tipoAsset || 'stock',
                             categoria,
-                            minus:     Math.abs(pnlEur),
+                            minus: Math.abs(pnlEur),
                             id
                         });
                     }
@@ -92,13 +84,11 @@ export function calcolaMinusvalenze(portfolio) {
     }
 
 
-    // Ordina per data decrescente
     righe.sort((a, b) => b.data.localeCompare(a.data));
     return righe;
 }
 
 
-// Raggruppa per anno fiscale
 export function raggruppaPerAnno(righe) {
     const mappa = {};
     for (const r of righe) {
@@ -109,7 +99,6 @@ export function raggruppaPerAnno(righe) {
 }
 
 
-// ── UI: apri/chiudi drawer ──────────────────────────────────────────────────
 let _portfolio = null;
 let _getPortfolio = null;
 
@@ -117,20 +106,108 @@ let _getPortfolio = null;
 function getActivePortfolioData() {
     const pf = typeof _getPortfolio === 'function' ? _getPortfolio() : null;
     if (!pf || typeof pf !== 'object') {
-        return {
-            name: 'Portafoglio',
-            taxRegime: 'amministrato',
-            assets: {},
-            fiscal: { manualLosses: [] }
-        };
+        return { name: 'Portafoglio', taxRegime: 'amministrato', assets: {}, fiscal: { manualLosses: [] } };
     }
-
     return {
         name: pf.name || 'Portafoglio',
         taxRegime: pf.taxRegime || 'amministrato',
         assets: pf.assets || {},
         fiscal: pf.fiscal || { manualLosses: [] }
     };
+}
+
+
+function ensureManualLosses(fiscal) {
+    if (!fiscal.manualLosses) fiscal.manualLosses = [];
+    return fiscal.manualLosses;
+}
+
+
+function parseFlexibleYear(value) {
+    const v = (value || '').trim();
+    if (!v) return null;
+    if (/^\d{4}$/.test(v)) return { year: parseInt(v, 10), date: `${v}-12-31` };
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return null;
+    return { year: d.getFullYear(), date: d.toISOString().slice(0, 10) };
+}
+
+
+function manualLossesHtml() {
+    const { name, taxRegime, fiscal } = getActivePortfolioData();
+    const losses = ensureManualLosses(fiscal);
+
+    const items = losses
+        .slice()
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    const listHtml = items.length
+        ? items.map((l, i) => `
+            <div class="manual-loss-item">
+                <div>
+                    <div class="manual-loss-title">${l.title || 'Minus manuale'}</div>
+                    <div class="manual-loss-meta">${l.date || l.year || ''}</div>
+                </div>
+                <div class="manual-loss-amount">− € ${fmt(l.amount || 0)}</div>
+                <button type="button" class="manual-loss-del" data-loss-idx="${i}">Elimina</button>
+            </div>
+        `).join('')
+        : `<div class="fiscale-empty" style="margin-top:12px;">Nessuna minusvalenza manuale inserita.</div>`;
+
+    return `
+        <div class="fiscale-subhead">
+            <div><strong>Portafoglio:</strong> ${name}</div>
+            <div><strong>Regime:</strong> ${taxRegime === 'dichiarativo' ? 'Dichiarativo' : 'Amministrato'}</div>
+        </div>
+
+        <div class="fiscale-regime-note">
+            Minusvalenze esterne registrate manualmente per questo portafoglio.
+        </div>
+
+        <div class="manual-loss-form">
+            <div class="manual-loss-grid">
+                <div>
+                    <label class="manual-loss-label" for="manual-loss-title">Nome strumento / fondo</label>
+                    <input
+                        id="manual-loss-title"
+                        class="manual-loss-input"
+                        type="text"
+                        placeholder="Es. Fondo X o Broker Y"
+                    >
+                </div>
+
+                <div>
+                    <label class="manual-loss-label" for="manual-loss-date">Data o anno</label>
+                    <input
+                        id="manual-loss-date"
+                        class="manual-loss-input"
+                        type="text"
+                        placeholder="2026 oppure 2026-03-04"
+                    >
+                </div>
+
+                <div>
+                    <label class="manual-loss-label" for="manual-loss-amount">Importo perdita (€)</label>
+                    <input
+                        id="manual-loss-amount"
+                        class="manual-loss-input"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                    >
+                </div>
+            </div>
+
+            <button type="button" class="manual-loss-submit" id="manual-loss-submit">
+                Aggiungi minusvalenza
+            </button>
+        </div>
+
+        <div class="manual-loss-list" id="manual-loss-list">
+            ${listHtml}
+        </div>
+    `;
 }
 
 
@@ -168,8 +245,7 @@ export function initCassettoFiscale(getPortfolio) {
     document.body.appendChild(drawer);
 
 
-    document.getElementById('drawer-fiscale-close')
-        .addEventListener('click', chiudiFiscale);
+    document.getElementById('drawer-fiscale-close')?.addEventListener('click', chiudiFiscale);
 }
 
 
@@ -186,14 +262,10 @@ export function aggiornaBadgeFiscale(portfolio) {
 
 function apriFiscale(portfolio) {
     _portfolio = portfolio;
-    const drawer  = document.getElementById('drawer-fiscale');
+    const drawer = document.getElementById('drawer-fiscale');
     const overlay = document.getElementById('drawer-overlay-fiscale');
     if (!drawer) return;
-
-
     renderDrawerFiscale(portfolio);
-
-
     drawer.classList.add('open');
     overlay?.classList.add('open');
 }
@@ -205,64 +277,119 @@ function chiudiFiscale() {
 }
 
 
+async function saveFiscalPortfolio() {
+    if (typeof window.__savePortfolioFiscal === 'function') {
+        return window.__savePortfolioFiscal();
+    }
+    return Promise.resolve();
+}
+
+
+function attachManualLossHandlers() {
+    const submit = document.getElementById('manual-loss-submit');
+    const list = document.getElementById('manual-loss-list');
+
+    if (submit && !submit.dataset.bound) {
+        submit.dataset.bound = '1';
+        submit.addEventListener('click', async () => {
+            const title = document.getElementById('manual-loss-title')?.value.trim();
+            const dateVal = document.getElementById('manual-loss-date')?.value.trim();
+            const amount = parseFloat(document.getElementById('manual-loss-amount')?.value || '0');
+            const parsed = parseFlexibleYear(dateVal);
+
+            const pf = typeof _getPortfolio === 'function' ? _getPortfolio() : null;
+            if (!pf) return;
+
+            if (!pf.fiscal) pf.fiscal = { manualLosses: [] };
+            const losses = ensureManualLosses(pf.fiscal);
+
+            if (!title || !parsed || isNaN(amount) || amount <= 0) {
+                return;
+            }
+
+            losses.push({
+                title,
+                date: parsed.date,
+                year: parsed.year,
+                amount
+            });
+
+            await saveFiscalPortfolio();
+            renderDrawerFiscale(_portfolio || (_getPortfolio ? _getPortfolio() : null));
+        });
+    }
+
+    if (list && !list.dataset.bound) {
+        list.dataset.bound = '1';
+        list.addEventListener('click', async (e) => {
+            const btn = e.target.closest('[data-loss-idx]');
+            if (!btn) return;
+
+            const idx = parseInt(btn.dataset.lossIdx, 10);
+            const pf = typeof _getPortfolio === 'function' ? _getPortfolio() : null;
+            if (!pf) return;
+
+            if (!pf.fiscal) pf.fiscal = { manualLosses: [] };
+            const losses = ensureManualLosses(pf.fiscal);
+
+            losses.splice(idx, 1);
+
+            await saveFiscalPortfolio();
+            renderDrawerFiscale(_portfolio || (_getPortfolio ? _getPortfolio() : null));
+        });
+    }
+}
+
+
 function renderDrawerFiscale(portfolio) {
     const body = document.getElementById('drawer-fiscale-body');
     if (!body) return;
 
 
     const data = portfolio && portfolio.assets ? portfolio : { assets: portfolio || {} };
-    const { name, taxRegime } = getActivePortfolioData();
-    const righe   = calcolaMinusvalenze(data);
+    const { name, taxRegime, fiscal } = getActivePortfolioData();
+    const righe = calcolaMinusvalenze(data);
     const perAnno = raggruppaPerAnno(righe);
-    const oggi    = new Date();
+    const oggi = new Date();
     const annoCorrente = oggi.getFullYear();
     const regimeLabel = taxRegime === 'dichiarativo' ? 'Dichiarativo' : 'Amministrato';
     const regimeNote = taxRegime === 'dichiarativo'
         ? 'Modalità dichiarativa: i calcoli mostrati sono una stima utile al monitoraggio fiscale e alla dichiarazione.'
         : 'Modalità amministrata: il cassetto fiscale del portafoglio viene usato per stimare la compensazione interna delle minusvalenze.';
+    const losses = ensureManualLosses(fiscal);
+    const lossesTotal = losses.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
 
 
     if (!righe.length) {
         body.innerHTML = `
-            <div class="fiscale-subhead">
-                <div><strong>Portafoglio:</strong> ${name}</div>
-                <div><strong>Regime:</strong> ${regimeLabel}</div>
-            </div>
-            <div class="fiscale-regime-note">${regimeNote}</div>
-            <div class="fiscale-empty">
-                <div style="font-size:2em;margin-bottom:8px;">🎉</div>
-                Nessuna minusvalenza compensabile nei 4 anni precedenti.
-            </div>
-            <div class="fiscale-nota">
-                Le minusvalenze realizzate sono compensabili con le plusvalenze della stessa
-                categoria nei <b>4 anni successivi</b> a quello di realizzo (art. 68 TUIR,
-                regime del risparmio amministrato).
-            </div>`;
+        ${manualLossesHtml()}
+        <div class="fiscale-empty">
+            <div style="font-size:2em;margin-bottom:8px;">🎉</div>
+            Nessuna minusvalenza compensabile nei 4 anni precedenti.
+        </div>
+        <div class="fiscale-nota">
+            Le minusvalenze realizzate sono compensabili con le plusvalenze della stessa
+            categoria nei <b>4 anni successivi</b> a quello di realizzo (art. 68 TUIR,
+            regime del risparmio amministrato).
+        </div>`;
+        attachManualLossHandlers();
         return;
     }
 
 
     const totaleStrumenti = righe.filter(r => r.categoria === 'strumenti').reduce((s, r) => s + r.minus, 0);
-    const totaleCrypto    = righe.filter(r => r.categoria === 'crypto').reduce((s, r) => s + r.minus, 0);
-    const totaleAssoluto  = totaleStrumenti + totaleCrypto;
+    const totaleCrypto = righe.filter(r => r.categoria === 'crypto').reduce((s, r) => s + r.minus, 0);
+    const totaleAssoluto = totaleStrumenti + totaleCrypto;
 
 
-    const anniConScadenza = Object.keys(perAnno)
-        .map(Number)
-        .filter(a => (a + ANNI_COMPENSAZIONE) === annoCorrente);
-    const semaforoClass = anniConScadenza.length > 0
-        ? 'semaforo-rosso'
-        : Object.keys(perAnno).some(a => (Number(a) + ANNI_COMPENSAZIONE) === annoCorrente + 1)
-            ? 'semaforo-giallo'
-            : 'semaforo-verde';
+    const anniConScadenza = Object.keys(perAnno).map(Number).filter(a => (a + ANNI_COMPENSAZIONE) === annoCorrente);
+    const semaforoClass = anniConScadenza.length > 0 ? 'semaforo-rosso'
+        : Object.keys(perAnno).some(a => (Number(a) + ANNI_COMPENSAZIONE) === annoCorrente + 1) ? 'semaforo-giallo'
+        : 'semaforo-verde';
 
 
     let html = `
-        <div class="fiscale-subhead">
-            <div><strong>Portafoglio:</strong> ${name}</div>
-            <div><strong>Regime:</strong> ${regimeLabel}</div>
-        </div>
-        <div class="fiscale-regime-note">${regimeNote}</div>
+        ${manualLossesHtml()}
         <div class="fiscale-totale">
             <div class="fiscale-semaforo ${semaforoClass}"></div>
             <div style="flex:1;">
@@ -270,6 +397,15 @@ function renderDrawerFiscale(portfolio) {
                 <div class="fiscale-totale-value neg-loss">− € ${fmt(totaleAssoluto)}</div>
             </div>
         </div>`;
+
+
+    if (lossesTotal > 0) {
+        html += `
+        <div style="margin-bottom:16px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);">
+            <div class="fiscale-totale-label">Minus manuali registrate</div>
+            <div style="font-size:0.92em;font-weight:700;color:var(--danger);">− € ${fmt(lossesTotal)}</div>
+        </div>`;
+    }
 
 
     if (totaleStrumenti > 0 && totaleCrypto > 0) {
@@ -293,22 +429,13 @@ function renderDrawerFiscale(portfolio) {
     for (const anno of anni) {
         const scadenza = anno + ANNI_COMPENSAZIONE;
         const giorniRimasti = Math.ceil((new Date(`${scadenza}-12-31`) - oggi) / 86400000);
-        const percScaduta = Math.max(0, Math.min(100,
-            ((oggi.getFullYear() - anno) / ANNI_COMPENSAZIONE) * 100
-        ));
-        const barClass = percScaduta > 75 ? 'scadenza-danger'
-            : percScaduta > 40 ? 'scadenza-warning'
-            : 'scadenza-ok';
+        const percScaduta = Math.max(0, Math.min(100, ((oggi.getFullYear() - anno) / ANNI_COMPENSAZIONE) * 100));
+        const barClass = percScaduta > 75 ? 'scadenza-danger' : percScaduta > 40 ? 'scadenza-warning' : 'scadenza-ok';
 
 
-        const righeAnno = [
-            ...(perAnno[anno].strumenti || []),
-            ...(perAnno[anno].crypto    || [])
-        ].sort((a, b) => b.data.localeCompare(a.data));
-
-
+        const righeAnno = [...(perAnno[anno].strumenti || []), ...(perAnno[anno].crypto || [])].sort((a, b) => b.data.localeCompare(a.data));
         const totaleAnno = righeAnno.reduce((s, r) => s + r.minus, 0);
-        const isScaduto  = scadenza < annoCorrente;
+        const isScaduto = scadenza < annoCorrente;
         const scadeLabel = isScaduto
             ? `Scaduta il 31/12/${scadenza}`
             : giorniRimasti <= 180
@@ -317,8 +444,6 @@ function renderDrawerFiscale(portfolio) {
 
 
         const annoId = `fiscale-anno-${anno}`;
-
-
         html += `
         <div class="fiscale-anno" id="${annoId}">
             <div class="fiscale-anno-header" onclick="toggleAnnoFiscale('${annoId}')">
@@ -343,22 +468,14 @@ function renderDrawerFiscale(portfolio) {
             html += `<div class="fiscale-detail-row" style="color:var(--text-muted);font-size:0.8em;">Nessuna minusvalenza per quest'anno</div>`;
         } else {
             const hasStrumenti = righeAnno.some(r => r.categoria === 'strumenti');
-            const hasCrypto    = righeAnno.some(r => r.categoria === 'crypto');
-
-
+            const hasCrypto = righeAnno.some(r => r.categoria === 'crypto');
             if (hasStrumenti && hasCrypto) {
                 html += `<div style="padding:6px 14px 4px;font-size:0.68em;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;background:var(--secondary);">Azioni / Bond</div>`;
-                for (const r of righeAnno.filter(x => x.categoria === 'strumenti')) {
-                    html += rigaDettaglio(r);
-                }
+                for (const r of righeAnno.filter(x => x.categoria === 'strumenti')) html += rigaDettaglio(r);
                 html += `<div style="padding:6px 14px 4px;font-size:0.68em;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;background:var(--secondary);">Crypto</div>`;
-                for (const r of righeAnno.filter(x => x.categoria === 'crypto')) {
-                    html += rigaDettaglio(r);
-                }
+                for (const r of righeAnno.filter(x => x.categoria === 'crypto')) html += rigaDettaglio(r);
             } else {
-                for (const r of righeAnno) {
-                    html += rigaDettaglio(r);
-                }
+                for (const r of righeAnno) html += rigaDettaglio(r);
             }
         }
 
@@ -377,6 +494,7 @@ function renderDrawerFiscale(portfolio) {
 
 
     body.innerHTML = html;
+    attachManualLossHandlers();
 
 
     for (const anno of anni.slice(0, 2)) {
@@ -387,9 +505,7 @@ function renderDrawerFiscale(portfolio) {
 
 
 function rigaDettaglio(r) {
-    const tipoLabel = r.tipoAsset === 'bond' ? 'Bond'
-        : r.tipoAsset === 'crypto' ? 'Crypto'
-        : 'Stock';
+    const tipoLabel = r.tipoAsset === 'bond' ? 'Bond' : r.tipoAsset === 'crypto' ? 'Crypto' : 'Stock';
     return `
         <div class="fiscale-detail-row">
             <div class="fiscale-detail-titolo">

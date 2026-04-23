@@ -97,12 +97,15 @@ export class PortfolioPage {
         await Exchange.prefetchRatesForPortfolio(this.portfolio);
         this._syncActivePortfolio();
 
-        await this._render();
-
         CartPanel.init();
 
-        initCassettoFiscale(() => this._getActivePortfolio());
-        aggiornaBadgeFiscale(this.portfolio);
+window.__savePortfolioFiscal = async () => {
+    await this._save();
+};
+
+initCassettoFiscale(() => this._getActivePortfolio());
+
+aggiornaBadgeFiscale(this.portfolio);
 
         this._refreshPrices();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
