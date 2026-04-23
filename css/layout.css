@@ -522,3 +522,104 @@
     .desktop-only { display: none !important; }
     .mobile-only  { display: block !important; }
 }
+
+/* ── PORTFOLIO SWITCHER ───────────────────────────────────────────── */
+.portfolio-switcher {
+    position: relative;
+    margin-right: 10px;
+}
+
+.portfolio-switcher-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.portfolio-switcher-toggle:hover {
+    background: var(--secondary);
+}
+
+.portfolio-switcher-caret {
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.portfolio-switcher-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 280px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+    overflow: hidden;
+}
+
+.portfolio-switcher-list {
+    max-height: 320px;
+    overflow: auto;
+    padding: 6px;
+}
+
+.portfolio-switcher-item {
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    display: block;
+}
+
+.portfolio-switcher-item:hover {
+    background: var(--secondary);
+}
+
+.portfolio-switcher-item.active {
+    background: rgba(1, 105, 111, 0.10);
+}
+
+.portfolio-switcher-item-name {
+    display: block;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.portfolio-switcher-item-meta {
+    display: block;
+    font-size: 0.78em;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+.portfolio-switcher-actions {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.portfolio-switcher-actions button {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.portfolio-switcher-actions button:hover {
+    background: var(--secondary);
+}
