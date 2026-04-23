@@ -774,3 +774,19 @@
 .manual-loss-del{padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text-muted)}
 @media (min-width:768px){.manual-loss-grid{grid-template-columns:1.2fr .8fr .8fr;align-items:end}.manual-loss-submit{width:auto}}
 @media (max-width:720px){.manual-loss-item{align-items:flex-start;flex-direction:column}}
+
+.manual-loss-help{
+  margin-top: 6px;
+  font-size: .78rem;
+  color: var(--text-muted);
+}
+
+.manual-loss-row{
+  background: rgba(150, 66, 25, 0.06);
+}
+
+.manual-loss-badge{
+  background: rgba(150, 66, 25, 0.10);
+  color: var(--warning);
+  border: 1px solid rgba(150, 66, 25, 0.18);
+}
