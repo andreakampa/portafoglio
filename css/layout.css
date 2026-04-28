@@ -171,15 +171,32 @@
 
 /* FIX punto 2: opacità meno aggressiva */
 .row-closed {
-    opacity: 0.72;
+    opacity: 0.80;
 }
 .row-empty {
-    opacity: 0.52;
+    opacity: 0.70;
 }
 /* Hover su righe chiuse/vuote non ripristina opacità ma schiarisce leggermente */
 .row-closed:hover td,
 .row-empty:hover td {
     background: rgba(74,158,255,0.025) !important;
+}
+
+.price-live {
+    display: inline-block;
+    font-weight: 700;
+}
+
+.price-live-sub {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.1;
+}
+
+.row-closed .ticker-name,
+.row-empty .ticker-name {
+    opacity: 1;
 }
 
 /* Badge stato titolo */
@@ -790,3 +807,19 @@
   color: var(--warning);
   border: 1px solid rgba(150, 66, 25, 0.18);
 }
+
+.kpi-card .kpi-label {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.kpi-card .kpi-value {
+    font-weight: 700;
+}
+
+.tx-table td:nth-child(9), .tx-table th:nth-child(9) { min-width: 150px; }
+.preview-box .hl { color: var(--warning); font-weight: 700; }
+.preview-box .pos-gain { color: var(--success); }
+.preview-box .neg-loss { color: var(--danger); }
+.btn-del-tx { border: 1px solid var(--border); background: transparent; color: var(--danger); border-radius: var(--radius-sm); padding: 6px 8px; cursor: pointer; }
+.btn-del-tx:hover { background: var(--danger-dim); }
