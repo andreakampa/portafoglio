@@ -700,44 +700,63 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency 
         container.appendChild(labelEl);
 
         for (const id of ids) {
-            const p   = portfolio[id];
+            const p = portfolio[id];
             const pos = positionMap[id];
-           const {
-    qta,
-    pmc,
-    pmcEur,
-    realizedPnL,
-    prLive,
-    att,
-    pnl,
-    pnlP,
-    tax,
-    pnlAfterTax,
-    taxEur,
-    pnlAfterTaxEur,
-    invEur,
-    valuta: v
-} = pos;
+
+            const {
+                qta = 0,
+                pmc = 0,
+                realizedPnL = 0,
+                prLive = 0,
+                att = 0,
+                pnl = 0,
+                pnlP = 0,
+                tax = 0,
+                pnlAfterTax = 0,
+                taxEur = 0,
+                pnlAfterTaxEur = 0,
+                invEur = 0,
+                inv = 0,
+                valuta: v = (p.valuta || 'EUR').toUpperCase()
+            } = pos || {};
+
             const prPrev = prevClose[id] ?? null;
-            const cv     = x => Exchange.convert(x, v, currency);
+            const cv = x => Exchange.convert(x, v, currency);
             const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
 
             const costoDisplay = currency === 'EUR'
                 ? `€ ${Calc.fmt(invEur)}`
-                : `${s} ${Calc.fmt(cv(pos.inv))}`;
+                : `${s} ${Calc.fmt(cv(inv))}`;
 
             const assetBadge =
-                p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>'  :
-                p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>'  : '';
+                p.tipoAsset === 'bond' ? '<span class="badge badge-bond">12.5%</span>' :
+                p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>' : '';
 
             const varHtml = varDay !== null
                 ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${Calc.fmtSign(varDay)}%</span>`
                 : '<span class="text-muted">—</span>';
 
+            const unrealizedNetShown = currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax);
+            const unrealizedTaxShown = currency === 'EUR' ? taxEur : cv(tax);
+
+            const realizedEur = v === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, v, 'EUR');
+            const realizedBreakdown = Calc.realizedTaxBreakdown({
+                gainEur: realizedEur,
+                assetType: p.tipoAsset,
+                availableMinus: 0
+            });
+
+            const realizedNetEur = realizedEur > 0 ? realizedBreakdown.nettoTeorico : realizedEur;
+            const realizedNetShown = currency === 'EUR'
+                ? realizedNetEur
+                : Exchange.convert(realizedNetEur, 'EUR', currency);
+
+            const realizedNetClass = realizedNetShown >= 0 ? 'pos-gain' : 'neg-loss';
+
             const card = document.createElement('div');
             card.className = `mobile-card${groupClass ? ' ' + groupClass : ''}`;
             if (groupClass === 'row-closed') card.style.opacity = '0.6';
-            if (groupClass === 'row-empty')  card.style.opacity = '0.4';
+            if (groupClass === 'row-empty') card.style.opacity = '0.4';
 
             card.innerHTML = `
                 <div class="mobile-card-header" data-id="${id}">
@@ -771,78 +790,43 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency 
                     </div>
                 </div>
                 <div class="mobile-card-detail" id="detail-${id}" style="display:none;">
-    <div class="mobile-card-row">
-        <span class="text-muted">P&L After Tax</span>
-        <span class="${(currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax)) >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">
-            ${att > 0
-                ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax))}`
-                : '—'}
-        </span>
-    </div>
-    <div class="mobile-card-row">
-        <span class="text-muted">Tasse stimate</span>
-        <span class="text-warning">
-            ${att > 0
-                ? `${s} ${Calc.fmt(currency === 'EUR' ? taxEur : cv(tax))}`
-                : '—'}
-        </span>
-    </div>
-    <div class="mobile-card-row">
-        <span class="text-muted">P&L Realizzato Lordo</span>
-        <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
-            ${realizedPnL !== 0 ? `${s} ${Calc.fmt(cv(realizedPnL))}` : '—'}
-        </span>
-    </div>
-    <div class="mobile-card-row">
-        <span class="text-muted">P&L Realizzato Netto</span>
-        <span class="${(() => {
-            if (realizedPnL === 0) return '';
-            const realizedEur = v === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, v, 'EUR');
-            const breakdown = Calc.realizedTaxBreakdown({
-                gainEur: realizedEur,
-                assetType: p.tipoAsset,
-                availableMinus: 0
-            });
-            const realNetEur = realizedEur > 0 ? breakdown.nettoTeorico : realizedEur;
-            const realNetShown = currency === 'EUR'
-                ? realNetEur
-                : Exchange.convert(realNetEur, 'EUR', currency);
-            return realNetShown >= 0 ? 'pos-gain' : 'neg-loss';
-        })()} fw-bold">
-            ${(() => {
-                if (realizedPnL === 0) return '—';
-
-                const realizedEur =
-                    v === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, v, 'EUR');
-
-                const breakdown = Calc.realizedTaxBreakdown({
-                    gainEur: realizedEur,
-                    assetType: p.tipoAsset,
-                    availableMinus: 0
-                });
-
-                const realNetEur = realizedEur > 0 ? breakdown.nettoTeorico : realizedEur;
-                const realNetShown =
-                    currency === 'EUR'
-                        ? realNetEur
-                        : Exchange.convert(realNetEur, 'EUR', currency);
-
-                return `${s} ${Calc.fmt(realNetShown)}`;
-            })()}
-        </span>
-    </div>
-    <div class="mobile-card-actions">
-        <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
-        <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
-        <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
-        <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
-        <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
-    </div>
-</div>
+                    <div class="mobile-card-row">
+                        <span class="text-muted">P&L After Tax</span>
+                        <span class="${unrealizedNetShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">
+                            ${att > 0 ? `${s} ${Calc.fmt(unrealizedNetShown)}` : '—'}
+                        </span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="text-muted">Tasse stimate</span>
+                        <span class="text-warning">
+                            ${att > 0 ? `${s} ${Calc.fmt(unrealizedTaxShown)}` : '—'}
+                        </span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="text-muted">P&L Realizzato Lordo</span>
+                        <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
+                            ${realizedPnL !== 0 ? `${s} ${Calc.fmt(cv(realizedPnL))}` : '—'}
+                        </span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="text-muted">P&L Realizzato Netto</span>
+                        <span class="${realizedNetClass} fw-bold">
+                            ${realizedPnL !== 0 ? `${s} ${Calc.fmt(realizedNetShown)}` : '—'}
+                        </span>
+                    </div>
+                    <div class="mobile-card-actions">
+                        <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
+                        <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
+                        <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
+                        <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
+                        <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
+                    </div>
+                </div>
+            `;
 
             card.querySelector('.mobile-card-header').addEventListener('click', () => {
                 const detail = document.getElementById(`detail-${id}`);
-                const arrow  = card.querySelector('.mobile-card-arrow');
+                const arrow = card.querySelector('.mobile-card-arrow');
                 const isOpen = detail.style.display !== 'none';
                 detail.style.display = isOpen ? 'none' : 'block';
                 arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
@@ -853,10 +837,10 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency 
                     e.stopPropagation();
                     const { action, id } = btn.dataset;
                     if (action === 'history') handlers.onHistory(id);
-                    if (action === 'buy')     handlers.onTransaction(id, 'buy');
-                    if (action === 'sell')    handlers.onTransaction(id, 'sell');
-                    if (action === 'sim')     handlers.onSimulation(id);
-                    if (action === 'delete')  handlers.onDelete(id);
+                    if (action === 'buy') handlers.onTransaction(id, 'buy');
+                    if (action === 'sell') handlers.onTransaction(id, 'sell');
+                    if (action === 'sim') handlers.onSimulation(id);
+                    if (action === 'delete') handlers.onDelete(id);
                 });
             });
 
@@ -866,5 +850,5 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency 
 
     renderMobileGroup(active, '', '📈 Titoli attivi');
     renderMobileGroup(closed, 'row-closed', '🔒 Posizioni chiuse');
-    renderMobileGroup(empty,  'row-empty',  '⬜ Senza operazioni');
+    renderMobileGroup(empty, 'row-empty', '⬜ Senza operazioni');
 }
