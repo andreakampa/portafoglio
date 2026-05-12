@@ -7,14 +7,27 @@ export const Calc = {
     let realizedLordoEur = 0;
     let realizedNettoTeoricoEur = 0;
     let realizedNettoEffettivoEur = 0;
+
     let rollingMinusStock = 0;
     let rollingMinusCrypto = 0;
     let rollingMinusBond = 0;
 
+    const readMinus = (state, type) => {
+        if (!state) return 0;
+
+        if (typeof state === 'object') {
+            if (typeof state[type] === 'number') return state[type];
+            if (typeof state[`${type}Minus`] === 'number') return state[`${type}Minus`];
+            if (typeof state[`${type}Losses`] === 'number') return state[`${type}Losses`];
+        }
+
+        return 0;
+    };
+
     if (fiscalState) {
-        rollingMinusStock = getAvailableMinusForPreview(fiscalState, 'stock');
-        rollingMinusCrypto = getAvailableMinusForPreview(fiscalState, 'crypto');
-        rollingMinusBond = getAvailableMinusForPreview(fiscalState, 'bond');
+        rollingMinusStock = readMinus(fiscalState, 'stock');
+        rollingMinusCrypto = readMinus(fiscalState, 'crypto');
+        rollingMinusBond = readMinus(fiscalState, 'bond');
     }
 
     for (const p of Object.values(portfolio || {})) {
@@ -25,8 +38,6 @@ export const Calc = {
 
         for (const tx of txs) {
             const n = Calc.normalizeTx(tx, p);
-
-
 
             if (tx.type === 'buy') {
                 qty += n.qty;

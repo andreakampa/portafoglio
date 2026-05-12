@@ -2,6 +2,7 @@ import { Calc } from '../modules/portfolio/calc.js';
 import { Exchange } from '../api/exchange.js';
 
 
+
 // ── CASSETTO FISCALE ────────────────────────────────────────────────────────
 // Calcola e mostra le minusvalenze compensabili per anno fiscale.
 // Le minus sono compensabili nei 4 anni successivi a quello di realizzo.
@@ -96,6 +97,25 @@ export function raggruppaPerAnno(righe) {
         mappa[r.anno][r.categoria].push(r);
     }
     return mappa;
+}
+
+export function getAvailableMinusForPreview(fiscalState, assetType = 'stock') {
+    if (!fiscalState) return 0;
+
+    const manualLosses = Array.isArray(fiscalState.manualLosses)
+        ? fiscalState.manualLosses
+        : [];
+
+    const totaleManuale = manualLosses.reduce((sum, row) => {
+        const amount = Math.abs(parseFloat(row.amount) || 0);
+        return sum + amount;
+    }, 0);
+
+    if (assetType === 'crypto') {
+        return 0;
+    }
+
+    return totaleManuale;
 }
 
 
