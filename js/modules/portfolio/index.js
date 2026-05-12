@@ -169,31 +169,66 @@ aggiornaBadgeFiscale(this.portfolio);
     }
 
     async _refreshPrices(soloId = null) {
-        const btn = document.getElementById('btn-refresh');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<span class=\"spinner\"></span>Aggiornamento...';
-        }
+  const btn = document.getElementById('btn-refresh');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = 'Aggiornamento...';
+  }
 
-        const tickerMap = soloId
-            ? { [soloId]: this.portfolio[soloId].nome }
-            : Object.fromEntries(
-                Object.keys(this.portfolio).map(id => [id, this.portfolio[id].nome])
-            );
+  this._syncActivePortfolio();
 
-        const { prices, prevs } = await Yahoo.fetchAll(tickerMap);
-        Object.assign(this.prices, prices);
-        Object.assign(this.prevClose, prevs);
-        Cache.savePrices(this.prices, this.prevClose);
+  let tickerMap = {};
 
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '🔄 Aggiorna';
-        }
-        this._updateTimestamp();
+  if (soloId) {
+    const asset = this.portfolio?.[soloId];
 
-        await this._render();
+    if (!asset?.nome) {
+      console.warn('Refresh saltato: asset non trovato nel portafoglio attivo', {
+        soloId,
+        activePortfolioId: this.activePortfolioId,
+        portfolio: this.portfolio
+      });
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Aggiorna';
+      }
+
+      await this._render();
+      return;
     }
+
+    tickerMap = { [soloId]: asset.nome };
+  } else {
+    tickerMap = Object.fromEntries(
+      Object.entries(this.portfolio)
+        .filter(([, asset]) => asset?.nome)
+        .map(([id, asset]) => [id, asset.nome])
+    );
+  }
+
+  if (!Object.keys(tickerMap).length) {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🔄 Aggiorna';
+    }
+    await this._render();
+    return;
+  }
+
+  const { prices, prevs } = await Yahoo.fetchAll(tickerMap);
+  Object.assign(this.prices, prices);
+  Object.assign(this.prevClose, prevs);
+  Cache.savePrices(this.prices, this.prevClose);
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '🔄 Aggiorna';
+  }
+
+  this._updateTimestamp();
+  await this._render();
+}
 
     async _backgroundRefresh() {
         await Exchange.update();
@@ -627,36 +662,49 @@ aggiornaBadgeFiscale(this.portfolio);
         };
     }
 
-    async _aggiungiTitolo() {
-        const nome = document.getElementById('input-ticker-final').value.toUpperCase().trim();
-        const valuta = document.getElementById('input-valuta').value || 'EUR';
-        if (!nome) { Toast.show('Seleziona un titolo dalla lista', 'err'); return; }
-        if (Object.values(this.portfolio).find(p => p.nome === nome)) {
-            Toast.show(`${nome} già presente`, 'err'); return;
-        }
-        const id = 'T' + Date.now();
-        const logoUrl = document.getElementById('input-logo-url').value || null;
+    async _aggiungiTitolo(item) {
+  const active = this._getActivePortfolio();
+  if (!active) {
+    Toast.show('Portafoglio attivo non trovato', 'err');
+    return;
+  }
 
-        this.portfolio[id] = {
-            nome, valuta,
-            tipoAsset: document.getElementById('input-tipo-asset').value,
-            commDefault: parseFloat(document.getElementById('input-comm-default').value) || 7,
-            logoUrl,
-            transactions: []
-        };
+  if (!active.assets) active.assets = {};
 
-        document.getElementById('input-titolo').value = '';
-        document.getElementById('input-ticker-final').value = '';
-        document.getElementById('input-valuta').value = '';
-        document.getElementById('input-logo-url').value = '';
-        document.getElementById('btn-add-titolo').disabled = true;
-        document.getElementById('ticker-selected').textContent = '— nessuno selezionato —';
-        document.getElementById('ticker-selected').className = 'ticker-selected-box';
+  const id =
+    item.id ||
+    item.isin ||
+    item.symbol ||
+    item.ticker ||
+    item.nome;
 
-        await this._save();
-        this._refreshPrices(id);
-        Toast.show(`${nome} aggiunto (${valuta})`, 'ok');
-    }
+  if (!id) {
+    Toast.show('Titolo non valido', 'err');
+    return;
+  }
+
+  if (active.assets[id]) {
+    Toast.show('Titolo già presente in questo portafoglio', 'info');
+    return;
+  }
+
+  active.assets[id] = {
+    nome: item.nome || item.name || item.symbol || item.ticker || id,
+    isin: item.isin || '',
+    ticker: item.symbol || item.ticker || '',
+    valuta: item.valuta || item.currency || 'EUR',
+    tipoAsset: item.tipoAsset || item.assetClass || 'stock',
+    transactions: [],
+    commDefault: item.commDefault || 7
+  };
+
+  this._syncActivePortfolio();
+  await DB.save('portfolio_state', this.portfolioState);
+
+  Toast.show(`Titolo aggiunto: ${active.assets[id].nome}`, 'ok');
+
+  await this._refreshPrices(id);
+}
 
     async _elimina(id) {
         const nome = this.portfolio[id]?.nome;
