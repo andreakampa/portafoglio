@@ -642,7 +642,25 @@ aggiornaBadgeFiscale(this.portfolio);
             }
         });
 
-        document.getElementById('btn-add-titolo')?.addEventListener('click', () => this._aggiungiTitolo());
+        document.getElementById('btn-add-titolo')?.addEventListener('click', () => {
+    const ticker = hiddenTicker.value?.trim();
+    const valuta = hiddenValuta.value?.trim() || 'EUR';
+    const nome = inputTitolo.value?.trim();
+    const tipoAsset = document.getElementById('input-tipo-asset')?.value?.trim() || 'stock';
+
+    if (!ticker) {
+        Toast.show('Seleziona prima un titolo dai suggerimenti', 'err');
+        return;
+    }
+
+    this._aggiungiTitolo({
+        id: ticker,
+        ticker,
+        nome: nome || ticker,
+        valuta,
+        tipoAsset
+    });
+});
     }
 
     async _setValuta(v) {
@@ -662,59 +680,45 @@ aggiornaBadgeFiscale(this.portfolio);
         };
     }
 
-    async _aggiungiTitolo(itemOrEvent) {
-  const active = this._getActivePortfolio();
-  if (!active) {
-    Toast.show('Portafoglio attivo non trovato', 'err');
-    return;
-  }
-
-  if (!active.assets) active.assets = {};
-
-  let item = itemOrEvent;
-
-  if (!item || item.target) {
-    const btn = itemOrEvent?.currentTarget || itemOrEvent?.target;
-    if (!btn) {
-      Toast.show('Titolo non valido', 'err');
-      return;
+    async _aggiungiTitolo(item) {
+    const active = this._getActivePortfolio();
+    if (!active) {
+        Toast.show('Portafoglio attivo non trovato', 'err');
+        return;
     }
 
-    item = {
-      id: btn.dataset.id || btn.dataset.isin || btn.dataset.ticker || btn.dataset.symbol,
-      nome: btn.dataset.nome || btn.dataset.name || btn.dataset.symbol || btn.dataset.ticker,
-      isin: btn.dataset.isin || '',
-      ticker: btn.dataset.ticker || btn.dataset.symbol || '',
-      valuta: btn.dataset.valuta || btn.dataset.currency || 'EUR',
-      tipoAsset: btn.dataset.tipoAsset || btn.dataset.assetClass || 'stock'
+    if (!item) {
+        Toast.show('Titolo non valido', 'err');
+        return;
+    }
+
+    if (!active.assets) active.assets = {};
+
+    const id = item.id || item.isin || item.ticker || item.symbol || item.nome || item.name;
+    if (!id) {
+        Toast.show('Titolo non valido', 'err');
+        return;
+    }
+
+    if (active.assets[id]) {
+        Toast.show('Titolo già presente in questo portafoglio', 'info');
+        return;
+    }
+
+    active.assets[id] = {
+        nome: item.nome || item.name || item.symbol || item.ticker || id,
+        isin: item.isin || '',
+        ticker: item.ticker || item.symbol || '',
+        valuta: item.valuta || item.currency || 'EUR',
+        tipoAsset: item.tipoAsset || item.assetClass || 'stock',
+        transactions: [],
+        commDefault: 7
     };
-  }
 
-  const id = item?.id || item?.isin || item?.ticker || item?.symbol || item?.nome;
-  if (!id) {
-    Toast.show('Titolo non valido', 'err');
-    return;
-  }
-
-  if (active.assets[id]) {
-    Toast.show('Titolo già presente in questo portafoglio', 'info');
-    return;
-  }
-
-  active.assets[id] = {
-    nome: item.nome || item.name || item.symbol || item.ticker || id,
-    isin: item.isin || '',
-    ticker: item.ticker || item.symbol || '',
-    valuta: item.valuta || item.currency || 'EUR',
-    tipoAsset: item.tipoAsset || item.assetClass || 'stock',
-    transactions: [],
-    commDefault: 7
-  };
-
-  this._syncActivePortfolio();
-  await DB.save('portfolio_state', this.portfolioState);
-  Toast.show(`Titolo aggiunto: ${active.assets[id].nome}`, 'ok');
-  await this._refreshPrices(id);
+    this._syncActivePortfolio();
+    await DB.save('portfolio_state', this.portfolioState);
+    Toast.show(`Titolo aggiunto: ${active.assets[id].nome}`, 'ok');
+    await this._refreshPrices(id);
 }
 
     async _elimina(id) {
