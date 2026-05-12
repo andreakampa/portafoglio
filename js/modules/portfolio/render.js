@@ -304,29 +304,36 @@ export async function buildPositionMap(portfolio, prices) {
         const prLive = prices[id] ?? pos.pmc;
         const rate   = Exchange.rate || 1;
 
-        const inv    = pos.qta * pos.pmc;
-        const att    = pos.qta * prLive;
-        const pnl    = att - inv;
+        const inv = pos.qta * pos.pmc;
+const att = pos.qta * prLive;
+const pnl = att - inv;
 
-        // Costo totale in EUR con tassi storici (include commissioni)
-        const invEur = v === 'EUR' ? inv : (pos.totalCostEur ?? inv / rate);
-        const attEur = v === 'EUR' ? att : att / rate;
-        const pnlEur = attEur - invEur;
+const invEur = v === 'EUR' ? inv : (pos.totalCostEur ?? inv / rate);
+const attEur = v === 'EUR' ? att : att / rate;
+const pnlEur = attEur - invEur;
 
-        map[id] = {
-            ...pos,
-            prLive,
-            inv,
-            att,
-            pnl,
-            pnlP:        inv > 0 ? (pnl / inv) * 100 : 0,
-            invEur,
-            attEur,
-            pnlEur,
-            tax:         Calc.taxOnGain(pnl, p.tipoAsset),
-            pnlAfterTax: pnl - Calc.taxOnGain(pnl, p.tipoAsset),
-            valuta:      v,
-        };
+const taxNative = Calc.taxOnGain(pnl, p.tipoAsset);
+const pnlAfterTaxNative = pnl - taxNative;
+
+const taxEur = Calc.taxOnGain(pnlEur, p.tipoAsset);
+const pnlAfterTaxEur = pnlEur - taxEur;
+
+map[id] = {
+    ...pos,
+    prLive,
+    inv,
+    att,
+    pnl,
+    pnlP: inv > 0 ? (pnl / inv) * 100 : 0,
+    invEur,
+    attEur,
+    pnlEur,
+    tax: taxNative,
+    pnlAfterTax: pnlAfterTaxNative,
+    taxEur,
+    pnlAfterTaxEur,
+    valuta: v,
+};
     });
 
     return map;
@@ -363,7 +370,21 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
         for (const id of ids) {
             const p   = portfolio[id];
             const pos = positionMap[id];
-            const { qta, pmc, totalCostEur, realizedPnL, prLive, att, pnl, pnlP, tax, pnlAfterTax, invEur, valuta: v } = pos;
+            const {
+    qta = 0,
+    pmc = 0,
+    realizedPnL = 0,
+    prLive = 0,
+    att = 0,
+    pnl = 0,
+    pnlP = 0,
+    tax = 0,
+    pnlAfterTax = 0,
+    taxEur = 0,
+    pnlAfterTaxEur = 0,
+    invEur = 0,
+    valuta: v = (p.valuta || 'EUR').toUpperCase()
+} = pos || {};
             const prPrev = prevClose[id] ?? null;
             const cv     = x => Exchange.convert(x, v, currency);
             const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
@@ -412,25 +433,52 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
                 <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
                 <td>${varHtml}</td>
                 <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
-                    ${att > 0 ? `${s} ${Calc.fmt(cv(pnl))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>` : '—'}
+                    ${att > 0
+    ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>`
+    : '—'}
                 </td>
                 <td>
                     ${att > 0
-                        ? `<span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(pnlAfterTax))}</span>
-                           <br><span class="text-muted fs-xs">tasse: ${s} ${Calc.fmt(cv(tax))}</span>`
-                        : '—'}
+    ? (() => {
+        const netShown = currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax);
+        const taxShown = currency === 'EUR' ? taxEur : cv(tax);
+        return `<span class="${netShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(netShown)}</span>
+                <br><span class="text-muted fs-xs">tasse: ${s} ${Calc.fmt(taxShown)}</span>`;
+      })()
+    : '—'}
                 </td>
                 <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
                     ${realizedPnL !== 0 ? `${s} ${Calc.fmt(cv(realizedPnL))}` : '—'}
                 </td>
                 <td>${(() => {
-                    const realTax = Calc.taxOnGain(realizedPnL, p.tipoAsset);
-                    const realNet = realizedPnL - realTax;
-                    const taxLbl  = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
-                    if (realizedPnL === 0) return '—';
-                    return `<span class="${realNet >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(cv(realNet))}</span>
-                            <br><span class="text-muted fs-xs">tasse (${taxLbl}): ${s} ${Calc.fmt(cv(realTax))}</span>`;
-                })()}</td>
+    if (realizedPnL === 0) return '—';
+
+    const realizedEur =
+        v === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, v, 'EUR');
+
+    const breakdown = Calc.realizedTaxBreakdown({
+        gainEur: realizedEur,
+        assetType: p.tipoAsset,
+        availableMinus: 0
+    });
+
+    const realNetEur = realizedEur > 0 ? breakdown.nettoTeorico : realizedEur;
+    const realTaxEur = realizedEur > 0 ? breakdown.taxTeorica : 0;
+
+    const realNetShown =
+        currency === 'EUR' ? realNetEur : Exchange.convert(realNetEur, 'EUR', currency);
+
+    const realTaxShown =
+        currency === 'EUR' ? realTaxEur : Exchange.convert(realTaxEur, 'EUR', currency);
+
+    const taxLbl =
+        p.tipoAsset === 'bond' ? '12,5%' :
+        p.tipoAsset === 'crypto' ? '33%' :
+        '26%';
+
+    return `<span class="${realNetShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(realNetShown)}</span>
+            <br><span class="text-muted fs-xs">tasse (${taxLbl}): ${s} ${Calc.fmt(realTaxShown)}</span>`;
+})()}</td>
                 <td>
                     <div class="action-btns">
                         <button class="btn-action btn-action-history"  data-action="history" data-id="${id}" title="Storico">📜</button>
@@ -503,37 +551,71 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
     }, 100);
 }
 
-export function renderKPI({ portfolio, positionMap, currency }) {
+export function renderKPI({ portfolio, positionMap, currency, fiscalState }) {
     const s = currency === 'EUR' ? '€' : '$';
-    let totInv = 0, totAtt = 0, totReal = 0, totTax = 0, totComm = 0;
-    let totInvEur = 0, totAttEur = 0;
+
+    let totInv = 0;
+    let totAtt = 0;
+    let totTax = 0;
+    let totComm = 0;
+    let totInvEur = 0;
+    let totAttEur = 0;
 
     for (const id in portfolio) {
-        const p   = portfolio[id];
+        const p = portfolio[id];
         const pos = positionMap[id];
-        const { inv, att, tax, realizedPnL, totalComm, invEur, attEur, valuta: v } = pos;
-        const cv  = x => Exchange.convert(x, v, currency);
+        if (!pos) continue;
 
-        totInv  += cv(inv);
-        totAtt  += cv(att);
-        totReal += cv(realizedPnL);
-        totTax  += cv(tax);
+        const {
+            inv = 0,
+            att = 0,
+            tax = 0,
+            totalComm = 0,
+            invEur = 0,
+            attEur = 0,
+            valuta: v = (p.valuta || 'EUR').toUpperCase()
+        } = pos;
+
+        const cv = x => Exchange.convert(x, v, currency);
+
+        totInv += cv(inv);
+        totAtt += cv(att);
+        totTax += cv(tax);
         totComm += cv(totalComm);
 
         totInvEur += invEur;
         totAttEur += attEur;
     }
 
-    const pnl            = totAtt - totInv;
-    const pnlP           = totInv > 0 ? (pnl / totInv) * 100 : 0;
-    const pnlAfterTax    = pnl - totTax;
-    const pnlAfterTaxP   = totInv > 0 ? (pnlAfterTax / totInv) * 100 : 0;
-    const totNetto       = pnlAfterTax + totReal;
-    const pnlEurStorico  = totAttEur - totInvEur;
+    const {
+        realizedLordoEur = 0,
+        realizedNettoEffettivoEur = 0
+    } = Calc.buildDashboardTaxMetrics(portfolio, fiscalState);
+
+    const realizedLordo =
+        currency === 'EUR'
+            ? realizedLordoEur
+            : Exchange.convert(realizedLordoEur, 'EUR', currency);
+
+    const realizedNetto =
+        currency === 'EUR'
+            ? realizedNettoEffettivoEur
+            : Exchange.convert(realizedNettoEffettivoEur, 'EUR', currency);
+
+    const pnl = totAtt - totInv;
+    const pnlP = totInv > 0 ? (pnl / totInv) * 100 : 0;
+
+    const pnlAfterTax = pnl - totTax;
+    const pnlAfterTaxP = totInv > 0 ? (pnlAfterTax / totInv) * 100 : 0;
+
+    const totNetto = pnlAfterTax + realizedNetto;
+
+    const pnlEurStorico = totAttEur - totInvEur;
     const pnlEurStoricoP = totInvEur > 0 ? (pnlEurStorico / totInvEur) * 100 : 0;
 
     const dash = document.getElementById('dashboard');
     if (!dash) return;
+
     dash.innerHTML = `
         <div class="kpi-group">
             <div class="kpi-label">💼 Portafoglio</div>
@@ -571,14 +653,19 @@ export function renderKPI({ portfolio, positionMap, currency }) {
                 </div>
                 <div class="kpi-sep"></div>
                 <div class="kpi-item">
-                    <div class="kpi-title">P&L Realizzato</div>
-                    <div class="kpi-value ${totReal >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(totReal)}</div>
+                    <div class="kpi-title">P&L Realizzato Lordo</div>
+                    <div class="kpi-value ${realizedLordo >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedLordo)}</div>
+                </div>
+                <div class="kpi-sep"></div>
+                <div class="kpi-item">
+                    <div class="kpi-title">P&L Realizzato Netto</div>
+                    <div class="kpi-value ${realizedNetto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedNetto)}</div>
                 </div>
                 <div class="kpi-sep"></div>
                 <div class="kpi-item">
                     <div class="kpi-title">P&L Totale After Tax</div>
                     <div class="kpi-value ${totNetto >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(totNetto)}</div>
-                    <div class="kpi-sub">realizzato + non realizzato</div>
+                    <div class="kpi-sub">realizzato netto + non realizzato netto</div>
                 </div>
                 <div class="kpi-sep"></div>
                 <div class="kpi-item">
@@ -615,7 +702,22 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency 
         for (const id of ids) {
             const p   = portfolio[id];
             const pos = positionMap[id];
-            const { qta, pmc, pmcEur, realizedPnL, prLive, att, pnl, pnlP, tax, pnlAfterTax, invEur, valuta: v } = pos;
+           const {
+    qta,
+    pmc,
+    pmcEur,
+    realizedPnL,
+    prLive,
+    att,
+    pnl,
+    pnlP,
+    tax,
+    pnlAfterTax,
+    taxEur,
+    pnlAfterTaxEur,
+    invEur,
+    valuta: v
+} = pos;
             const prPrev = prevClose[id] ?? null;
             const cv     = x => Exchange.convert(x, v, currency);
             const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
@@ -669,26 +771,74 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency 
                     </div>
                 </div>
                 <div class="mobile-card-detail" id="detail-${id}" style="display:none;">
-                    <div class="mobile-card-row">
-                        <span class="text-muted">P&L After Tax</span>
-                        <span class="${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${att > 0 ? `${s} ${Calc.fmt(cv(pnlAfterTax))}` : '—'}</span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">Tasse stimate</span>
-                        <span class="text-warning">${att > 0 ? `${s} ${Calc.fmt(cv(tax))}` : '—'}</span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">P&L Realizzato</span>
-                        <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${realizedPnL !== 0 ? `${s} ${Calc.fmt(cv(realizedPnL))}` : '—'}</span>
-                    </div>
-                    <div class="mobile-card-actions">
-                        <button class="btn btn-dark btn-sm"    data-action="history" data-id="${id}">📜 Storico</button>
-                        <button class="btn btn-success btn-sm" data-action="buy"     data-id="${id}">＋ Compra</button>
-                        <button class="btn btn-purple btn-sm"  data-action="sell"    data-id="${id}">－ Vendi</button>
-                        <button class="btn btn-sm"             data-action="sim"     data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
-                        <button class="btn btn-danger btn-sm"  data-action="delete"  data-id="${id}">🗑 Elimina</button>
-                    </div>
-                </div>`;
+    <div class="mobile-card-row">
+        <span class="text-muted">P&L After Tax</span>
+        <span class="${(currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax)) >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">
+            ${att > 0
+                ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax))}`
+                : '—'}
+        </span>
+    </div>
+    <div class="mobile-card-row">
+        <span class="text-muted">Tasse stimate</span>
+        <span class="text-warning">
+            ${att > 0
+                ? `${s} ${Calc.fmt(currency === 'EUR' ? taxEur : cv(tax))}`
+                : '—'}
+        </span>
+    </div>
+    <div class="mobile-card-row">
+        <span class="text-muted">P&L Realizzato Lordo</span>
+        <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
+            ${realizedPnL !== 0 ? `${s} ${Calc.fmt(cv(realizedPnL))}` : '—'}
+        </span>
+    </div>
+    <div class="mobile-card-row">
+        <span class="text-muted">P&L Realizzato Netto</span>
+        <span class="${(() => {
+            if (realizedPnL === 0) return '';
+            const realizedEur = v === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, v, 'EUR');
+            const breakdown = Calc.realizedTaxBreakdown({
+                gainEur: realizedEur,
+                assetType: p.tipoAsset,
+                availableMinus: 0
+            });
+            const realNetEur = realizedEur > 0 ? breakdown.nettoTeorico : realizedEur;
+            const realNetShown = currency === 'EUR'
+                ? realNetEur
+                : Exchange.convert(realNetEur, 'EUR', currency);
+            return realNetShown >= 0 ? 'pos-gain' : 'neg-loss';
+        })()} fw-bold">
+            ${(() => {
+                if (realizedPnL === 0) return '—';
+
+                const realizedEur =
+                    v === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, v, 'EUR');
+
+                const breakdown = Calc.realizedTaxBreakdown({
+                    gainEur: realizedEur,
+                    assetType: p.tipoAsset,
+                    availableMinus: 0
+                });
+
+                const realNetEur = realizedEur > 0 ? breakdown.nettoTeorico : realizedEur;
+                const realNetShown =
+                    currency === 'EUR'
+                        ? realNetEur
+                        : Exchange.convert(realNetEur, 'EUR', currency);
+
+                return `${s} ${Calc.fmt(realNetShown)}`;
+            })()}
+        </span>
+    </div>
+    <div class="mobile-card-actions">
+        <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
+        <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
+        <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
+        <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
+        <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
+    </div>
+</div>
 
             card.querySelector('.mobile-card-header').addEventListener('click', () => {
                 const detail = document.getElementById(`detail-${id}`);

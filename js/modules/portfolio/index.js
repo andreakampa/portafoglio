@@ -121,7 +121,8 @@ aggiornaBadgeFiscale(this.portfolio);
 
         const { portfolio, prices, prevClose, currency } = this;
         const positionMap = await buildPositionMap(portfolio, prices);
-        const state = { portfolio, positionMap, prices, prevClose, currency };
+        const fiscalState = this._getActivePortfolio()?.fiscal || null;
+const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState };
 
         renderTable._refresh = () => renderTable(state, this._handlers());
         renderKPI(state);
