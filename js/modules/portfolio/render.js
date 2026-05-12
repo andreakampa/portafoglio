@@ -378,6 +378,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
     att = 0,
     pnl = 0,
     pnlP = 0,
+    pnlEur = 0,
     tax = 0,
     pnlAfterTax = 0,
     taxEur = 0,
