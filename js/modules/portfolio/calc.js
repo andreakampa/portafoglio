@@ -385,7 +385,7 @@ realizedTaxBreakdown({ gainEur, assetType, availableMinus = 0 }) {
             ? (v === 'EUR' ? pmc : totalCostEur / qta)
             : 0;
 
-        return { qta, pmc, pmcEur, totalCostEur, totalCostNative, realizedPnL, totalComm };
+        return { qta, pmc, pmcEur, totalCostEur, totalCostNative, realizedPnL: Calc.round(realizedPnL), totalComm };
     })();
 
     this._positionCache.set(sig, promise);
@@ -470,7 +470,7 @@ realizedTaxBreakdown({ gainEur, assetType, availableMinus = 0 }) {
         ? (v === 'EUR' ? pmc : totalCostEur / qta)
         : 0;
 
-    const result = { qta, pmc, pmcEur, totalCostEur, realizedPnL, totalComm };
+    const result = { qta, pmc, pmcEur, totalCostEur, realizedPnL: Calc.round(realizedPnL), totalComm };
     this._positionSyncCache.set(sig, result);
     return result;
 },
@@ -515,12 +515,9 @@ realizedTaxBreakdown({ gainEur, assetType, availableMinus = 0 }) {
             : 0;
     },
 
-    fmt(n, d = 2) {
-        if (n === null || n === undefined || isNaN(n)) return '—';
-        return Number(n).toLocaleString('it-IT', {
-            minimumFractionDigits: d,
-            maximumFractionDigits: d
-        });
+    round(n, d = 10) {
+        if (!Number.isFinite(n)) return n;
+        return Math.round(n * 10 ** d) / 10 ** d;
     },
 
     fmtSign(n, d = 2) {

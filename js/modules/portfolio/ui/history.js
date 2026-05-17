@@ -144,12 +144,12 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
         }
         if (editBtn) {
             const origTx = txsSorted[+editBtn.dataset.idx];
-            openEditModal(id, origTx, portfolio, onSave);
+            openEditModal(id, origTx, portfolio, onSave, currency);
         }
     };
 }
 
-function openEditModal(id, origTx, portfolio, onSave) {
+function openEditModal(id, origTx, portfolio, onSave, currency) {
     document.getElementById('modal-edit-tx')?.remove();
 
     const isUSD = portfolio[id].valuta === 'USD';
