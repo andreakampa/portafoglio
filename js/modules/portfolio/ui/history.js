@@ -20,7 +20,7 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
                         <thead><tr>
                             <th>Data</th><th>Tipo</th><th>Q.tà</th>
                             <th>Prezzo</th><th>Comm.</th><th>Totale</th>
-                            ${isUSD ? '<th>Tasso €/$</th>' : ''}
+                            ${portfolio[id]?.valuta === 'USD' ? '<th>Tasso €/$</th>' : ''}
                             <th>PMC</th><th>P&L Lordo</th><th>P&L Netto</th><th></th>
                         </tr></thead>
                         <tbody id="hist-tbody"></tbody>
