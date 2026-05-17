@@ -118,10 +118,11 @@ export function simulateSell({
     if (isUSD) {
         grossReceipt = qty * price;
         grossReceiptEur = grossReceipt / rate;
+        const commissionEur = (commission || 0) / rate;
         const costoEur = (pmcEur > 0 ? pmcEur : pmc / rate) * qty;
-        pnl = grossReceiptEur - costoEur - (commission || 0);
+        pnl = grossReceiptEur - costoEur - commissionEur;
         tax = pnl > 0 ? pnl * taxRate : 0;
-        netReceiptEur = grossReceiptEur - (commission || 0) - tax;
+        netReceiptEur = grossReceiptEur - commissionEur - tax;
         netReceipt = netReceiptEur;
     } else {
         grossReceipt = qty * price - (commission || 0);
