@@ -99,17 +99,17 @@ export function renderPage(container) {
                 <table id="portfolio-table">
                     <thead>
                         <tr>
-                            <th>Titolo</th>
-                            <th>Q.tà</th>
-                            <th>PMC</th>
-                            <th>Costo Totale</th>
-                            <th>Controvalore</th>
-                            <th>Var. Oggi</th>
-                            <th>P&L Lordo</th>
-                            <th>P&L Netto (After Tax)</th>
-                            <th>P&L Realizzato Lordo</th>
-                            <th>P&L Realizzato Netto</th>
-                            <th>Azioni</th>
+                            <th>Symbol</th>
+                            <th>Shares</th>
+                            <th>AC/Share</th>
+                            <th>Total Cost</th>
+                            <th>Market Value</th>
+                            <th>Last Price</th>
+                            <th>P&L Gross UNRL</th>
+                            <th>P&L Net UNRL</th>
+                            <th>P&L Gross REAL</th>
+                            <th>P&L Net REAL</th>
+                            <th>Trading Tools</th>
                         </tr>
                     </thead>
                     <tbody id="portfolio-tbody"></tbody>
@@ -408,8 +408,8 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
             }
 
             const varHtml = varDay !== null
-                ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'}">${Calc.fmtSign(varDay)}%</span>`
-                : '<span class="text-muted">—</span>';
+                ? `<b>${Calc.fmt(prLive)}</b><br><span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fs-xs">${Calc.fmtSign(varDay)}%</span>`
+                : `<b>${Calc.fmt(prLive)}</b><br><span class="text-muted fs-xs">—</span>`;
 
             const assetBadge =
                 p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>'  :
