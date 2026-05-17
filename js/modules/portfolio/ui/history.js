@@ -83,11 +83,11 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
                 rCostEur += (q * pr + c);
             }
         } else {
-            tradePnL = (pr - rPmc) * q - c;
+            tradePnL = Calc.round((pr - rPmc) * q - c);
             if (isUSD) {
                 const ricavoEur = (pr * q - c) / txRate;
                 const rPmcEur = rQta > 0 ? rCostEur / rQta : 0;
-                tradePnLEur = ricavoEur - (rPmcEur * q);
+                tradePnLEur = Calc.round(ricavoEur - (rPmcEur * q));
                 if (rQta > 0) rCostEur -= (rCostEur / rQta) * q;
             } else {
                 tradePnLEur = tradePnL;
@@ -95,7 +95,6 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
             rQta -= q;
             if (rQta < 0.00001) { rQta = 0; rPmc = 0; rCostEur = 0; }
         }
-
         const totale = tx.type === 'buy' ? q * pr + c : q * pr - c;
         const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
         const pnlTax  = tradePnLEur !== null && tradePnLEur > 0 ? tradePnLEur * taxPct : 0;
@@ -238,32 +237,35 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
             fxReset.style.display = autoRate ? '' : 'none';
         };
 
-        Exchange._fetchHistoricRate(origTx.date)
-            .then(rate => {
-                if (!rate || rate <= 0) throw new Error();
-                Exchange._memoryCache.set(origTx.date, { rate, ts: Date.now() });
-                Exchange._saveFxCache();
-                autoRate = rate;
+        if (origTx.exchangeRate) {
+            fxField.value = parseFloat(origTx.exchangeRate).toFixed(4);
+            fxField.style.color = 'var(--warning)';
+            fxHint.textContent = 'Tasso modificato manualmente';
+            fxReset.style.display = 'none';
+            autoRate = null;
 
-                if (origTx.exchangeRate) {
-                    setManualMode(
-                        parseFloat(origTx.exchangeRate).toFixed(4),
-                        `Tasso manuale salvato · BCE per questa data: ${rate.toFixed(4)}`
-                    );
+            Exchange._fetchHistoricRate(origTx.date)
+                .then(rate => {
+                    if (!rate || rate <= 0) return;
+                    autoRate = rate;
+                    fxHint.textContent = `Tasso manuale salvato · BCE per questa data: ${rate.toFixed(4)}`;
                     fxReset.style.display = '';
-                } else {
+                })
+                .catch(() => {});
+        } else {
+            Exchange._fetchHistoricRate(origTx.date)
+                .then(rate => {
+                    if (!rate || rate <= 0) throw new Error();
+                    Exchange._memoryCache.set(origTx.date, { rate, ts: Date.now() });
+                    Exchange._saveFxCache();
+                    autoRate = rate;
                     setAutoMode(rate);
-                }
-            })
-            .catch(() => {
-                fxHint.textContent = 'Tasso BCE non trovato per questa data';
-                if (origTx.exchangeRate) {
-                    fxField.value = parseFloat(origTx.exchangeRate).toFixed(4);
-                    fxField.style.color = 'var(--warning)';
-                } else {
+                })
+                .catch(() => {
+                    fxHint.textContent = 'Tasso BCE non trovato per questa data';
                     fxField.placeholder = 'non disponibile';
-                }
-            });
+                });
+        }
 
         document.getElementById('edit-tx-data').addEventListener('change', e => {
             fxField.value = '';
