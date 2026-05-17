@@ -10,7 +10,7 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
     overlay.innerHTML = `
         <div class="modal modal-wide">
             <div class="modal-header">
-                <h3>📜 Storico — ${p.nome}</h3>
+                <h3>📜 Storico — ${p.nome}${p.valuta === 'USD' ? ` <button id="hist-fix-valuta" title="Correggi valuta a EUR" style="margin-left:8px;padding:2px 8px;font-size:11px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;">$ → €</button>` : ''}</h3>
                 <button class="btn-x" id="hist-close">✕</button>
             </div>
             <div class="modal-body">
@@ -34,6 +34,20 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
         overlay.classList.remove('visible');
         unlockScroll();
     };
+
+    document.getElementById('hist-fix-valuta')?.addEventListener('click', async () => {
+        if (!confirm(`Cambiare la valuta di ${p.nome} da USD a EUR?\nAttenzione: i tassi di cambio salvati sulle transazioni verranno rimossi.`)) return;
+        p.valuta = 'EUR';
+        p.transactions = (p.transactions || []).map(tx => {
+            const { exchangeRate, ...rest } = tx;
+            return rest;
+        });
+        await onSave();
+        overlay.classList.remove('visible');
+        unlockScroll();
+        Toast.show(`${p.nome} ora è in EUR`, 'ok');
+    });
+
     renderHistoryContent(id, portfolio, onSave, currency);
 }
 
