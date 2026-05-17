@@ -309,10 +309,10 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
             return;
         }
 
-        const fxInput  = document.getElementById('edit-tx-fx');
+       const fxInput  = document.getElementById('edit-tx-fx');
         const fxHint   = document.getElementById('edit-tx-fx-hint');
         const fxVal    = fxInput ? parseFloat(fxInput.value) : NaN;
-        const isManual = fxHint?.textContent?.includes('manuale') || false;
+        const isManual = fxVal > 0 && fxInput !== null;
 
         const realIdx = portfolio[id].transactions.findIndex(
             t => t.date === origTx.date && t.qty === origTx.qty &&
