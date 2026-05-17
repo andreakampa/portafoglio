@@ -20,6 +20,7 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
                         <thead><tr>
                             <th>Data</th><th>Tipo</th><th>Q.tà</th>
                             <th>Prezzo</th><th>Comm.</th><th>Totale</th>
+                            ${isUSD ? '<th>Tasso €/$</th>' : ''}
                             <th>PMC</th><th>P&L Lordo</th><th>P&L Netto</th><th></th>
                         </tr></thead>
                         <tbody id="hist-tbody"></tbody>
@@ -102,12 +103,19 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${tx.date}</td>
+            <td>${tx.date}${(() => {
+    if (!isUSD) return '';
+    const isRecent = !Exchange._memoryCache.get(tx.date)?.rate;
+    const hasManual = tx.exchangeRate > 0;
+    if (!hasManual && isRecent) return ' <span title="Tasso BCE non disponibile per questa data — considera di inserire il tasso manualmente" style="cursor:help;color:var(--warning);">⚠️</span>';
+    return '';
+})()}</td>
             <td class="${tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
             <td>${Calc.fmt(q, 4)}</td>
             <td>${s} ${Calc.fmt(pr)}</td>
             <td>€ ${Calc.fmt(c)}</td>
             <td>${s} ${Calc.fmt(totale)}</td>
+            ${isUSD ? `<td style="font-size:11px;color:var(--text-muted);">${tx.exchangeRate ? Calc.fmt(parseFloat(tx.exchangeRate), 4) : (Exchange._memoryCache.get(tx.date)?.rate ? Calc.fmt(Exchange._memoryCache.get(tx.date).rate, 4) : '—')}</td>` : ''}
             <td>${s} ${Calc.fmt(rPmc)}</td>
             <td>${tradePnL !== null
                 ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(tradePnL)}</span>
