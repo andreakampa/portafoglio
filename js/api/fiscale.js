@@ -121,6 +121,7 @@ export function getAvailableMinusForPreview(fiscalState, assetType = 'stock') {
 
 let _portfolio = null;
 let _getPortfolio = null;
+let _savePortfolio = null;
 
 
 function getActivePortfolioData() {
@@ -233,8 +234,9 @@ function manualLossesHtml() {
 }
 
 
-export function initCassettoFiscale(getPortfolio) {
+export function initCassettoFiscale(getPortfolio, savePortfolio) {
     _getPortfolio = getPortfolio;
+_savePortfolio = savePortfolio;
     const bar = document.querySelector('.controls-right');
     if (!bar || document.getElementById('btn-cassetto-fiscale')) return;
 
@@ -300,8 +302,8 @@ function chiudiFiscale() {
 
 
 async function saveFiscalPortfolio() {
-    if (typeof window.__savePortfolioFiscal === 'function') {
-        return window.__savePortfolioFiscal();
+    if (typeof _savePortfolio === 'function') {
+        return _savePortfolio();
     }
     return Promise.resolve();
 }

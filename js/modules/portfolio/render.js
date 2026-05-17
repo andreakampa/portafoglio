@@ -356,6 +356,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
     // Stato visibilità gruppi collassabili
     if (typeof renderTable._showClosed === 'undefined') renderTable._showClosed = true;
     if (typeof renderTable._showEmpty  === 'undefined') renderTable._showEmpty  = true;
+    // Nota: lo stato viene resettato ad ogni mount tramite resetRenderState()
 
     const renderGroup = (ids, groupClass, groupLabel, collapsible, showKey) => {
         if (!ids.length) return;
@@ -551,7 +552,10 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
         if (right) right.style.display = (wrapper.scrollLeft + wrapper.clientWidth < wrapper.scrollWidth - 10) ? 'flex' : 'none';
     }, 100);
 }
-
+export function resetRenderState() {
+    renderTable._showClosed = true;
+    renderTable._showEmpty  = true;
+}
 export function renderKPI({ portfolio, positionMap, currency, fiscalState }) {
     const s = currency === 'EUR' ? '€' : '$';
 

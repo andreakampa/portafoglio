@@ -7,7 +7,7 @@ import { Search } from '../../api/search.js';
 import { Calc } from './calc.js';
 import {
     renderPage, renderTable, renderKPI, renderSkeleton,
-    renderMobileCards, buildPositionMap
+    renderMobileCards, buildPositionMap, resetRenderState
 } from './render.js';
 import { openTransactionModal, openHistoryModal, openSimModal, CartPanel } from './ui.js';
 import { initCassettoFiscale, aggiornaBadgeFiscale } from '../../api/fiscale.js';
@@ -67,6 +67,8 @@ export class PortfolioPage {
         this.currency = 'EUR';
         this._autoTimer = null;
         this._portfolioSwitcherBound = false;
+        this._docClickSwitcher = null;
+        this._docClickSuggest = null;
     }
 
     _getActivePortfolio() {
@@ -79,6 +81,7 @@ export class PortfolioPage {
     }
 
     async mount() {
+        resetRenderState();
         renderPage(this.container);
         this._bindStaticEvents();
         renderSkeleton();
@@ -99,11 +102,7 @@ export class PortfolioPage {
 
         CartPanel.init();
 
-window.__savePortfolioFiscal = async () => {
-    await this._save();
-};
-
-initCassettoFiscale(() => this._getActivePortfolio());
+initCassettoFiscale(() => this._getActivePortfolio(), () => this._save());
 
 aggiornaBadgeFiscale(this.portfolio);
 
@@ -112,8 +111,13 @@ aggiornaBadgeFiscale(this.portfolio);
         
     }
 
-    destroy() {
+   destroy() {
         clearInterval(this._autoTimer);
+        this._portfolioSwitcherBound = false;
+        if (this._docClickSwitcher) document.removeEventListener('click', this._docClickSwitcher);
+        if (this._docClickSuggest) document.removeEventListener('click', this._docClickSuggest);
+        this._docClickSwitcher = null;
+        this._docClickSuggest = null;
     }
 
     async _render() {
@@ -295,12 +299,13 @@ const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState
             menu.style.display = isOpen ? 'none' : 'block';
         });
 
-        document.addEventListener('click', (e) => {
+        this._docClickSwitcher = (e) => {
             if (!e.target.closest('#portfolio-switcher')) {
                 const menu = document.getElementById('portfolio-switcher-menu');
                 if (menu) menu.style.display = 'none';
             }
-        });
+        };
+        document.addEventListener('click', this._docClickSwitcher);
 
                 document.getElementById('portfolio-new-btn')?.addEventListener('click', () => {
             this._openCreatePortfolioModal();
@@ -637,11 +642,12 @@ const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState
             }, 350);
         });
 
-        document.addEventListener('click', e => {
+        this._docClickSuggest = e => {
             if (!e.target.closest('#input-titolo') && !e.target.closest('#ticker-suggestions')) {
                 suggestBox.classList.remove('visible');
             }
-        });
+        };
+        document.addEventListener('click', this._docClickSuggest);
 
         document.getElementById('btn-add-titolo')?.addEventListener('click', () => {
     const ticker = hiddenTicker.value?.trim();
