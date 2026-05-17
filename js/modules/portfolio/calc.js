@@ -520,6 +520,14 @@ realizedTaxBreakdown({ gainEur, assetType, availableMinus = 0 }) {
         return Math.round(n * 10 ** d) / 10 ** d;
     },
 
+    fmt(n, d = 2) {
+        if (n === null || n === undefined || isNaN(n)) return '—';
+        return Number(n).toLocaleString('it-IT', {
+            minimumFractionDigits: d,
+            maximumFractionDigits: d
+        });
+    },
+
     fmtSign(n, d = 2) {
         if (isNaN(n)) return '—';
         const formatted = Math.abs(n).toLocaleString('it-IT', {
