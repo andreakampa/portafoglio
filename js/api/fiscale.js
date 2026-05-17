@@ -169,7 +169,7 @@ function manualLossesHtml() {
                     <div class="manual-loss-title">${l.title || 'Minus manuale'}</div>
                     <div class="manual-loss-meta">${l.date || l.year || ''}</div>
                 </div>
-                <div class="manual-loss-amount">− € ${fmt(l.amount || 0)}</div>
+                <div class="manual-loss-amount">− € ${Calc.fmt(l.amount || 0)}</div>
                 <button type="button" class="manual-loss-del" data-loss-idx="${i}">Elimina</button>
             </div>
         `).join('')
@@ -436,7 +436,7 @@ function renderDrawerFiscale(portfolio) {
             <div class="fiscale-semaforo ${semaforoClass}"></div>
             <div style="flex:1;">
                 <div class="fiscale-totale-label">Totale minusvalenze compensabili</div>
-                <div class="fiscale-totale-value neg-loss">− € ${fmt(totaleAssoluto)}</div>
+                <div class="fiscale-totale-value neg-loss">− € ${Calc.fmt(totaleAssoluto)}</div>
             </div>
         </div>`;
 
@@ -446,11 +446,11 @@ function renderDrawerFiscale(portfolio) {
         <div style="display:flex;gap:8px;margin-bottom:16px;">
             <div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;">
                 <div class="fiscale-totale-label">Azioni / Bond</div>
-                <div style="font-size:0.92em;font-weight:700;color:var(--danger);">− € ${fmt(totaleStrumenti)}</div>
+                <div style="font-size:0.92em;font-weight:700;color:var(--danger);">− € ${Calc.fmt(totaleStrumenti)}</div>
             </div>
             <div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;">
                 <div class="fiscale-totale-label">Crypto</div>
-                <div style="font-size:0.92em;font-weight:700;color:var(--danger);">− € ${fmt(totaleCrypto)}</div>
+                <div style="font-size:0.92em;font-weight:700;color:var(--danger);">− € ${Calc.fmt(totaleCrypto)}</div>
             </div>
         </div>`;
     }
@@ -479,13 +479,13 @@ function renderDrawerFiscale(portfolio) {
         const annoId = `fiscale-anno-${anno}`;
         html += `
         <div class="fiscale-anno" id="${annoId}">
-            <div class="fiscale-anno-header" onclick="toggleAnnoFiscale('${annoId}')">
+            <div class="fiscale-anno-header" data-toggle-anno="${annoId}">
                 <div class="fiscale-anno-label">
                     Anno ${anno}
                     <span class="fiscale-anno-scadenza">${isScaduto ? '(scaduta)' : ''}</span>
                 </div>
                 <div class="fiscale-anno-importo ${totaleAnno === 0 ? 'zero' : ''}">
-                    ${totaleAnno > 0 ? `− € ${fmt(totaleAnno)}` : '—'}
+                    ${totaleAnno > 0 ? `− € ${Calc.fmt(totaleAnno)}` : '—'}
                 </div>
             </div>
             <div class="fiscale-scadenza-bar-wrap">
@@ -527,6 +527,9 @@ function renderDrawerFiscale(portfolio) {
 
 
     body.innerHTML = html;
+    body.querySelectorAll('[data-toggle-anno]').forEach(el => {
+        el.addEventListener('click', () => toggleAnnoFiscale(el.dataset.toggleAnno));
+    });
     attachManualLossHandlers();
 
 
@@ -554,17 +557,15 @@ function rigaDettaglio(r) {
                 <span class="fiscale-detail-cat ${isManual ? 'manual-loss-badge' : ''}">${tipoLabel}</span>
             </div>
             <div class="fiscale-detail-data">${r.data}</div>
-            <div class="fiscale-detail-importo">− € ${fmt(r.minus)}</div>
+            <div class="fiscale-detail-importo">− € ${Calc.fmt(r.minus)}</div>
         </div>`;
 }
 
 
-function fmt(n) {
-    return Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 
-window.toggleAnnoFiscale = function(annoId) {
+
+function toggleAnnoFiscale(annoId) {
     const detail = document.getElementById(`${annoId}-detail`);
     if (detail) detail.classList.toggle('open');
-};
+}
