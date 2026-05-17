@@ -1,7 +1,7 @@
 const RATE_CACHE_KEY = 'ptpro_fx_history';
 const FX_TTL = 24 * 60 * 60 * 1000;
 const HIST_TTL = 7 * 24 * 60 * 60 * 1000;
-const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';
+import { PROXY } from './config.js';
 
 const LATEST_PROXIES = [
   `${PROXY}?url=${encodeURIComponent('https://open.er-api.com/v6/latest/EUR')}`,

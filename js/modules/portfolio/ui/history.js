@@ -138,8 +138,8 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
                      t.price === origTx.price && t.type === origTx.type
             );
             if (realIdx > -1) portfolio[id].transactions.splice(realIdx, 1);
-            await onSave();
-            renderHistoryContent(id, portfolio, onSave);
+           await onSave();
+            renderHistoryContent(id, portfolio, onSave, currency);
             Toast.show('Transazione rimossa', 'ok');
         }
         if (editBtn) {
@@ -327,7 +327,7 @@ function openEditModal(id, origTx, portfolio, onSave) {
 
         close();
         await onSave();
-        renderHistoryContent(id, portfolio, onSave);
+        renderHistoryContent(id, portfolio, onSave, currency);
         Toast.show('Transazione aggiornata', 'ok');
     };
 }

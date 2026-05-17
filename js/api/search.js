@@ -1,4 +1,4 @@
-const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';
+import { PROXY } from './config.js';
 
 const SEARCH_PROXIES = [
     q => `${PROXY}?url=${encodeURIComponent('https://query1.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(q) + '&lang=it-IT&region=IT&quotesCount=8&newsCount=0')}`,

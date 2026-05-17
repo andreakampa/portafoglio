@@ -1,0 +1,1 @@
+export const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';

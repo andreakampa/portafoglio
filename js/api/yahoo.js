@@ -1,4 +1,4 @@
-const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';
+import { PROXY } from './config.js';
 
 const PROXIES = [
     ticker => `${PROXY}?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=5d')}`,
