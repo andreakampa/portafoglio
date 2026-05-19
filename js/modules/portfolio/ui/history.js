@@ -207,7 +207,14 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
                     </div>
                     <div>
                         <span class="modal-label">Commissione</span>
-                        <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}">
+                        <div style="display:flex; gap:6px;">
+                            <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}" style="flex:1;">
+                            ${isUSD ? `
+                            <select id="edit-tx-comm-currency" style="width:80px;">
+                                <option value="EUR" ${(origTx.commissionCurrency || 'EUR') === 'EUR' ? 'selected' : ''}>€ EUR</option>
+                                <option value="USD" ${origTx.commissionCurrency === 'USD' ? 'selected' : ''}>$ USD</option>
+                            </select>` : '<input type="hidden" id="edit-tx-comm-currency" value="EUR">'}
+                        </div>
                     </div>
                     ${isUSD ? `
                     <div>
@@ -341,10 +348,12 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
                  t.price === origTx.price && t.type === origTx.type
         );
 
+        const editCommCurrency = document.getElementById('edit-tx-comm-currency')?.value || 'EUR';
         if (realIdx > -1) {
             portfolio[id].transactions[realIdx] = {
                 date: newDate, type: newType,
                 qty: newQty, price: newPr, commission: newComm,
+                ...(editCommCurrency !== 'EUR' ? { commissionCurrency: editCommCurrency } : {}),
                 ...(isManual && fxVal > 0 ? { exchangeRate: fxVal } : {})
             };
         }

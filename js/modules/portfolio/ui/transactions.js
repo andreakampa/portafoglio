@@ -34,8 +34,15 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
                         <input type="number" id="tx-prezzo" step="any" value="${prLive}">
                     </div>
                     <div>
-                        <span class="modal-label">Commissione (€)</span>
-                        <input type="number" id="tx-comm" step="any" value="${p.commDefault || 7}">
+                        <span class="modal-label">Commissione</span>
+                        <div style="display:flex; gap:6px;">
+                            <input type="number" id="tx-comm" step="any" placeholder="0.00" style="flex:1;">
+                            ${p.valuta === 'USD' ? `
+                            <select id="tx-comm-currency" style="width:80px;">
+                                <option value="EUR">€ EUR</option>
+                                <option value="USD">$ USD</option>
+                            </select>` : '<input type="hidden" id="tx-comm-currency" value="EUR">'}
+                        </div>
                     </div>
                     ${p.valuta === 'USD' ? `
                     <div>
@@ -104,8 +111,10 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
         if (!portfolio[id].transactions) portfolio[id].transactions = [];
         const fxInp = document.getElementById('tx-fx');
         const fxSave = fxInp ? parseFloat(fxInp.value) : NaN;
+        const commCurrency = document.getElementById('tx-comm-currency')?.value || 'EUR';
         portfolio[id].transactions.push({
             date: dt, type, qty: q, price: pr, commission: c,
+            ...(commCurrency !== 'EUR' ? { commissionCurrency: commCurrency } : {}),
             ...(fxSave > 0 ? { exchangeRate: fxSave } : {})
         });
         closeModal();

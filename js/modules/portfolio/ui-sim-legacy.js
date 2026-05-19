@@ -45,7 +45,7 @@ export async function openSimModal(id, portfolio, prices) {
                         </div>
                         <div>
                             <span class="modal-label">Commissioni</span>
-                            <input type="number" id="sim-comm" step="any" value="${p.commDefault || 7}">
+                            <input type="number" id="sim-comm" step="any" placeholder="0.00">
                         </div>
                         <div id="sim-budget-field">
                             <span class="modal-label">Budget Disponibile</span>
@@ -80,7 +80,7 @@ export async function openSimModal(id, portfolio, prices) {
                         </div>
                         <div>
                             <span class="modal-label">Commissioni</span>
-                            <input type="number" id="sim-sell-comm" step="any" value="${p.commDefault || 7}">
+                            <input type="number" id="sim-sell-comm" step="any" placeholder="0.00">
                         </div>
                         <div style="display:flex; align-items:flex-end;">
                             <div class="preview-box" style="padding:6px 10px; font-size:12px; width:100%;">
