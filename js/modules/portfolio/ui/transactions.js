@@ -37,11 +37,10 @@ export function openTransactionModal(id, type, portfolio, prices, onSave) {
                         <span class="modal-label">Commissione</span>
                         <div style="display:flex; gap:6px;">
                             <input type="number" id="tx-comm" step="any" placeholder="0.00" style="flex:1;">
-                            ${p.valuta === 'USD' ? `
                             <select id="tx-comm-currency" style="width:80px;">
                                 <option value="EUR">€ EUR</option>
                                 <option value="USD">$ USD</option>
-                            </select>` : '<input type="hidden" id="tx-comm-currency" value="EUR">'}
+                            </select>
                         </div>
                     </div>
                     ${p.valuta === 'USD' ? `

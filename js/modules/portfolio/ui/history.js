@@ -209,11 +209,10 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
                         <span class="modal-label">Commissione</span>
                         <div style="display:flex; gap:6px;">
                             <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}" style="flex:1;">
-                            ${isUSD ? `
                             <select id="edit-tx-comm-currency" style="width:80px;">
                                 <option value="EUR" ${(origTx.commissionCurrency || 'EUR') === 'EUR' ? 'selected' : ''}>€ EUR</option>
                                 <option value="USD" ${origTx.commissionCurrency === 'USD' ? 'selected' : ''}>$ USD</option>
-                            </select>` : '<input type="hidden" id="edit-tx-comm-currency" value="EUR">'}
+                            </select>
                         </div>
                     </div>
                     ${isUSD ? `
