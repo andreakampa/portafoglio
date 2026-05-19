@@ -78,10 +78,7 @@ export function renderPage(container) {
                 <label>Titolo Selezionato</label>
                 <div id="ticker-selected" class="ticker-selected-box">— nessuno selezionato —</div>
             </div>
-            <div class="form-field" style="min-width:120px;">
-                <label>Commissione Default (€)</label>
-                <input type="number" id="input-comm-default" placeholder="7.00" step="0.01">
-            </div>
+            
             <button id="btn-add-titolo" class="btn btn-success" style="align-self:flex-end;" disabled>Aggiungi</button>
         </div>
         <input type="hidden" id="input-ticker-final">
