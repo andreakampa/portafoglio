@@ -701,7 +701,8 @@ const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState
 
     if (!active.assets) active.assets = {};
 
-    const id = item.id || item.isin || item.ticker || item.symbol || item.nome || item.name;
+    const rawId = item.id || item.isin || item.ticker || item.symbol || item.nome || item.name;
+    const id = rawId.replace(/[.$#[\]/]/g, '_');
     if (!id) {
         Toast.show('Titolo non valido', 'err');
         return;
