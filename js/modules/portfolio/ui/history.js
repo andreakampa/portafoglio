@@ -2,6 +2,7 @@ import { Calc } from '../calc.js';
 import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 import { lockScroll, unlockScroll } from './helpers.js';
+import { openPacModal, generaPacTransazioni } from './pac.js';
 
 export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
     const p = portfolio[id];
@@ -10,7 +11,7 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
     overlay.innerHTML = `
         <div class="modal modal-wide">
             <div class="modal-header">
-                <h3>📜 Storico — ${p.nome}${p.valuta === 'USD' ? ` <button id="hist-fix-valuta" title="Correggi valuta a EUR" style="margin-left:8px;padding:2px 8px;font-size:11px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;">$ → €</button>` : ''}</h3>
+                <h3>📜 Storico — ${p.nome}${p.valuta === 'USD' ? ` <button id="hist-fix-valuta" title="Correggi valuta a EUR" style="margin-left:8px;padding:2px 8px;font-size:11px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;">$ → €</button>` : ''} <button id="hist-pac-btn" title="Gestisci PAC" style="margin-left:6px;padding:2px 8px;font-size:11px;font-weight:600;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:4px;cursor:pointer;">↻ PAC</button></h3>
                 <button class="btn-x" id="hist-close">✕</button>
             </div>
             <div class="modal-body">
@@ -34,6 +35,13 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
         overlay.classList.remove('visible');
         unlockScroll();
     };
+
+    document.getElementById('hist-pac-btn')?.addEventListener('click', () => {
+        openPacModal(id, portfolio, async () => {
+            await onSave();
+            renderHistoryContent(id, portfolio, onSave, currency);
+        });
+    });
 
     document.getElementById('hist-fix-valuta')?.addEventListener('click', async () => {
         if (!confirm(`Cambiare la valuta di ${p.nome} da USD a EUR?\nAttenzione: i tassi di cambio salvati sulle transazioni verranno rimossi.`)) return;
@@ -117,7 +125,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${tx.date}${(() => {
+            <td>${tx.date}${tx.source === 'pac' ? ' <span style="display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">↻ PAC</span>' : ''}${(() => {
     if (!isUSD) return '';
     const isRecent = !Exchange._memoryCache.get(tx.date)?.rate;
     const hasManual = tx.exchangeRate > 0;
