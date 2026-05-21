@@ -142,7 +142,7 @@ function txPreview(id, type, portfolio, prices) {
 
     // Converti commissione in valuta nativa del titolo
     let cNative;
-    if (commCurrency === assetIsUSD ? 'USD' : 'EUR') {
+    if (commCurrency === (assetIsUSD ? 'USD' : 'EUR')) {
         // Stessa valuta — nessuna conversione
         cNative = c;
     } else if (commCurrency === 'USD' && !assetIsUSD) {
@@ -175,7 +175,7 @@ function txPreview(id, type, portfolio, prices) {
         const tax      = pnlLordo > 0 ? pnlLordo * taxPct : 0;
         const pnlNetto = pnlLordo - tax;
         box.innerHTML = `
-            Incasso lordo: <b>${s} ${Calc.fmt(q * pr - cNative)}</b><br>
+            Incasso lordo: <b>${s} ${Calc.fmt(q * pr - cNative)}</b> &nbsp;·&nbsp; Comm.: <b class="text-warning">${commLabel}</b><br>
             P&L lordo: <b class="${pnlLordo >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordo)}</b><br>
             ${pnlLordo > 0 ? `Tasse (${taxLabel}): <b class="neg-loss">− ${s} ${Calc.fmt(tax)}</b><br>` : ''}
             P&L <b>netto</b>: <b class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlNetto)}</b><br>
