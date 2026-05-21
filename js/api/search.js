@@ -7,8 +7,19 @@ const SEARCH_PROXIES = [
 
 const CURRENCY_MAP = {
     'EUR': 'EUR', 'USD': 'USD', 'GBp': 'EUR', 'GBP': 'EUR',
-    'CHF': 'EUR', 'JPY': 'USD', 'CAD': 'USD', 'AUD': 'USD',
+    'CHF': 'CHF', 'JPY': 'USD', 'CAD': 'USD', 'AUD': 'USD',
 };
+
+const EUR_SUFFIXES = [
+    '.MI', '.DE', '.PA', '.AS', '.MC', '.BR', '.LS', '.VI',
+    '.WA', '.HE', '.CO', '.OL', '.ST', '.F', '.XETRA'
+];
+
+function resolveCurrency(ticker, yahooRawCurrency) {
+    const upper = (ticker || '').toUpperCase();
+    if (EUR_SUFFIXES.some(s => upper.endsWith(s))) return 'EUR';
+    return CURRENCY_MAP[yahooRawCurrency] || (yahooRawCurrency?.startsWith('EUR') ? 'EUR' : 'USD');
+}
 
 const ASSET_TYPE_MAP = {
     'EQUITY':         { tipo: 'stock',  label: 'Azione (26%)' },
@@ -46,7 +57,7 @@ export const Search = {
                             name:      q.shortname || q.longname || q.symbol,
                             type:      q.quoteType || '',
                             exchange:  q.exchDisp || '',
-                            currency:  CURRENCY_MAP[q.currency] || (q.currency?.startsWith('EUR') ? 'EUR' : 'USD'),
+                            currency:  resolveCurrency(q.symbol, q.currency),
                             tipoAsset: assetInfo.tipo,
                             tipoLabel: assetInfo.label,
                             logoUrl:   `https://img.logo.dev/ticker/${base}?token=pk_free&size=32`,
