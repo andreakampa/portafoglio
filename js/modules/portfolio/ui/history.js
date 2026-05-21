@@ -127,7 +127,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
             <td class="${tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
             <td>${Calc.fmt(q, 4)}</td>
             <td>${s} ${Calc.fmt(pr)}</td>
-            <td>€ ${Calc.fmt(c)}</td>
+            <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}</td>
             <td>${s} ${Calc.fmt(totale)}</td>
             ${isUSD ? `<td style="font-size:11px;color:var(--text-muted);">${tx.exchangeRate ? Calc.fmt(parseFloat(tx.exchangeRate), 4) : (Exchange._memoryCache.get(tx.date)?.rate ? Calc.fmt(Exchange._memoryCache.get(tx.date).rate, 4) : '—')}</td>` : ''}
             <td>${s} ${Calc.fmt(rPmc)}</td>
