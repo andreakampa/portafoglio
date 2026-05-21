@@ -681,7 +681,7 @@ const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState
         return {
             onHistory: id => openHistoryModal(id, this.portfolio, () => this._save(), this.currency),
             onTransaction: (id, type) => openTransactionModal(id, type, this.portfolio, this.prices,
-                async () => { await this._save(); }),
+                async () => { await this._save(); }, this._getActivePortfolio()),
             onSimulation: id => openSimModal(id, this.portfolio, this.prices),
             onDelete: id => this._elimina(id),
         };
