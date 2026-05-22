@@ -166,8 +166,15 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
                 t => t.date === origTx.date && t.qty === origTx.qty &&
                      t.price === origTx.price && t.type === origTx.type
             );
-            if (realIdx > -1) portfolio[id].transactions.splice(realIdx, 1);
-           await onSave();
+            if (realIdx > -1) {
+                const isPac = portfolio[id].transactions[realIdx].source === 'pac';
+                portfolio[id].transactions.splice(realIdx, 1);
+                if (isPac && portfolio[id].pac) {
+                    if (!portfolio[id].pac.skipDates) portfolio[id].pac.skipDates = [];
+                    portfolio[id].pac.skipDates.push(origTx.date);
+                }
+            }
+            await onSave();
             renderHistoryContent(id, portfolio, onSave, currency);
             Toast.show('Transazione rimossa', 'ok');
         }

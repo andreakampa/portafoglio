@@ -104,7 +104,7 @@ function renderPacDashboard(wrap, id, portfolio, pac, close, onSave) {
                                 <td>${tx.date}</td>
                                 <td>${Calc.fmt(tx.qty, 4)}</td>
                                 <td>${s} ${Calc.fmt(tx.price)}</td>
-                                <td><b>${s} ${Calc.fmt(tx.qty * tx.price)}</b></td>
+                                <td><b>${s} ${Calc.fmt(tx.importoPac || tx.qty * tx.price)}</b></td>
                                 <td>€ ${Calc.fmt(tx.commission || 0)}</td>
                                 <td><button class="btn-del-pac" data-date="${tx.date}" title="Elimina rata" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:13px;">✕</button></td>
                             </tr>`).join('')}
@@ -272,13 +272,16 @@ export async function generaPacTransazioni(id, portfolio) {
         if (!prezzo || prezzo <= 0) continue;
 
         const qty = rata / prezzo;
+        const qtyRounded = Math.round(qty * 10000) / 10000;
+        const prezzoRounded = Math.round(prezzo * 10000) / 10000;
 
         if (!p.transactions) p.transactions = [];
         p.transactions.push({
             date: data,
             type: 'buy',
-            qty: Math.round(qty * 10000) / 10000,
-            price: Math.round(prezzo * 10000) / 10000,
+            qty: qtyRounded,
+            price: prezzoRounded,
+            importoPac: rata,
             commission: pac.commissione || 0,
             source: PAC_SOURCE
         });
