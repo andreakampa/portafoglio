@@ -212,7 +212,7 @@ function renderPacForm(wrap, id, portfolio, existing, close, onSave) {
         const box     = document.getElementById('pac-preview');
         if (!importo || !start) { box.style.display = 'none'; return; }
         const rata = calcolaRata(importo, cadenza);
-        const prossime = calcolaDateFuture(start, cadenza, 3);
+        const prossime = calcolaDateFuture(start, cadenza, 3, null, true);
         box.style.display = 'block';
         box.innerHTML = `Rata: <b>€ ${Calc.fmt(rata)}</b> · Cadenza: <b>${cadenza}</b><br>
             Prime date: <b>${prossime.join(', ')}</b>`;

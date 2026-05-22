@@ -357,9 +357,11 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
 
         const editCommCurrency = document.getElementById('edit-tx-comm-currency')?.value || 'EUR';
         if (realIdx > -1) {
+            const isPac = origTx.source === 'pac';
             portfolio[id].transactions[realIdx] = {
                 date: newDate, type: newType,
                 qty: newQty, price: newPr, commission: newComm,
+                ...(isPac ? { source: 'pac' } : {}),
                 ...(editCommCurrency !== 'EUR' ? { commissionCurrency: editCommCurrency } : {}),
                 ...(isManual && fxVal > 0 ? { exchangeRate: fxVal } : {})
             };
