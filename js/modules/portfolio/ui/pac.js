@@ -298,7 +298,8 @@ export function calcolaDateFuture(startDate, cadenza, max = 9999, fineDate = nul
     const oggi = new Date();
     oggi.setHours(0, 0, 0, 0);
 
-    let current = new Date(startDate);
+    const parts = startDate.split('-');
+    let current = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
     current.setHours(0, 0, 0, 0);
 
     const fine = fineDate
@@ -307,7 +308,10 @@ export function calcolaDateFuture(startDate, cadenza, max = 9999, fineDate = nul
         : oggi;
 
     while (current <= fine && date.length < max) {
-        date.push(current.toISOString().slice(0, 10));
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        date.push(`${y}-${m}-${d}`);
 
         if (cadenza === 'settimanale')        current.setDate(current.getDate() + 7);
         else if (cadenza === 'bisettimanale') current.setDate(current.getDate() + 14);
