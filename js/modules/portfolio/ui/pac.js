@@ -309,7 +309,7 @@ async function fetchPrezzoPacData(ticker, dateStr) {
 }
 
 function toUnix(dateStr, addDays = 0) {
-    const d = new Date(dateStr);
+    const d = new Date(dateStr + 'T12:00:00Z');
     d.setDate(d.getDate() + addDays);
     return Math.floor(d.getTime() / 1000);
 }
