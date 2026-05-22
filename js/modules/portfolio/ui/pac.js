@@ -106,6 +106,7 @@ function renderPacDashboard(wrap, id, portfolio, pac, close, onSave) {
                                 <td>${s} ${Calc.fmt(tx.price)}</td>
                                 <td><b>${s} ${Calc.fmt(tx.qty * tx.price)}</b></td>
                                 <td>€ ${Calc.fmt(tx.commission || 0)}</td>
+                                <td><button class="btn-del-pac" data-date="${tx.date}" title="Elimina rata" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:13px;">✕</button></td>
                             </tr>`).join('')}
                         </tbody>
                     </table>
@@ -121,6 +122,27 @@ function renderPacDashboard(wrap, id, portfolio, pac, close, onSave) {
 
     wrap.querySelector('#pac-close').onclick  = close;
     wrap.querySelector('#pac-cancel').onclick = close;
+
+    wrap.querySelectorAll('.btn-del-pac').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const date = btn.dataset.date;
+            if (!confirm(`Eliminare la rata PAC del ${date}? Non verrà rigenerata automaticamente.`)) return;
+            
+            // Aggiungi la data alle eccezioni
+            if (!portfolio[id].pac.skipDates) portfolio[id].pac.skipDates = [];
+            portfolio[id].pac.skipDates.push(date);
+            
+            // Rimuovi la transazione
+            portfolio[id].transactions = portfolio[id].transactions.filter(
+                tx => !(tx.source === PAC_SOURCE && tx.date === date)
+            );
+            
+            await onSave();
+            wrap.remove();
+            unlockScroll();
+            openPacModal(id, portfolio, onSave);
+        });
+    });
 
     wrap.querySelector('#pac-edit').onclick = () => {
         wrap.innerHTML = '';
@@ -236,11 +258,12 @@ export async function generaPacTransazioni(id, portfolio) {
     const date = calcolaDateFuture(pac.startDate, pac.cadenza, 9999, fine);
 
     // Date già coperte da transazioni PAC esistenti
-    const datePacEsistenti = new Set(
-        (p.transactions || [])
+    const datePacEsistenti = new Set([
+        ...(p.transactions || [])
             .filter(tx => tx.source === PAC_SOURCE)
-            .map(tx => tx.date)
-    );
+            .map(tx => tx.date),
+        ...(pac.skipDates || [])
+    ]);
 
     for (const data of date) {
         if (datePacEsistenti.has(data)) continue;
@@ -309,7 +332,12 @@ async function fetchPrezzoPacData(ticker, dateStr) {
 }
 
 function toUnix(dateStr, addDays = 0) {
-    const d = new Date(dateStr + 'T12:00:00Z');
-    d.setDate(d.getDate() + addDays);
+    const parts = dateStr.split('-');
+    const d = new Date(
+        parseInt(parts[0]),
+        parseInt(parts[1]) - 1,
+        parseInt(parts[2]) + addDays,
+        12, 0, 0
+    );
     return Math.floor(d.getTime() / 1000);
 }
