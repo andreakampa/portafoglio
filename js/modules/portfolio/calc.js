@@ -325,11 +325,15 @@ realizedTaxBreakdown({ gainEur, assetType, availableMinus = 0 }) {
             return rateMap.get(tx.date) || Exchange.rate || 1;
         };
 
-        for (const tx of txs) {
-            const q = +tx.qty || 0;
-            const pr = +tx.price || 0;
-            const c = +(tx.commission || 0);
-            totalComm += c;
+        const q = +tx.qty || 0;
+        const pr = +tx.price || 0;
+        const commRaw = +(tx.commission || 0);
+        const commCurr = (tx.commissionCurrency || 'EUR').toUpperCase();
+        const txRate = getRate(tx);
+        const c = commCurr === 'USD' && v !== 'USD' ? commRaw / txRate
+                : commCurr === 'EUR' && v === 'USD' ? commRaw * txRate
+                : commRaw;
+        totalComm += commRaw;
 
             if (tx.type === 'buy') {
                 const newCost = (qta * pmcCost) + (q * pr) + c;
@@ -427,8 +431,13 @@ realizedTaxBreakdown({ gainEur, assetType, availableMinus = 0 }) {
     for (const tx of txs) {
         const q = +tx.qty || 0;
         const pr = +tx.price || 0;
-        const c = +(tx.commission || 0);
-        totalComm += c;
+        const commRaw = +(tx.commission || 0);
+        const commCurr = (tx.commissionCurrency || 'EUR').toUpperCase();
+        const txRate = tx.exchangeRate ? parseFloat(tx.exchangeRate) : (Exchange._memoryCache.get(tx.date)?.rate || Exchange.rate || 1);
+        const c = commCurr === 'USD' && v !== 'USD' ? commRaw / txRate
+                : commCurr === 'EUR' && v === 'USD' ? commRaw * txRate
+                : commRaw;
+        totalComm += commRaw;
 
         if (tx.type === 'buy') {
             const newCost = (qta * pmcCost) + (q * pr) + c;
