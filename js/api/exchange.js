@@ -115,7 +115,9 @@ export const Exchange = {
     return request;
   },
 
-  async _fetchHistoricRate(dateStr) {
+  async _fetchHistoricRate(dateStr, _depth = 0) {
+    if (_depth > 7) return null; // max 7 giorni indietro
+
     const key = toISODate(dateStr);
     const proxies = BDITALIA_PROXIES(key);
 
@@ -130,14 +132,17 @@ export const Exchange = {
         if (eurRecord) {
           const eurPerUsd = parseFloat(eurRecord.avgRate);
           if (eurPerUsd > 0) {
-            const usdPerEur = 1 / eurPerUsd;
-            return usdPerEur;
+            return 1 / eurPerUsd;
           }
         }
       } catch (e) {}
     }
 
-    return null;
+    // Nessun tasso trovato — prova il giorno precedente (festivi/weekend)
+    const prev = new Date(key);
+    prev.setDate(prev.getDate() - 1);
+    const prevStr = prev.toISOString().slice(0, 10);
+    return this._fetchHistoricRate(prevStr, _depth + 1);
   },
 
   _normalizeProxyPayload(raw, proxyIndex) {

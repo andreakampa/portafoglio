@@ -12,6 +12,8 @@ import {
 import { openTransactionModal, openHistoryModal, openSimModal, CartPanel } from './ui.js';
 import { initCassettoFiscale, aggiornaBadgeFiscale } from '../../api/fiscale.js';
 
+import { generaPacTransazioni } from './ui/pac.js';
+
 const DEFAULT_PORTFOLIO_NAME = 'Portafoglio principale';
 const DEFAULT_TAX_REGIME = 'amministrato';
 
@@ -102,6 +104,8 @@ export class PortfolioPage {
 
         CartPanel.init();
 
+        await this._aggiornaAllPac();
+
 initCassettoFiscale(() => this._getActivePortfolio(), () => this._save());
 
 aggiornaBadgeFiscale(this.portfolio);
@@ -109,6 +113,21 @@ aggiornaBadgeFiscale(this.portfolio);
         this._refreshPrices();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
         
+    }
+
+    async _aggiornaAllPac() {
+        let changed = false;
+        for (const id in this.portfolio) {
+            const p = this.portfolio[id];
+            if (!p.pac) continue;
+            const before = (p.transactions || []).length;
+            await generaPacTransazioni(id, this.portfolio);
+            if ((p.transactions || []).length !== before) changed = true;
+        }
+        if (changed) {
+            await DB.save('portfolio_state', this.portfolioState);
+            Calc.clearCaches();
+        }
     }
 
    destroy() {
@@ -701,7 +720,8 @@ const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState
 
     if (!active.assets) active.assets = {};
 
-    const id = item.id || item.isin || item.ticker || item.symbol || item.nome || item.name;
+    const rawId = item.id || item.isin || item.ticker || item.symbol || item.nome || item.name;
+    const id = rawId.replace(/[.$#[\]/]/g, '_');
     if (!id) {
         Toast.show('Titolo non valido', 'err');
         return;
