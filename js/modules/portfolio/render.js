@@ -563,7 +563,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                         <button class="btn-action btn-action-sim"      data-action="sim"     data-id="${id}" title="Simulazione">◎</button>
                         <button class="btn-action btn-action-delete"   data-action="delete"  data-id="${id}" title="Elimina">✕</button>
                     </div>
-                </td>
+                </td>`;
             tbody.appendChild(tr);
         }
 
