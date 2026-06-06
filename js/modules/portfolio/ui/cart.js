@@ -2,11 +2,27 @@ import { Calc } from '../calc.js';
 import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 
+const CART_KEY = 'ptpro_cart';
+
+function loadCartItems() {
+    try {
+        const raw = localStorage.getItem(CART_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+}
+
+function saveCartItems(items) {
+    try {
+        localStorage.setItem(CART_KEY, JSON.stringify(items));
+    } catch (e) {}
+}
+
 export const Cart = {
-    items: [],
+    items: loadCartItems(),
 
     add(item) {
         this.items.push({ ...item, _cartId: Date.now() + Math.random() });
+        saveCartItems(this.items);
         CartPanel.render();
         CartPanel.show();
         Toast.show(`${item.nome} aggiunto al carrello`, 'ok');
@@ -14,11 +30,13 @@ export const Cart = {
 
     remove(cartId) {
         this.items = this.items.filter(i => i._cartId !== cartId);
+        saveCartItems(this.items);
         CartPanel.render();
     },
 
     clear() {
         this.items = [];
+        saveCartItems(this.items);
         CartPanel.render();
     }
 };
