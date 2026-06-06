@@ -446,9 +446,15 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 });
             }
 
-            const varHtml = varDay !== null
-                ? `<b>${Calc.fmt(prLive)}</b><br><span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fs-xs">${Calc.fmtSign(varDay)}%</span>`
-                : `<b>${Calc.fmt(prLive)}</b><br><span class="text-muted fs-xs">—</span>`;
+            const extMarket = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
+            const varHtml = `
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                    <b>${Calc.fmt(prLive)}</b>
+                    ${varDay !== null
+                        ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fs-xs">${Calc.fmtSign(varDay)}%</span>`
+                        : '<span class="text-muted fs-xs">—</span>'}
+                    ${extMarket ? `<span style="font-size:10px;color:var(--text-muted);">${extMarket.label} ${Calc.fmt(extMarket.price)} <span class="${extMarket.diff >= 0 ? 'text-success' : 'text-danger'}">${Calc.fmtSign(extMarket.diff)}%</span></span>` : ''}
+                </div>`;
 
             const assetBadge =
                 p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>'  :
@@ -468,11 +474,6 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                     <div style="display:flex;flex-direction:column;gap:1px;">
                         <span class="ticker-name">${p.nome}</span>
                         <span class="badge">${v}</span>${assetBadge}${statoBadge}
-                        ${(() => {
-                            const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
-                            if (!ext) return '';
-                            return `<span style="font-size:10px;color:var(--text-muted);">${ext.label} ${Calc.fmt(ext.price)} <span class="${ext.diff >= 0 ? 'text-success' : 'text-danger'}">${Calc.fmtSign(ext.diff)}%</span></span>`;
-                        })()}
                     </div>
                 </div></td>
                 <td>${qta > 0 ? Calc.fmt(qta, 4) : '—'}</td>
