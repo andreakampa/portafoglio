@@ -508,7 +508,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
                 <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                     ${att > 0
-    ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">📊 fx: ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
+    ? `${pnlEur < 0 ? '-' : ''}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEur : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">⇄ ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
     : '—'}
                 </td>
                 <td>
@@ -523,7 +523,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 </td>
                 <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
                     ${realizedPnL !== 0
-                        ? `${s} ${Calc.fmt(cv(realizedPnL))}${pos?.fxEffectRealized != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">📊 fx: ${pos.fxEffectRealized >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffectRealized)}</span>` : ''}`
+                        ? `${s} ${Calc.fmt(cv(realizedPnL))}${pos?.fxEffectRealized != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">⇄ ${pos.fxEffectRealized >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffectRealized)}</span>` : ''}`
                         : '—'}
                 </td>
                 <td>${(() => {
