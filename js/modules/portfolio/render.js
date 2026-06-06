@@ -408,7 +408,7 @@ map[id] = {
     return map;
 }
 
-export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {} }, handlers) {
+export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {} }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -503,8 +503,11 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 <td><div class="ticker-cell">
                     ${logoImg(p.nome, 'ticker-logo')}
                     <div style="display:flex;flex-direction:column;gap:1px;">
-                        <span class="ticker-name">${p.nome}</span>
-                        <span class="badge">${v}</span>${assetBadge}${statoBadge}
+                        <div style="display:flex;align-items:center;gap:4px;">
+                            <span class="ticker-name">${p.nome}</span>
+                            ${dividendi[id]?.some(d => d.pagato) ? `<span title="Hai ricevuto dividendi su questo titolo" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;flex-shrink:0;box-shadow:0 0 4px var(--success);cursor:pointer;" data-action="dividendi" data-id="${id}"></span>` : ''}
+                        </div>
+                        <span><span class="badge">${v}</span>${assetBadge}${statoBadge}</span>
                     </div>
                 </div></td>
                 <td>${qta > 0 ? Calc.fmt(qta, 4) : '—'}</td>
@@ -765,7 +768,7 @@ export function renderKPI({ portfolio, positionMap, currency, fiscalState }) {
         </div>`;
 }
 
-export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {} }, handlers) {
+export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {} }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -851,7 +854,10 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                     <div class="mobile-card-left">
                         ${logoImg(p.nome, 'ticker-logo')}
                         <div style="display:flex;flex-direction:column;gap:1px;">
-                            <span class="ticker-name">${p.nome}</span>
+                            <div style="display:flex;align-items:center;gap:4px;">
+                                <span class="ticker-name">${p.nome}</span>
+                                ${dividendi[id]?.some(d => d.pagato) ? `<span title="Hai ricevuto dividendi" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;flex-shrink:0;box-shadow:0 0 4px var(--success);"></span>` : ''}
+                            </div>
                             <span><span class="badge">${v}</span>${assetBadge}</span>
                             ${(() => {
                                 const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);

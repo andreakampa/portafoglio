@@ -14,6 +14,9 @@ import { initCassettoFiscale, aggiornaBadgeFiscale } from '../../api/fiscale.js'
 
 import { generaPacTransazioni } from './ui/pac.js';
 
+import { Dividendi } from '../../api/dividendi.js';
+import { openDividendiModal } from './ui/dividendi.js';
+
 const DEFAULT_PORTFOLIO_NAME = 'Portafoglio principale';
 const DEFAULT_TAX_REGIME = 'amministrato';
 
@@ -70,6 +73,7 @@ export class PortfolioPage {
         this.postMarkets = {};
         this.week52Lows = {};
         this.week52Highs = {};
+        this.dividendi = {};
         this.currency = 'EUR';
         this._autoTimer = null;
         this._portfolioSwitcherBound = false;
@@ -115,6 +119,7 @@ initCassettoFiscale(() => this._getActivePortfolio(), () => this._save());
 aggiornaBadgeFiscale(this.portfolio);
 
         this._refreshPrices();
+        this._aggiornaDividendi();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
         
     }
@@ -134,6 +139,22 @@ aggiornaBadgeFiscale(this.portfolio);
         }
     }
 
+
+    async _aggiornaDividendi() {
+        // Prima prova dalla cache
+        const cached = Dividendi.carica();
+        if (cached) {
+            this.dividendi = cached;
+            await this._render();
+            return;
+        }
+
+        // Altrimenti fetch completo
+        this.dividendi = await Dividendi.aggiornaPortfolio(this.portfolio);
+        Dividendi.salva(this.dividendi);
+        await this._render();
+    }
+
    destroy() {
         clearInterval(this._autoTimer);
         this._portfolioSwitcherBound = false;
@@ -149,7 +170,7 @@ aggiornaBadgeFiscale(this.portfolio);
         const { portfolio, prices, prevClose, currency, preMarkets, postMarkets, week52Lows, week52Highs } = this;
         const positionMap = await buildPositionMap(portfolio, prices);
         const fiscalState = this._getActivePortfolio()?.fiscal || null;
-        const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState, preMarkets, postMarkets, week52Lows, week52Highs };
+        const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState, preMarkets, postMarkets, week52Lows, week52Highs, dividendi: this.dividendi };
         renderTable._refresh = () => renderTable(state, this._handlers());
         renderKPI(state);
         renderTable(state, this._handlers());
@@ -710,6 +731,7 @@ aggiornaBadgeFiscale(this.portfolio);
                 async () => { await this._save(); }, this._getActivePortfolio()),
             onSimulation: id => openSimModal(id, this.portfolio, this.prices),
             onDelete: id => this._elimina(id),
+            onDividendi: id => openDividendiModal(id, this.portfolio, this.dividendi),
         };
     }
 
