@@ -21,8 +21,11 @@ export const Cart = {
     items: loadCartItems(),
 
     add(item) {
+        console.log('Cart.add called', item);
         this.items.push({ ...item, _cartId: Date.now() + Math.random() });
+        console.log('items after push', this.items);
         saveCartItems(this.items);
+        console.log('saved to localStorage');
         CartPanel.render();
         CartPanel.show();
         Toast.show(`${item.nome} aggiunto al carrello`, 'ok');
