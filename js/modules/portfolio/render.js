@@ -357,6 +357,26 @@ const pnlAfterTaxNative = pnl - taxNative;
 const taxEur = Calc.taxOnGain(pnlEur, p.tipoAsset);
 const pnlAfterTaxEur = pnlEur - taxEur;
 
+// Effetto cambio per titoli USD
+        let fxEffect = null;
+        if (v === 'USD' && pos.totalCostNative > 0 && pos.totalCostEur > 0) {
+            const tassoStorico = pos.totalCostNative / pos.totalCostEur;
+            const valoreCorrentivoUSD = pos.qta * prLive;
+            const attEurConTassoStorico = valoreCorrentivoUSD / tassoStorico;
+            const attEurConTassoAttuale = valoreCorrentivoUSD / rate;
+            fxEffect = attEurConTassoAttuale - attEurConTassoStorico;
+        }
+
+        // Effetto cambio realizzato
+        let fxEffectRealized = null;
+        if (v === 'USD' && pos.realizedPnL !== 0) {
+            const tassoStorico = pos.totalCostNative > 0 && pos.totalCostEur > 0
+                ? pos.totalCostNative / pos.totalCostEur
+                : rate;
+            const realizedUSD = pos.realizedPnL;
+            fxEffectRealized = (realizedUSD / rate) - (realizedUSD / tassoStorico);
+        }
+
 map[id] = {
     ...pos,
     prLive,
@@ -372,6 +392,8 @@ map[id] = {
     taxEur,
     pnlAfterTaxEur,
     valuta: v,
+    fxEffect,
+    fxEffectRealized,
 };
     });
 
@@ -486,7 +508,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
                 <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                     ${att > 0
-    ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>`
+    ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">📊 fx: ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
     : '—'}
                 </td>
                 <td>
@@ -500,7 +522,9 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     : '—'}
                 </td>
                 <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
-                    ${realizedPnL !== 0 ? `${s} ${Calc.fmt(cv(realizedPnL))}` : '—'}
+                    ${realizedPnL !== 0
+                        ? `${s} ${Calc.fmt(cv(realizedPnL))}${pos?.fxEffectRealized != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">📊 fx: ${pos.fxEffectRealized >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffectRealized)}</span>` : ''}`
+                        : '—'}
                 </td>
                 <td>${(() => {
     if (realizedPnL === 0) return '—';
