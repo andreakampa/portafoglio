@@ -141,9 +141,9 @@ export function renderPage(container) {
                             <th>Symbol</th>
                             <th>Shares</th>
                             <th>AC/Share</th>
+                            <th>Last Price</th>
                             <th>Total Cost</th>
                             <th>Market Value</th>
-                            <th>Last Price</th>
                             <th>P&L Gross UNRL</th>
                             <th>P&L Net UNRL</th>
                             <th>P&L Gross REAL</th>
@@ -477,12 +477,12 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 </div></td>
                 <td>${qta > 0 ? Calc.fmt(qta, 4) : '—'}</td>
                 <td>${pmc > 0 ? Calc.fmt(pmc) : '—'}</td>
-                <td>${invEur > 0 ? costoDisplay : '—'}</td>
                 <td>
-                    ${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}
+                    ${varHtml}
                     ${week52Bar(id, prLive, week52Lows, week52Highs)}
                 </td>
-                <td>${varHtml}</td>
+                <td>${invEur > 0 ? costoDisplay : '—'}</td>
+                <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
                 <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                     ${att > 0
     ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>`
