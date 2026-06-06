@@ -21,7 +21,12 @@ export const Yahoo = {
                 const meta   = result.meta;
                 const closes = result.indicators?.quote?.[0]?.close?.filter(Boolean) ?? [];
                 const prev   = closes.length >= 2 ? closes[closes.length - 2] : (meta.chartPreviousClose ?? null);
-                return { price: meta.regularMarketPrice, prevClose: prev };
+                return {
+                    price: meta.regularMarketPrice,
+                    prevClose: prev,
+                    preMarket: meta.preMarketPrice ?? null,
+                    postMarket: meta.postMarketPrice ?? null
+                };
             } catch (e) { /* try next proxy */ }
         }
         return null;
@@ -35,13 +40,16 @@ export const Yahoo = {
             )
         );
         const prices = {}, prevs = {};
+        const preMarkets = {}, postMarkets = {};
         results.forEach(({ status, value }) => {
             if (status === 'fulfilled' && value?.r) {
-                prices[value.id] = value.r.price;
-                prevs[value.id]  = value.r.prevClose;
+                prices[value.id]     = value.r.price;
+                prevs[value.id]      = value.r.prevClose;
+                preMarkets[value.id]  = value.r.preMarket;
+                postMarkets[value.id] = value.r.postMarket;
             }
         });
-        return { prices, prevs };
+        return { prices, prevs, preMarkets, postMarkets };
     },
 
     async fetchSparkline(ticker) {

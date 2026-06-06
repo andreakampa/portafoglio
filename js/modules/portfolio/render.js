@@ -51,6 +51,28 @@ function groupedSortedIds(portfolio, positionMap) {
     return { active, closed, empty };
 }
 
+function getExtendedMarketInfo(id, valuta, preMarkets, postMarkets, prLive) {
+    if (valuta !== 'USD') return null;
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const utcMin  = now.getUTCMinutes();
+    const utcTime = utcHour * 60 + utcMin;
+
+    // Orari in UTC: premarket 9:00-14:30 (IT 11:00-16:30), aftermarket 21:00-01:00 (IT 23:00-03:00)
+    const isPreMarket  = utcTime >= 540  && utcTime < 870;
+    const isPostMarket = utcTime >= 1260 || utcTime < 60;
+
+    if (isPreMarket && preMarkets[id] != null) {
+        const diff = ((preMarkets[id] - prLive) / prLive) * 100;
+        return { label: '🌅', price: preMarkets[id], diff, type: 'pre' };
+    }
+    if (isPostMarket && postMarkets[id] != null) {
+        const diff = ((postMarkets[id] - prLive) / prLive) * 100;
+        return { label: '🌙', price: postMarkets[id], diff, type: 'post' };
+    }
+    return null;
+}
+
 export function renderPage(container) {
     container.innerHTML = `
     <div class="controls-bar">
@@ -336,7 +358,7 @@ map[id] = {
     return map;
 }
 
-export function renderTable({ portfolio, positionMap, prevClose, currency }, handlers) {
+export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {} }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -423,8 +445,15 @@ export function renderTable({ portfolio, positionMap, prevClose, currency }, han
             tr.innerHTML = `
                 <td><div class="ticker-cell">
                     ${logoImg(p.nome, 'ticker-logo')}
-                    <span class="ticker-name">${p.nome}</span>
-                    <span class="badge">${v}</span>${assetBadge}${statoBadge}
+                    <div style="display:flex;flex-direction:column;gap:1px;">
+                        <span class="ticker-name">${p.nome}</span>
+                        <span class="badge">${v}</span>${assetBadge}${statoBadge}
+                        ${(() => {
+                            const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
+                            if (!ext) return '';
+                            return `<span style="font-size:10px;color:var(--text-muted);">${ext.label} ${Calc.fmt(ext.price)} <span class="${ext.diff >= 0 ? 'text-success' : 'text-danger'}">${Calc.fmtSign(ext.diff)}%</span></span>`;
+                        })()}
+                    </div>
                 </div></td>
                 <td>${qta > 0 ? Calc.fmt(qta, 4) : '—'}</td>
                 <td>${pmc > 0 ? Calc.fmt(pmc) : '—'}</td>
@@ -679,7 +708,7 @@ export function renderKPI({ portfolio, positionMap, currency, fiscalState }) {
         </div>`;
 }
 
-export function renderMobileCards({ portfolio, positionMap, prevClose, currency }, handlers) {
+export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {} }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -764,8 +793,15 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency 
                 <div class="mobile-card-header" data-id="${id}">
                     <div class="mobile-card-left">
                         ${logoImg(p.nome, 'ticker-logo')}
-                        <span class="ticker-name">${p.nome}</span>
-                        <span class="badge">${v}</span>${assetBadge}
+                        <div style="display:flex;flex-direction:column;gap:1px;">
+                            <span class="ticker-name">${p.nome}</span>
+                            <span><span class="badge">${v}</span>${assetBadge}</span>
+                            ${(() => {
+                                const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
+                                if (!ext) return '';
+                                return `<span style="font-size:10px;color:var(--text-muted);">${ext.label} ${Calc.fmt(ext.price)} <span class="${ext.diff >= 0 ? 'text-success' : 'text-danger'}">${Calc.fmtSign(ext.diff)}%</span></span>`;
+                            })()}
+                        </div>
                     </div>
                     <div class="mobile-card-right">
                         <span class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${att > 0 ? `${s} ${Calc.fmt(cv(pnl))}` : '—'}</span>
