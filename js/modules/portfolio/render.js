@@ -350,6 +350,13 @@ const pnl = att - inv;
 const invEur = v === 'EUR' ? inv : (pos.totalCostEur ?? inv / rate);
 const attEur = v === 'EUR' ? att : att / rate;
 const pnlEur = attEur - invEur;
+const pnlEurPuro = pnlEur - (v === 'USD' && pos.totalCostNative > 0 && pos.totalCostEur > 0
+    ? (() => {
+        const tassoStorico = pos.totalCostNative / pos.totalCostEur;
+        const valoreCorrentivoUSD = pos.qta * prLive;
+        return (valoreCorrentivoUSD / (Exchange.rate || 1)) - (valoreCorrentivoUSD / tassoStorico);
+    })()
+    : 0);
 
 const taxNative = Calc.taxOnGain(pnl, p.tipoAsset);
 const pnlAfterTaxNative = pnl - taxNative;
@@ -387,6 +394,7 @@ map[id] = {
     invEur,
     attEur,
     pnlEur,
+    pnlEurPuro,
     tax: taxNative,
     pnlAfterTax: pnlAfterTaxNative,
     taxEur,
@@ -441,6 +449,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     pnl = 0,
     pnlP = 0,
     pnlEur = 0,
+    pnlEurPuro = pnlEur,
     tax = 0,
     pnlAfterTax = 0,
     taxEur = 0,
@@ -508,7 +517,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
                 <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                     ${att > 0
-    ? `${currency === 'EUR' ? (pnlEur < 0 ? '-' : '') : (cv(pnl) < 0 ? '-' : '')}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEur : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">⇄ ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
+    ? `${currency === 'EUR' ? (pnlEurPuro < 0 ? '-' : '') : (cv(pnl) < 0 ? '-' : '')}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEurPuro : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">fx ⇄  ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
     : '—'}
                 </td>
                 <td>
@@ -523,7 +532,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 </td>
                 <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
                     ${realizedPnL !== 0
-                        ? `${s} ${Calc.fmt(cv(realizedPnL))}${pos?.fxEffectRealized != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">fx ⇄ ${pos.fxEffectRealized >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffectRealized)}</span>` : ''}`
+                        ? `${s} ${Calc.fmt(cv(realizedPnL))}${pos?.fxEffectRealized != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">fx fx ⇄  ${pos.fxEffectRealized >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffectRealized)}</span>` : ''}`
                         : '—'}
                 </td>
                 <td>${(() => {
