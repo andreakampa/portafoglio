@@ -68,6 +68,8 @@ export class PortfolioPage {
         this.prevClose = {};
         this.preMarkets = {};
         this.postMarkets = {};
+        this.week52Lows = {};
+        this.week52Highs = {};
         this.currency = 'EUR';
         this._autoTimer = null;
         this._portfolioSwitcherBound = false;
@@ -144,11 +146,10 @@ aggiornaBadgeFiscale(this.portfolio);
     async _render() {
         this._syncActivePortfolio();
 
-        const { portfolio, prices, prevClose, currency, preMarkets, postMarkets } = this;
+        const { portfolio, prices, prevClose, currency, preMarkets, postMarkets, week52Lows, week52Highs } = this;
         const positionMap = await buildPositionMap(portfolio, prices);
         const fiscalState = this._getActivePortfolio()?.fiscal || null;
-        const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState, preMarkets, postMarkets };
-
+        const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState, preMarkets, postMarkets, week52Lows, week52Highs };
         renderTable._refresh = () => renderTable(state, this._handlers());
         renderKPI(state);
         renderTable(state, this._handlers());
@@ -242,11 +243,13 @@ aggiornaBadgeFiscale(this.portfolio);
     return;
   }
 
-  const { prices, prevs, preMarkets, postMarkets } = await Yahoo.fetchAll(tickerMap);
+  const { prices, prevs, preMarkets, postMarkets, week52Lows, week52Highs } = await Yahoo.fetchAll(tickerMap);
   Object.assign(this.prices, prices);
   Object.assign(this.prevClose, prevs);
   Object.assign(this.preMarkets, preMarkets || {});
   Object.assign(this.postMarkets, postMarkets || {});
+  Object.assign(this.week52Lows, week52Lows || {});
+  Object.assign(this.week52Highs, week52Highs || {});
   Cache.savePrices(this.prices, this.prevClose);
 
   if (btn) {

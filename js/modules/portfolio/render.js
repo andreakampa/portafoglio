@@ -73,6 +73,26 @@ function getExtendedMarketInfo(id, valuta, preMarkets, postMarkets, prLive) {
     return null;
 }
 
+function week52Bar(id, prLive, week52Lows, week52Highs) {
+    const low  = week52Lows[id];
+    const high = week52Highs[id];
+    if (!low || !high || high <= low) return '';
+
+    const pct = Math.max(0, Math.min(100, ((prLive - low) / (high - low)) * 100));
+    const color = pct < 30 ? 'var(--danger)' : pct > 70 ? 'var(--success)' : 'var(--warning)';
+
+    return `
+        <div style="margin-top:3px;width:100%;min-width:80px;">
+            <div style="position:relative;height:3px;background:var(--border);border-radius:2px;">
+                <div style="position:absolute;left:${pct}%;top:-2px;width:7px;height:7px;border-radius:50%;background:${color};transform:translateX(-50%);"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-top:2px;">
+                <span>${Calc.fmt(low)}</span>
+                <span>${Calc.fmt(high)}</span>
+            </div>
+        </div>`;
+}
+
 export function renderPage(container) {
     container.innerHTML = `
     <div class="controls-bar">
@@ -358,7 +378,7 @@ map[id] = {
     return map;
 }
 
-export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {} }, handlers) {
+export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {} }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -458,7 +478,10 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 <td>${qta > 0 ? Calc.fmt(qta, 4) : '—'}</td>
                 <td>${pmc > 0 ? Calc.fmt(pmc) : '—'}</td>
                 <td>${invEur > 0 ? costoDisplay : '—'}</td>
-                <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
+                <td>
+                    ${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}
+                    ${week52Bar(id, prLive, week52Lows, week52Highs)}
+                </td>
                 <td>${varHtml}</td>
                 <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                     ${att > 0
@@ -708,7 +731,7 @@ export function renderKPI({ portfolio, positionMap, currency, fiscalState }) {
         </div>`;
 }
 
-export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {} }, handlers) {
+export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {} }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -825,6 +848,10 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                     <div class="mobile-card-row">
                         <span class="text-muted">Controvalore</span>
                         <span>${att > 0 ? `${s} ${Calc.fmt(cv(att))}` : '—'}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="text-muted">52 settimane</span>
+                        <span style="flex:1;">${week52Bar(id, prLive, week52Lows, week52Highs) || '—'}</span>
                     </div>
                 </div>
                 <div class="mobile-card-detail" id="detail-${id}" style="display:none;">

@@ -25,7 +25,9 @@ export const Yahoo = {
                     price: meta.regularMarketPrice,
                     prevClose: prev,
                     preMarket: meta.preMarketPrice ?? null,
-                    postMarket: meta.postMarketPrice ?? null
+                    postMarket: meta.postMarketPrice ?? null,
+                    week52Low: meta.fiftyTwoWeekLow ?? null,
+                    week52High: meta.fiftyTwoWeekHigh ?? null
                 };
             } catch (e) { /* try next proxy */ }
         }
@@ -40,16 +42,18 @@ export const Yahoo = {
             )
         );
         const prices = {}, prevs = {};
-        const preMarkets = {}, postMarkets = {};
+        const preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {};
         results.forEach(({ status, value }) => {
             if (status === 'fulfilled' && value?.r) {
-                prices[value.id]     = value.r.price;
-                prevs[value.id]      = value.r.prevClose;
+                prices[value.id]      = value.r.price;
+                prevs[value.id]       = value.r.prevClose;
                 preMarkets[value.id]  = value.r.preMarket;
                 postMarkets[value.id] = value.r.postMarket;
+                week52Lows[value.id]  = value.r.week52Low;
+                week52Highs[value.id] = value.r.week52High;
             }
         });
-        return { prices, prevs, preMarkets, postMarkets };
+        return { prices, prevs, preMarkets, postMarkets, week52Lows, week52Highs };
     },
 
     async fetchSparkline(ticker) {
