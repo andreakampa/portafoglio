@@ -325,6 +325,7 @@ realizedTaxBreakdown({ gainEur, assetType, availableMinus = 0 }) {
             return rateMap.get(tx.date) || Exchange.rate || 1;
         };
 
+        for (const tx of txs) {
         const q = +tx.qty || 0;
         const pr = +tx.price || 0;
         const commRaw = +(tx.commission || 0);
