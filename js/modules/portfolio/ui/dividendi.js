@@ -70,12 +70,12 @@ export function openDividendiModal(id, portfolio, dividendi) {
                                 <td>${d.exDate}</td>
                                 <td>${d.payDate || '—'}</td>
                                 <td>${
-                                    d.pagato
-                                        ? '<span style="color:var(--success);font-weight:600;">✅ Pagato</span>'
-                                        : d.maturato
-                                            ? '<span style="color:var(--success);font-weight:600;">🟢 Maturato</span>'
-                                            : '<span style="color:var(--warning);font-weight:600;">⏳ Atteso</span>'
-                                }</td>
+    d.pagato
+        ? '<span style="color:var(--success);font-weight:600;">✅ Pagato</span>'
+        : d.maturato
+            ? '<span style="color:var(--warning);font-weight:600;">🟠 Maturato</span>'
+            : '<span style="color:var(--text-muted);font-weight:600;">⏳ Atteso</span>'
+}</td>
                                 <td>${s} ${Calc.fmt(d.dividendoPerAzione, 4)}</td>
                                 <td>${Calc.fmt(d.qta, 4)}</td>
                                 <td><b>${s} ${Calc.fmt(d.importoNativo)}</b></td>

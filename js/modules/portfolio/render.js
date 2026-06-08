@@ -505,7 +505,25 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                     <div style="display:flex;flex-direction:column;gap:1px;">
                         <div style="display:flex;align-items:center;gap:4px;">
                             <span class="ticker-name">${p.nome}</span>
-                            ${dividendi[id]?.some(d => d.maturato) ? `<span title="Hai ricevuto dividendi su questo titolo" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;flex-shrink:0;box-shadow:0 0 4px var(--success);cursor:pointer;" data-action="dividendi" data-id="${id}"></span>` : ''}
+                            ${(() => {
+  const divsAsset = dividendi?.[id] || [];
+  const hasPaid = divsAsset.some(d => d.pagato);
+  const hasMaturedPending = divsAsset.some(d => d.maturato && !d.pagato);
+
+  if (hasPaid && hasMaturedPending) {
+    return `<span title="Dividendi pagati e in maturazione" style="display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;" data-action="dividendi" data-id="${id}"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;box-shadow:0 0 4px var(--success);pointer-events:none;"></span><span style="width:7px;height:7px;border-radius:50%;background:var(--warning);display:inline-block;box-shadow:0 0 4px var(--warning);pointer-events:none;"></span></span>`;
+  }
+
+  if (hasPaid) {
+    return `<span title="Dividendi pagati" style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:2px 5px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;" data-action="dividendi" data-id="${id}"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;box-shadow:0 0 4px var(--success);pointer-events:none;"></span></span>`;
+  }
+
+  if (hasMaturedPending) {
+    return `<span title="Dividendi in maturazione" style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:2px 5px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;" data-action="dividendi" data-id="${id}"><span style="width:7px;height:7px;border-radius:50%;background:var(--warning);display:inline-block;box-shadow:0 0 4px var(--warning);pointer-events:none;"></span></span>`;
+  }
+
+  return '';
+})()}
                         </div>
                         <span><span class="badge">${v}</span>${assetBadge}${statoBadge}</span>
                     </div>
@@ -857,7 +875,25 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                         <div style="display:flex;flex-direction:column;gap:1px;">
                             <div style="display:flex;align-items:center;gap:4px;">
                                 <span class="ticker-name">${p.nome}</span>
-                                ${dividendi[id]?.some(d => d.maturato) ? `<span title="Hai ricevuto dividendi" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;flex-shrink:0;box-shadow:0 0 4px var(--success);"></span>` : ''}
+                                ${(() => {
+  const divsAsset = dividendi?.[id] || [];
+  const hasPaid = divsAsset.some(d => d.pagato);
+  const hasMaturedPending = divsAsset.some(d => d.maturato && !d.pagato);
+
+  if (hasPaid && hasMaturedPending) {
+    return `<span title="Dividendi pagati e in maturazione" style="display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;" data-action="dividendi" data-id="${id}"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;box-shadow:0 0 4px var(--success);pointer-events:none;"></span><span style="width:7px;height:7px;border-radius:50%;background:var(--warning);display:inline-block;box-shadow:0 0 4px var(--warning);pointer-events:none;"></span></span>`;
+  }
+
+  if (hasPaid) {
+    return `<span title="Dividendi pagati" style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:2px 5px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;" data-action="dividendi" data-id="${id}"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;box-shadow:0 0 4px var(--success);pointer-events:none;"></span></span>`;
+  }
+
+  if (hasMaturedPending) {
+    return `<span title="Dividendi in maturazione" style="display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:2px 5px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;" data-action="dividendi" data-id="${id}"><span style="width:7px;height:7px;border-radius:50%;background:var(--warning);display:inline-block;box-shadow:0 0 4px var(--warning);pointer-events:none;"></span></span>`;
+  }
+
+  return '';
+})()}
                             </div>
                             <span><span class="badge">${v}</span>${assetBadge}</span>
                             ${(() => {
