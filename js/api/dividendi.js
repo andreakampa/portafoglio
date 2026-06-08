@@ -40,6 +40,7 @@ export const Dividendi = {
   async fetchDividendi(ticker) {
     try {
       if (!ticker) return [];
+
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=10y&events=dividends`;
       const proxyUrl = `${PROXY}?url=${encodeURIComponent(url)}`;
       const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
@@ -81,7 +82,7 @@ export const Dividendi = {
 
       const importoNativo = (Number(div.amount) || 0) * qtaAllExDate;
 
-            const payDateEstimated = addDays(exDate, 21);
+      const payDateEstimated = addDays(exDate, 21);
       const maturato = exDate <= oggi;
       const pagato = payDateEstimated <= oggi;
 
@@ -175,6 +176,6 @@ export const Dividendi = {
   },
 
   haRicevutoDividendi(dividendiAsset) {
-  return (dividendiAsset || []).some(d => d.maturato);
-}
+    return (dividendiAsset || []).some(d => d.maturato);
+  }
 };
