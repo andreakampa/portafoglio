@@ -753,7 +753,8 @@ const totaleDividendi = currency === 'EUR'
                     <div class="kpi-title">Commissioni Pagate</div>
                     <div class="kpi-value text-warning">${s} ${Calc.fmt(totComm)}</div>
                 </div>
-                <div class="kpi-sep"></div>
+                <div class="kpi-sep">
+            </div>
 <div class="kpi-item" data-action="dividendi-dashboard" style="cursor:pointer;">
     <div class="kpi-title">Dividendi</div>
     <div class="kpi-value pos-gain">${s} ${Calc.fmt(totaleDividendi)}</div>
@@ -801,6 +802,16 @@ const totaleDividendi = currency === 'EUR'
             </div>
         </div>`;
 }
+
+dash.onclick = e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    const { action } = btn.dataset;
+    if (action === 'dividendi-dashboard') {
+        handlers?.onDividendiDashboard?.();
+    }
+};
 
 export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {} }, handlers) {
     const container = document.getElementById('mobile-cards');
