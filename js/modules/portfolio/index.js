@@ -412,7 +412,7 @@ await this._aggiornaDividendi(true);
             await DB.save('portfolio_state', this.portfolioState);
             this._renderPortfolioSwitcher();
             await Exchange.prefetchRatesForPortfolio(this.portfolio);
-            await this._render();
+await this._aggiornaDividendi();
 
             Toast.show('Portafoglio eliminato', 'ok');
         });
@@ -732,7 +732,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             onTransaction: (id, type) => openTransactionModal(id, type, this.portfolio, this.prices,
                 async () => { await this._save(); }, this._getActivePortfolio()),
             onSimulation: id => openSimModal(id, this.portfolio, this.prices),
-            onDelete: id => this._elimina(id),
+            onDelete: id => this.elimina(id),
             onDividendi: id => openDividendiModal(id, this.portfolio, this.dividendi),
         };
     }
@@ -777,6 +777,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
     await DB.save('portfolio_state', this.portfolioState);
     Toast.show(`Titolo aggiunto: ${active.assets[id].nome}`, 'ok');
     await this._refreshPrices(id);
+await this._aggiornaDividendi(true);
 }
 
     async elimina(id) {

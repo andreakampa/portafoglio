@@ -81,7 +81,10 @@ export const Dividendi = {
 
       const importoNativo = (Number(div.amount) || 0) * qtaAllExDate;
 
-      const payDateEstimated = addDays(exDate, 30);
+            const payDateEstimated = addDays(exDate, 21);
+      const maturato = exDate <= oggi;
+      const pagato = payDateEstimated <= oggi;
+
       const rateDate = asset.valuta === 'USD' ? payDateEstimated : exDate;
       const rate = await getRateForDate(rateDate);
 
@@ -93,7 +96,8 @@ export const Dividendi = {
         exDate,
         payDate: payDateEstimated,
         payDateEstimated: true,
-        pagato: payDateEstimated <= oggi,
+        maturato,
+        pagato,
         dividendoPerAzione: Number(div.amount) || 0,
         qta: qtaAllExDate,
         importoNativo,
@@ -171,6 +175,6 @@ export const Dividendi = {
   },
 
   haRicevutoDividendi(dividendiAsset) {
-    return (dividendiAsset || []).some(d => d.pagato);
-  }
+  return (dividendiAsset || []).some(d => d.maturato);
+}
 };

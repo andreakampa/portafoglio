@@ -505,7 +505,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                     <div style="display:flex;flex-direction:column;gap:1px;">
                         <div style="display:flex;align-items:center;gap:4px;">
                             <span class="ticker-name">${p.nome}</span>
-                            ${dividendi[id]?.some(d => d.pagato) ? `<span title="Hai ricevuto dividendi su questo titolo" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;flex-shrink:0;box-shadow:0 0 4px var(--success);cursor:pointer;" data-action="dividendi" data-id="${id}"></span>` : ''}
+                            ${dividendi[id]?.some(d => d.maturato) ? `<span title="Hai ricevuto dividendi su questo titolo" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;flex-shrink:0;box-shadow:0 0 4px var(--success);cursor:pointer;" data-action="dividendi" data-id="${id}"></span>` : ''}
                         </div>
                         <span><span class="badge">${v}</span>${assetBadge}${statoBadge}</span>
                     </div>
@@ -857,7 +857,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                         <div style="display:flex;flex-direction:column;gap:1px;">
                             <div style="display:flex;align-items:center;gap:4px;">
                                 <span class="ticker-name">${p.nome}</span>
-                                ${dividendi[id]?.some(d => d.pagato) ? `<span title="Hai ricevuto dividendi" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;flex-shrink:0;box-shadow:0 0 4px var(--success);"></span>` : ''}
+                                ${dividendi[id]?.some(d => d.maturato) ? `<span title="Hai ricevuto dividendi" style="width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;flex-shrink:0;box-shadow:0 0 4px var(--success);"></span>` : ''}
                             </div>
                             <span><span class="badge">${v}</span>${assetBadge}</span>
                             ${(() => {

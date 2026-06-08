@@ -16,8 +16,15 @@ export function openDividendiModal(id, portfolio, dividendi) {
     const close = () => { wrap.remove(); unlockScroll(); };
 
     const s = p.valuta === 'USD' ? '$' : '€';
-    const totaleEur = divs.filter(d => d.pagato).reduce((sum, d) => sum + d.importoEur, 0);
-    const totaleNativo = divs.filter(d => d.pagato).reduce((sum, d) => sum + d.importoNativo, 0);
+
+    const ricevuti = divs.filter(d => d.pagato);
+    const maturati = divs.filter(d => d.maturato);
+
+    const totaleEur = ricevuti.reduce((sum, d) => sum + d.importoEur, 0);
+    const totaleNativo = ricevuti.reduce((sum, d) => sum + d.importoNativo, 0);
+
+    const ultimoPagato = ricevuti[0]?.payDate || '—';
+    const ultimoMaturato = maturati[0]?.exDate || '—';
 
     wrap.innerHTML = `
         <div class="modal modal-wide" style="border-top: 3px solid var(--success);">
@@ -28,28 +35,29 @@ export function openDividendiModal(id, portfolio, dividendi) {
             <div class="modal-body">
                 ${divs.length === 0 ? `
                     <div class="text-muted" style="text-align:center;padding:24px;">
-                        Nessun dividendo ricevuto su questo titolo
+                        Nessun dividendo registrato su questo titolo
                     </div>` : `
                 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
                     <div class="preview-box" style="text-align:center;">
-                        <div class="text-muted fs-xs">Dividendi ricevuti</div>
-                        <div class="fw-600">${divs.filter(d => d.pagato).length}</div>
+                        <div class="text-muted fs-xs">Dividendi maturati</div>
+                        <div class="fw-600">${maturati.length}</div>
+                        <div class="text-muted fs-xs">ultimo ex-date: ${ultimoMaturato}</div>
                     </div>
                     <div class="preview-box" style="text-align:center;">
-                        <div class="text-muted fs-xs">Totale ricevuto</div>
+                        <div class="text-muted fs-xs">Totale pagato</div>
                         <div class="fw-600 pos-gain">€ ${Calc.fmt(totaleEur)}</div>
                         ${p.valuta === 'USD' ? `<div class="text-muted fs-xs">≈ ${s} ${Calc.fmt(totaleNativo)}</div>` : ''}
                     </div>
                     <div class="preview-box" style="text-align:center;">
-                        <div class="text-muted fs-xs">Ultimo dividendo</div>
-                        <div class="fw-600">${divs.find(d => d.pagato)?.payDate || '—'}</div>
+                        <div class="text-muted fs-xs">Ultimo pagamento</div>
+                        <div class="fw-600">${ultimoPagato}</div>
                     </div>
                 </div>
                 <div class="table-wrapper" style="max-height:320px;overflow-y:auto;">
                     <table class="tx-table tx-table-compact">
                         <thead><tr>
                             <th>Ex-Date</th>
-                            <th>Data Pagamento</th>
+                            <th>Pagamento stimato</th>
                             <th>Stato</th>
                             <th>Div/Azione</th>
                             <th>Quantità</th>
@@ -58,12 +66,16 @@ export function openDividendiModal(id, portfolio, dividendi) {
                         </tr></thead>
                         <tbody>
                             ${divs.map(d => `
-                            <tr style="${!d.pagato ? 'opacity:0.5;' : ''}">
+                            <tr style="${!d.pagato ? 'opacity:0.78;' : ''}">
                                 <td>${d.exDate}</td>
-                                <td>${d.payDate}</td>
-                                <td>${d.pagato
-                                    ? '<span style="color:var(--success);font-weight:600;">✅ Pagato</span>'
-                                    : '<span style="color:var(--warning);font-weight:600;">⏳ Stimato</span>'}</td>
+                                <td>${d.payDate || '—'}</td>
+                                <td>${
+                                    d.pagato
+                                        ? '<span style="color:var(--success);font-weight:600;">✅ Pagato</span>'
+                                        : d.maturato
+                                            ? '<span style="color:var(--success);font-weight:600;">🟢 Maturato</span>'
+                                            : '<span style="color:var(--warning);font-weight:600;">⏳ Atteso</span>'
+                                }</td>
                                 <td>${s} ${Calc.fmt(d.dividendoPerAzione, 4)}</td>
                                 <td>${Calc.fmt(d.qta, 4)}</td>
                                 <td><b>${s} ${Calc.fmt(d.importoNativo)}</b></td>
@@ -76,6 +88,6 @@ export function openDividendiModal(id, portfolio, dividendi) {
             </div>
         </div>`;
 
-    wrap.querySelector('#div-close').onclick  = close;
+    wrap.querySelector('#div-close').onclick = close;
     wrap.querySelector('#div-close2').onclick = close;
 }
