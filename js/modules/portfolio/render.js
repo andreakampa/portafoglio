@@ -661,7 +661,7 @@ export function resetRenderState() {
     renderTable._showClosed = true;
     renderTable._showEmpty  = true;
 }
-export function renderKPI({ portfolio, positionMap, currency, fiscalState, dividendi, handlers }) {
+export function renderKPI({ portfolio, positionMap, currency, fiscalState, dividendi = {}, handlers = {} }) {
     const s = currency === 'EUR' ? '€' : '$';
 
     let totInv = 0;
@@ -725,83 +725,84 @@ export function renderKPI({ portfolio, positionMap, currency, fiscalState, divid
 
     const totaleDividendiEur = Object.values(dividendi || {})
     .flat()
-    .filter(d => d.pagato)
-    .reduce((sum, d) => sum + (d.importoEur || 0), 0);
+    .filter(d => d?.pagato)
+    .reduce((sum, d) => sum + Number(d?.importoEur || 0), 0);
 
 const totaleDividendi = currency === 'EUR'
     ? totaleDividendiEur
     : Exchange.convert(totaleDividendiEur, 'EUR', currency);
 
-    const dash = document.getElementById('dashboard');
-    if (!dash) return;
+    
 
-    dash.innerHTML = `
-        <div class="kpi-group">
-            <div class="kpi-label">💼 Portafoglio</div>
-            <div class="kpi-row">
-                <div class="kpi-item">
-                    <div class="kpi-title">Investito</div>
-                    <div class="kpi-value">${s} ${Calc.fmt(totInv)}</div>
-                </div>
-                <div class="kpi-sep"></div>
-                <div class="kpi-item">
-                    <div class="kpi-title">Controvalore</div>
-                    <div class="kpi-value">${s} ${Calc.fmt(totAtt)}</div>
-                </div>
-                <div class="kpi-sep"></div>
-                <div class="kpi-item">
-                    <div class="kpi-title">Commissioni Pagate</div>
-                    <div class="kpi-value text-warning">${s} ${Calc.fmt(totComm)}</div>
-                </div>
-                <div class="kpi-sep">
+    const dash = document.getElementById('dashboard');
+if (!dash) return;
+
+dash.innerHTML = `
+    <div class="kpi-group">
+        <div class="kpi-label">💼 Portafoglio</div>
+        <div class="kpi-row">
+            <div class="kpi-item">
+                <div class="kpi-title">Investito</div>
+                <div class="kpi-value">${s} ${Calc.fmt(totInv)}</div>
             </div>
-<div class="kpi-item" data-action="dividendi-dashboard" style="cursor:pointer;">
-    <div class="kpi-title">Dividendi</div>
-    <div class="kpi-value pos-gain">${s} ${Calc.fmt(totaleDividendi)}</div>
-    <div class="kpi-sub">totale ricevuto finora</div>
-</div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-item">
+                <div class="kpi-title">Controvalore</div>
+                <div class="kpi-value">${s} ${Calc.fmt(totAtt)}</div>
+            </div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-item">
+                <div class="kpi-title">Commissioni Pagate</div>
+                <div class="kpi-value text-warning">${s} ${Calc.fmt(totComm)}</div>
+            </div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-item" data-action="dividendi-dashboard" style="cursor:pointer;">
+                <div class="kpi-title">Dividendi</div>
+                <div class="kpi-value pos-gain">${s} ${Calc.fmt(totaleDividendi)}</div>
+                <div class="kpi-sub">totale ricevuto finora</div>
             </div>
         </div>
+    </div>
 
-        <div class="kpi-group">
-            <div class="kpi-label">📈 Performance</div>
-            <div class="kpi-row">
-                <div class="kpi-item">
-                    <div class="kpi-title">P&L Non Realizzato</div>
-                    <div class="kpi-value ${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnl)}</div>
-                    <div class="kpi-sub">${Calc.fmtSign(pnlP)}%</div>
-                </div>
-                <div class="kpi-sep"></div>
-                <div class="kpi-item">
-                    <div class="kpi-title">P&L After Tax</div>
-                    <div class="kpi-value ${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlAfterTax)}</div>
-                    <div class="kpi-sub">${Calc.fmtSign(pnlAfterTaxP)}% &nbsp;·&nbsp; tasse: ${s} ${Calc.fmt(totTax)}</div>
-                </div>
-                <div class="kpi-sep"></div>
-                <div class="kpi-item">
-                    <div class="kpi-title">P&L Realizzato Lordo</div>
-                    <div class="kpi-value ${realizedLordo >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedLordo)}</div>
-                </div>
-                <div class="kpi-sep"></div>
-                <div class="kpi-item">
-                    <div class="kpi-title">P&L Realizzato Netto</div>
-                    <div class="kpi-value ${realizedNetto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedNetto)}</div>
-                </div>
-                <div class="kpi-sep"></div>
-                <div class="kpi-item">
-                    <div class="kpi-title">P&L Totale After Tax</div>
-                    <div class="kpi-value ${totNetto >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(totNetto)}</div>
-                    <div class="kpi-sub">realizzato netto + non realizzato netto</div>
-                </div>
-                <div class="kpi-sep"></div>
-                <div class="kpi-item">
-                    <div class="kpi-title">P&L EUR storico 🏦</div>
-                    <div class="kpi-value ${pnlEurStorico >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlEurStorico)}</div>
-                    <div class="kpi-sub">${Calc.fmtSign(pnlEurStoricoP)}% · tasso BCE storico</div>
-                </div>
+    <div class="kpi-group">
+        <div class="kpi-label">📈 Performance</div>
+        <div class="kpi-row">
+            <div class="kpi-item">
+                <div class="kpi-title">P&L Non Realizzato</div>
+                <div class="kpi-value ${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnl)}</div>
+                <div class="kpi-sub">${Calc.fmtSign(pnlP)}%</div>
             </div>
-        </div>`;
-}
+            <div class="kpi-sep"></div>
+            <div class="kpi-item">
+                <div class="kpi-title">P&L After Tax</div>
+                <div class="kpi-value ${pnlAfterTax >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlAfterTax)}</div>
+                <div class="kpi-sub">${Calc.fmtSign(pnlAfterTaxP)}% &nbsp;·&nbsp; tasse: ${s} ${Calc.fmt(totTax)}</div>
+            </div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-item">
+                <div class="kpi-title">P&L Realizzato Lordo</div>
+                <div class="kpi-value ${realizedLordo >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedLordo)}</div>
+            </div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-item">
+                <div class="kpi-title">P&L Realizzato Netto</div>
+                <div class="kpi-value ${realizedNetto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedNetto)}</div>
+            </div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-item">
+                <div class="kpi-title">P&L Totale After Tax</div>
+                <div class="kpi-value ${totNetto >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(totNetto)}</div>
+                <div class="kpi-sub">realizzato netto + non realizzato netto</div>
+            </div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-item">
+                <div class="kpi-title">P&L EUR storico 🏦</div>
+                <div class="kpi-value ${pnlEurStorico >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlEurStorico)}</div>
+                <div class="kpi-sub">${Calc.fmtSign(pnlEurStoricoP)}% · tasso BCE storico</div>
+            </div>
+        </div>
+    </div>
+`;
 
 dash.onclick = e => {
     const btn = e.target.closest('[data-action]');
@@ -809,9 +810,10 @@ dash.onclick = e => {
 
     const { action } = btn.dataset;
     if (action === 'dividendi-dashboard') {
-        handlers?.onDividendiDashboard?.();
+        handlers.onDividendiDashboard?.();
     }
 };
+}
 
 export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {} }, handlers) {
     const container = document.getElementById('mobile-cards');
