@@ -618,15 +618,16 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     }
 
     tbody.onclick = e => {
-        const btn = e.target.closest('[data-action]');
-        if (!btn) return;
-        const { action, id } = btn.dataset;
-        if (action === 'history')  handlers.onHistory(id);
-        if (action === 'buy')      handlers.onTransaction(id, 'buy');
-        if (action === 'sell')     handlers.onTransaction(id, 'sell');
-        if (action === 'sim')      handlers.onSimulation(id);
-        if (action === 'delete')   handlers.onDelete(id);
-    };
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, id } = btn.dataset;
+  if (action === 'history') handlers.onHistory(id);
+  if (action === 'buy') handlers.onTransaction(id, 'buy');
+  if (action === 'sell') handlers.onTransaction(id, 'sell');
+  if (action === 'sim') handlers.onSimulation(id);
+  if (action === 'delete') handlers.onDelete(id);
+  if (action === 'dividendi') handlers.onDividendi(id);
+};
 
     // Aggiorna frecce scroll dopo render
     setTimeout(() => {
@@ -937,17 +938,18 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                 arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
             });
 
-            card.querySelectorAll('[data-action]').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    const { action, id } = btn.dataset;
-                    if (action === 'history') handlers.onHistory(id);
-                    if (action === 'buy') handlers.onTransaction(id, 'buy');
-                    if (action === 'sell') handlers.onTransaction(id, 'sell');
-                    if (action === 'sim') handlers.onSimulation(id);
-                    if (action === 'delete') handlers.onDelete(id);
-                });
-            });
+            card.querySelectorAll('[data-action]').forEach(btn =>
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const { action, id } = btn.dataset;
+    if (action === 'history') handlers.onHistory(id);
+    if (action === 'buy') handlers.onTransaction(id, 'buy');
+    if (action === 'sell') handlers.onTransaction(id, 'sell');
+    if (action === 'sim') handlers.onSimulation(id);
+    if (action === 'delete') handlers.onDelete(id);
+    if (action === 'dividendi') handlers.onDividendi(id);
+  })
+);
 
             container.appendChild(card);
         }
