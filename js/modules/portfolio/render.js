@@ -661,7 +661,7 @@ export function resetRenderState() {
     renderTable._showClosed = true;
     renderTable._showEmpty  = true;
 }
-export function renderKPI({ portfolio, positionMap, currency, fiscalState }) {
+export function renderKPI({ portfolio, positionMap, currency, fiscalState, dividendi, handlers }) {
     const s = currency === 'EUR' ? '€' : '$';
 
     let totInv = 0;
@@ -723,6 +723,15 @@ export function renderKPI({ portfolio, positionMap, currency, fiscalState }) {
     const pnlEurStorico = totAttEur - totInvEur;
     const pnlEurStoricoP = totInvEur > 0 ? (pnlEurStorico / totInvEur) * 100 : 0;
 
+    const totaleDividendiEur = Object.values(dividendi || {})
+    .flat()
+    .filter(d => d.pagato)
+    .reduce((sum, d) => sum + (d.importoEur || 0), 0);
+
+const totaleDividendi = currency === 'EUR'
+    ? totaleDividendiEur
+    : Exchange.convert(totaleDividendiEur, 'EUR', currency);
+
     const dash = document.getElementById('dashboard');
     if (!dash) return;
 
@@ -744,6 +753,12 @@ export function renderKPI({ portfolio, positionMap, currency, fiscalState }) {
                     <div class="kpi-title">Commissioni Pagate</div>
                     <div class="kpi-value text-warning">${s} ${Calc.fmt(totComm)}</div>
                 </div>
+                <div class="kpi-sep"></div>
+<div class="kpi-item" data-action="dividendi-dashboard" style="cursor:pointer;">
+    <div class="kpi-title">Dividendi</div>
+    <div class="kpi-value pos-gain">${s} ${Calc.fmt(totaleDividendi)}</div>
+    <div class="kpi-sub">totale ricevuto finora</div>
+</div>
             </div>
         </div>
 

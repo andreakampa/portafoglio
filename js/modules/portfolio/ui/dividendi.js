@@ -2,8 +2,26 @@ import { Calc } from '../calc.js';
 import { lockScroll, unlockScroll } from './helpers.js';
 
 export function openDividendiModal(id, portfolio, dividendi) {
-    const p = portfolio[id];
-    const divs = (dividendi[id] || []).sort((a, b) => b.exDate.localeCompare(a.exDate));
+    const isGlobal = id === '__ALL__';
+    const p = isGlobal ? null : portfolio[id];
+
+    const divs = isGlobal
+        ? Object.entries(dividendi || {})
+            .flatMap(([assetId, rows]) =>
+                (rows || []).map(d => ({
+                    ...d,
+                    assetId,
+                    nome: portfolio[assetId]?.nome || assetId,
+                    ticker: portfolio[assetId]?.ticker || assetId,
+                    valutaTitolo: portfolio[assetId]?.valuta || 'EUR'
+                }))
+            )
+            .sort((a, b) => {
+                const da = b.payDate || b.exDate || '';
+                const db = a.payDate || a.exDate || '';
+                return da.localeCompare(db);
+            })
+        : (dividendi[id] || []).sort((a, b) => b.exDate.localeCompare(a.exDate));
 
     document.getElementById('modal-dividendi')?.remove();
 
@@ -15,13 +33,13 @@ export function openDividendiModal(id, portfolio, dividendi) {
 
     const close = () => { wrap.remove(); unlockScroll(); };
 
-    const s = p.valuta === 'USD' ? '$' : '€';
+    const s = isGlobal ? '€' : (p.valuta === 'USD' ? '$' : '€');
 
     const ricevuti = divs.filter(d => d.pagato);
     const maturati = divs.filter(d => d.maturato);
 
     const totaleEur = ricevuti.reduce((sum, d) => sum + d.importoEur, 0);
-    const totaleNativo = ricevuti.reduce((sum, d) => sum + d.importoNativo, 0);
+    const totaleNativo = isGlobal ? 0 : ricevuti.reduce((sum, d) => sum + d.importoNativo, 0);
 
     const ultimoPagato = ricevuti[0]?.payDate || '—';
     const ultimoMaturato = maturati[0]?.exDate || '—';
@@ -29,13 +47,13 @@ export function openDividendiModal(id, portfolio, dividendi) {
     wrap.innerHTML = `
         <div class="modal modal-wide" style="border-top: 3px solid var(--success);">
             <div class="modal-header">
-                <h3>💰 Dividendi — ${p.nome}</h3>
+                <h3>💰 ${isGlobal ? 'Dividendi del portafoglio' : `Dividendi — ${p.nome}`}</h3>
                 <button class="btn-x" id="div-close">✕</button>
             </div>
             <div class="modal-body">
                 ${divs.length === 0 ? `
                     <div class="text-muted" style="text-align:center;padding:24px;">
-                        Nessun dividendo registrato su questo titolo
+                        ${isGlobal ? 'Nessun dividendo pagato registrato nel portafoglio' : 'Nessun dividendo registrato su questo titolo'}
                     </div>` : `
                 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
                     <div class="preview-box" style="text-align:center;">
@@ -46,7 +64,7 @@ export function openDividendiModal(id, portfolio, dividendi) {
                     <div class="preview-box" style="text-align:center;">
                         <div class="text-muted fs-xs">Totale pagato</div>
                         <div class="fw-600 pos-gain">€ ${Calc.fmt(totaleEur)}</div>
-                        ${p.valuta === 'USD' ? `<div class="text-muted fs-xs">≈ ${s} ${Calc.fmt(totaleNativo)}</div>` : ''}
+                        ${!isGlobal && p.valuta === 'USD' ? `<div class="text-muted fs-xs">≈ ${s} ${Calc.fmt(totaleNativo)}</div>` : ''}
                     </div>
                     <div class="preview-box" style="text-align:center;">
                         <div class="text-muted fs-xs">Ultimo pagamento</div>
@@ -56,33 +74,41 @@ export function openDividendiModal(id, portfolio, dividendi) {
                 <div class="table-wrapper" style="max-height:320px;overflow-y:auto;">
                     <table class="tx-table tx-table-compact">
                         <thead><tr>
-                            <th>Ex-Date</th>
-                            <th>Pagamento stimato</th>
-                            <th>Stato</th>
-                            <th>Div/Azione</th>
-                            <th>Quantità</th>
-                            <th>Importo Totale</th>
-                            <th>Importo (€)</th>
-                        </tr></thead>
-                        <tbody>
-                            ${divs.map(d => `
-                            <tr style="${!d.pagato ? 'opacity:0.78;' : ''}">
-                                <td>${d.exDate}</td>
-                                <td>${d.payDate || '—'}</td>
-                                <td>${
-    d.pagato
-        ? '<span style="color:var(--success);font-weight:600;">✅ Pagato</span>'
-        : d.maturato
-            ? '<span style="color:var(--warning);font-weight:600;">🟠 Maturato</span>'
-            : '<span style="color:var(--text-muted);font-weight:600;">⏳ Atteso</span>'
-}</td>
-                                <td>${s} ${Calc.fmt(d.dividendoPerAzione, 4)}</td>
-                                <td>${Calc.fmt(d.qta, 4)}</td>
-                                <td><b>${s} ${Calc.fmt(d.importoNativo)}</b></td>
-                                <td>${p.valuta === 'USD' ? `€ ${Calc.fmt(d.importoEur)}` : '—'}</td>
-                            </tr>`).join('')}
-                        </tbody>
-                    </table>
+    ${isGlobal ? '<th>Titolo</th>' : ''}
+    <th>Ex-Date</th>
+    <th>Pagamento</th>
+    ${!isGlobal ? '<th>Stato</th>' : ''}
+    <th>Div/Azione</th>
+    <th>Quantità</th>
+    <th>Importo Totale</th>
+    <th>Importo (€)</th>
+</tr></thead>
+<tbody>
+    ${(isGlobal ? ricevuti : divs).map(d => {
+        const rowSymbol = isGlobal
+            ? (d.valutaTitolo === 'USD' ? '$' : '€')
+            : s;
+
+        return `
+        <tr style="${!isGlobal && !d.pagato ? 'opacity:0.78;' : ''}">
+            ${isGlobal ? `<td><b>${d.nome}</b><div class="text-muted fs-xs">${d.ticker}</div></td>` : ''}
+            <td>${d.exDate}</td>
+            <td>${d.payDate || '—'}</td>
+            ${!isGlobal ? `<td>${
+                d.pagato
+                    ? '<span style="color:var(--success);font-weight:600;">✅ Pagato</span>'
+                    : d.maturato
+                        ? '<span style="color:var(--warning);font-weight:600;">🟠 Maturato</span>'
+                        : '<span style="color:var(--text-muted);font-weight:600;">⏳ Atteso</span>'
+            }</td>` : ''}
+            <td>${rowSymbol} ${Calc.fmt(d.dividendoPerAzione, 4)}</td>
+            <td>${Calc.fmt(d.qta, 4)}</td>
+            <td><b>${rowSymbol} ${Calc.fmt(d.importoNativo)}</b></td>
+            <td>${d.importoEur != null ? `€ ${Calc.fmt(d.importoEur)}` : '—'}</td>
+        </tr>`;
+    }).join('')}
+</tbody>
+</table>
                 </div>`}
                 <button id="div-close2" class="btn btn-ghost btn-full" style="margin-top:16px;">Chiudi</button>
             </div>

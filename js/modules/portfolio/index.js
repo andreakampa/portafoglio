@@ -172,11 +172,27 @@ await this._aggiornaDividendi();
         const { portfolio, prices, prevClose, currency, preMarkets, postMarkets, week52Lows, week52Highs } = this;
         const positionMap = await buildPositionMap(portfolio, prices);
         const fiscalState = this._getActivePortfolio()?.fiscal || null;
-        const state = { portfolio, positionMap, prices, prevClose, currency, fiscalState, preMarkets, postMarkets, week52Lows, week52Highs, dividendi: this.dividendi };
-        renderTable._refresh = () => renderTable(state, this._handlers());
-        renderKPI(state);
-        renderTable(state, this._handlers());
-        renderMobileCards(state, this._handlers());
+        const handlers = this._handlers();
+
+const state = {
+  portfolio,
+  positionMap,
+  prices,
+  prevClose,
+  currency,
+  fiscalState,
+  preMarkets,
+  postMarkets,
+  week52Lows,
+  week52Highs,
+  dividendi: this.dividendi,
+  handlers
+};
+
+renderTable._refresh = () => renderTable(state, handlers);
+renderKPI(state);
+renderTable(state, handlers);
+renderMobileCards(state, handlers);
 
         aggiornaBadgeFiscale(this.portfolio);
     }
@@ -734,6 +750,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             onSimulation: id => openSimModal(id, this.portfolio, this.prices),
             onDelete: id => this.elimina(id),
             onDividendi: id => openDividendiModal(id, this.portfolio, this.dividendi),
+            onDividendiDashboard: () => openDividendiModal('__ALL__', this.portfolio, this.dividendi),
         };
     }
 
