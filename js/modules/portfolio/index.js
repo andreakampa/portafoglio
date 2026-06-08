@@ -118,8 +118,8 @@ initCassettoFiscale(() => this._getActivePortfolio(), () => this._save());
 
 aggiornaBadgeFiscale(this.portfolio);
 
-        this._refreshPrices();
-        this._aggiornaDividendi();
+        await this._refreshPrices();
+await this._aggiornaDividendi();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
         
     }
@@ -140,20 +140,22 @@ aggiornaBadgeFiscale(this.portfolio);
     }
 
 
-    async _aggiornaDividendi() {
-        // Prima prova dalla cache
-        const cached = Dividendi.carica();
-        if (cached) {
-            this.dividendi = cached;
-            await this._render();
-            return;
-        }
+    async _aggiornaDividendi(force = false) {
+  const portfolioId = this.activePortfolioId || 'default';
 
-        // Altrimenti fetch completo
-        this.dividendi = await Dividendi.aggiornaPortfolio(this.portfolio);
-        Dividendi.salva(this.dividendi);
-        await this._render();
+  if (!force) {
+    const cached = Dividendi.carica(portfolioId);
+    if (cached) {
+      this.dividendi = cached;
+      await this._render();
+      return;
     }
+  }
+
+  this.dividendi = await Dividendi.aggiornaPortfolio(this.portfolio);
+  Dividendi.salva(this.dividendi, portfolioId);
+  await this._render();
+}
 
    destroy() {
         clearInterval(this._autoTimer);
@@ -213,7 +215,8 @@ aggiornaBadgeFiscale(this.portfolio);
         this._syncActivePortfolio();
         await DB.save('portfolio_state', this.portfolioState);
         Calc.clearCaches();
-        await this._render();
+        Dividendi.clear(this.activePortfolioId);
+await this._aggiornaDividendi(true);
     }
 
     async _refreshPrices(soloId = null) {
@@ -458,8 +461,8 @@ aggiornaBadgeFiscale(this.portfolio);
                 if (menu) menu.style.display = 'none';
 
                 await Exchange.prefetchRatesForPortfolio(this.portfolio);
-                await this._render();
-                Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, 'ok');
+await this._aggiornaDividendi();
+Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, 'ok');
             });
         });
     }
@@ -565,16 +568,15 @@ aggiornaBadgeFiscale(this.portfolio);
                 fiscal: { manualLosses: [] }
             };
 
-            this.portfolioState.activePortfolioId = id;
-            this.activePortfolioId = id;
-            this._syncActivePortfolio();
-
-            await DB.save('portfolio_state', this.portfolioState);
-            this._renderPortfolioSwitcher();
-            this._closeCreatePortfolioModal();
-            await this._render();
-
-            Toast.show(`Creato portafoglio "${name}"`, 'ok');
+              this.portfolioState.activePortfolioId = id;
+  this.activePortfolioId = id;
+  this._syncActivePortfolio();
+  this.dividendi = {};
+  await DB.save('portfolio_state', this.portfolioState);
+  this._renderPortfolioSwitcher();
+  this._closeCreatePortfolioModal();
+  await this._render();
+  Toast.show(`Creato portafoglio "${name}"`, 'ok');
         });
     }
 
@@ -777,13 +779,14 @@ aggiornaBadgeFiscale(this.portfolio);
     await this._refreshPrices(id);
 }
 
-    async _elimina(id) {
-        const nome = this.portfolio[id]?.nome;
-        if (!confirm(`Eliminare ${nome} e tutto il suo storico?`)) return;
-        delete this.portfolio[id];
-        delete this.prices[id];
-        delete this.prevClose[id];
-        await this._save();
-        Toast.show(`${nome} rimosso`, 'ok');
-    }
+    async elimina(id) {
+  const nome = this.portfolio[id]?.nome;
+  if (!confirm(`Eliminare ${nome} e tutto il suo storico?`)) return;
+  delete this.portfolio[id];
+  delete this.prices[id];
+  delete this.prevClose[id];
+  Dividendi.clear(this.activePortfolioId);
+  await this._save();
+  Toast.show(`${nome} rimosso`, 'ok');
+}
 }
