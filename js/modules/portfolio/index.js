@@ -794,7 +794,12 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
     await DB.save('portfolio_state', this.portfolioState);
     Toast.show(`Titolo aggiunto: ${active.assets[id].nome}`, 'ok');
     await this._refreshPrices(id);
-await this._aggiornaDividendi(true);
+    // Aggiorna dividendi solo per il nuovo ticker, senza invalidare tutta la cache
+    const divsTicker = await Dividendi.fetchDividendi(item.ticker || item.nome);
+    const nuovi = await Dividendi.calcolaDividendiRicevuti(this.portfolio[id], divsTicker);
+    if (nuovi.length > 0) this.dividendi[id] = nuovi;
+    Dividendi.salva(this.dividendi, this.activePortfolioId);
+    await this._render();
 }
 
     async elimina(id) {

@@ -26,6 +26,7 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
 
     const anni = [...new Set(
         allDivs
+            .filter(d => isGlobal ? d.pagato : true)
             .map(d => (d.payDate || d.exDate || '').slice(0, 4))
             .filter(Boolean)
     )].sort((a, b) => b.localeCompare(a));
@@ -69,7 +70,7 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
     const ultimoPagato = ricevuti[0]?.payDate || '—';
     const ultimoMaturato = maturati[0]?.exDate || '—';
 
-    const filtroHtml = isGlobal ? `
+    const filtroHtml = anni.length > 1 ? `
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap;">
             <div class="text-muted fs-xs">Filtra per anno</div>
             <select id="dividendi-anno-filter" class="input" style="min-width:140px;">
