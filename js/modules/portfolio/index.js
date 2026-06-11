@@ -892,3 +892,4 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
   await this._save();
   Toast.show(`${nome} rimosso`, 'ok');
 }
+}
