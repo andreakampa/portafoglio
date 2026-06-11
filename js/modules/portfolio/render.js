@@ -103,27 +103,6 @@ function dividendoDot(id, dividendi) {
     const dotStyle = (color) =>
         `<span style="width:7px;height:7px;border-radius:50%;background:${color};display:inline-block;box-shadow:0 0 4px ${color};pointer-events:none;"></span>`;
 
-    const wrapStyle = `display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;`;
-
-    if (hasPaid && hasMaturedPending) {
-        return `<span title="Dividendi pagati e in maturazione" style="${wrapStyle}justify-content:center;min-width:18px;height:18px;" data-action="dividendi" data-id="${id}">${dotStyle('var(--success)')}${dotStyle('var(--warning)')}</span>`;
-    }
-    if (hasPaid) {
-        return `<span title="Dividendi pagati" style="${wrapStyle}justify-content:center;min-width:18px;height:18px;" data-action="dividendi" data-id="${id}">${dotStyle('var(--success)')}</span>`;
-    }
-    return `<span title="Dividendo maturato non ancora pagato" style="${wrapStyle}justify-content:center;min-width:18px;height:18px;" data-action="dividendi" data-id="${id}">${dotStyle('var(--warning)')}</span>`;
-}
-
-function dividendoDot(id, dividendi) {
-    const divsAsset = dividendi?.[id] || [];
-    const hasPaid = divsAsset.some(d => d.pagato);
-    const hasMaturedPending = divsAsset.some(d => d.maturato && !d.pagato);
-
-    if (!hasPaid && !hasMaturedPending) return '';
-
-    const dotStyle = (color) =>
-        `<span style="width:7px;height:7px;border-radius:50%;background:${color};display:inline-block;box-shadow:0 0 4px ${color};pointer-events:none;"></span>`;
-
     const wrapStyle = `display:inline-flex;align-items:center;gap:2px;padding:2px 5px;border-radius:999px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;justify-content:center;min-width:18px;height:18px;`;
 
     if (hasPaid && hasMaturedPending) {
