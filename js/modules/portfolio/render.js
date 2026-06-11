@@ -467,7 +467,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     tbody.innerHTML = '';
     console.log('renderTable start', { active, closed, empty, transferred });
 
-    const { active, closed, empty } = groupedSortedIds(portfolio, positionMap);
+    const { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
 
     // Stato visibilità gruppi collassabili
     if (typeof renderTable._showClosed === 'undefined') renderTable._showClosed = true;
