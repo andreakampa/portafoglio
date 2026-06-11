@@ -25,14 +25,25 @@ function logoImg(nome, cssClass) {
 function groupedSortedIds(portfolio, positionMap) {
     const ids = Object.keys(portfolio);
 
-    const active  = [];
-    const closed  = [];
-    const empty   = [];
+    const active      = [];
+    const closed      = [];
+    const empty       = [];
+    const transferred = [];
 
     for (const id of ids) {
-        const txs = portfolio[id].transactions || [];
+        const p   = portfolio[id];
+        const txs = p.transactions || [];
         const qta = positionMap ? (positionMap[id]?.qta ?? 0) : 0;
-        if (txs.length === 0) {
+
+        if (p.transferredQuantity > 0 && qta < 0.00001) {
+            // Interamente trasferito: va solo in "trasferiti"
+            transferred.push(id);
+        } else if (p.transferredQuantity > 0 && qta >= 0.00001) {
+            // Parzialmente trasferito: va in "attivi" (badge aggiunto in rendering)
+            // e anche in "trasferiti"
+            active.push(id);
+            transferred.push(id);
+        } else if (txs.length === 0) {
             empty.push(id);
         } else if (qta < 0.00001) {
             closed.push(id);
@@ -47,8 +58,9 @@ function groupedSortedIds(portfolio, positionMap) {
     active.sort(byName);
     closed.sort(byName);
     empty.sort(byName);
+    transferred.sort(byName);
 
-    return { active, closed, empty };
+    return { active, closed, empty, transferred };
 }
 
 function getExtendedMarketInfo(id, valuta, preMarkets, postMarkets, prLive) {
@@ -317,6 +329,19 @@ export function renderPage(container) {
         .group-toggle-row td:hover {
             color: var(--text-primary);
         }
+          .badge-transferred {
+            background: #1a3a5c;
+            color: #7bb8e8;
+            border: 0.5px solid #2a5a8c;
+        }
+        .badge-partial-transfer {
+            background: var(--bg2);
+            color: var(--text-muted);
+            border: 0.5px solid var(--border);
+        }
+        .row-transferred {
+            opacity: 0.6;
+        }  
     </style>
     `;
 
@@ -516,6 +541,10 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 ? '<span class="badge-stato badge-closed">Chiuso</span>'
                 : groupClass === 'row-empty'
                 ? '<span class="badge-stato badge-empty">Vuoto</span>'
+                : groupClass === 'row-transferred'
+                ? '<span class="badge-stato badge-transferred">Trasferito</span>'
+                : portfolio[id]?.transferredQuantity > 0
+                ? `<span class="badge-stato badge-partial-transfer" title="Parzialmente trasferito: ${Calc.fmt(portfolio[id].transferredQuantity, 4)} unità">🔀 Parz.</span>`
                 : '';
 
             const tr = document.createElement('tr');
@@ -594,6 +623,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                         <button class="btn-action btn-action-buy"      data-action="buy"     data-id="${id}" title="Acquisto">＋</button>
                         <button class="btn-action btn-action-sell"     data-action="sell"    data-id="${id}" title="Vendita">－</button>
                         <button class="btn-action btn-action-sim"      data-action="sim"     data-id="${id}" title="Simulazione">◎</button>
+                        <button class="btn-action" data-action="transfer" data-id="${id}" title="Trasferisci" style="color:var(--warning);">🔀</button>
                         <button class="btn-action btn-action-delete"   data-action="delete"  data-id="${id}" title="Elimina">✕</button>
                     </div>
                 </td>`;
@@ -637,6 +667,17 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
         });
         tbody.appendChild(toggleRow);
     }
+    if (renderTable._showTransferred) renderGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti', true, '_showTransferred');
+    else if (transferred.length) {
+        const toggleRow = document.createElement('tr');
+        toggleRow.className = 'group-toggle-row';
+        toggleRow.innerHTML = `<td colspan="11">— Mostra titoli trasferiti (${transferred.length}) —</td>`;
+        toggleRow.addEventListener('click', () => {
+            renderTable._showTransferred = true;
+            renderTable._refresh && renderTable._refresh();
+        });
+        tbody.appendChild(toggleRow);
+    }
 
     tbody.onclick = e => {
   const btn = e.target.closest('[data-action]');
@@ -648,6 +689,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
   if (action === 'sim') handlers.onSimulation(id);
   if (action === 'delete') handlers.onDelete(id);
   if (action === 'dividendi') handlers.onDividendi(id);
+  if (action === 'transfer') handlers.onTransfer?.(id);
 };
 
     // Aggiorna frecce scroll dopo render
@@ -661,8 +703,9 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     }, 100);
 }
 export function resetRenderState() {
-    renderTable._showClosed = true;
-    renderTable._showEmpty  = true;
+    renderTable._showClosed      = true;
+    renderTable._showEmpty       = true;
+    renderTable._showTransferred = true;
 }
 export function renderKPI({ portfolio, positionMap, currency, fiscalState, dividendi = {}, handlers = {} }) {
     const s = currency === 'EUR' ? '€' : '$';

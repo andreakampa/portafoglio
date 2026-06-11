@@ -9,7 +9,7 @@ import {
     renderPage, renderTable, renderKPI, renderSkeleton,
     renderMobileCards, buildPositionMap, resetRenderState
 } from './render.js';
-import { openTransactionModal, openHistoryModal, openSimModal, CartPanel } from './ui.js';
+import { openTransactionModal, openHistoryModal, openSimModal, CartPanel, openTransferModal } from './ui.js';
 import { initCassettoFiscale, aggiornaBadgeFiscale } from '../../api/fiscale.js';
 
 import { generaPacTransazioni } from './ui/pac.js';
@@ -751,7 +751,87 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             onDelete: id => this.elimina(id),
             onDividendi: id => openDividendiModal(id, this.portfolio, this.dividendi),
             onDividendiDashboard: () => openDividendiModal('__ALL__', this.portfolio, this.dividendi),
+            onTransfer: id => openTransferModal(
+                id,
+                this.portfolio,
+                this.portfolioState.portfolios,
+                this.activePortfolioId,
+                (params) => this._eseguiTrasferimento(params)
+            ),
         };
+        async _eseguiTrasferimento({ sourceAssetId, destPortfolioId, qty }) {
+        const { Toast } = await import('../../core/toast.js');
+        const sourceAsset = this.portfolio[sourceAssetId];
+        const destPortfolio = this.portfolioState.portfolios[destPortfolioId];
+        if (!sourceAsset || !destPortfolio) {
+            Toast.show('Portafoglio o asset non trovato', 'err');
+            throw new Error('not found');
+        }
+
+        // PMC sorgente al momento del trasferimento
+        const { pmc } = Calc.positionSync(sourceAsset);
+        const today = new Date().toISOString().slice(0, 10);
+        const transferId = 'T' + Date.now();
+
+        // ── 1. Aggiorna sorgente ───────────────────────────────────
+        sourceAsset.transferred = true;
+        sourceAsset.transferredAt = today;
+        sourceAsset.transferredTo = destPortfolioId;
+        sourceAsset.transferredQuantity = (sourceAsset.transferredQuantity || 0) + qty;
+
+        // ── 2. Scrivi transazione sintetica nel destinazione ───────
+        if (!destPortfolio.assets) destPortfolio.assets = {};
+
+        const destAssetId = sourceAssetId; // stesso id (ticker sanitizzato)
+        if (!destPortfolio.assets[destAssetId]) {
+            // Copia la struttura base dell'asset senza le transazioni originali
+            destPortfolio.assets[destAssetId] = {
+                nome:      sourceAsset.nome,
+                ticker:    sourceAsset.ticker || sourceAsset.nome,
+                valuta:    sourceAsset.valuta || 'EUR',
+                tipoAsset: sourceAsset.tipoAsset || 'stock',
+                isin:      sourceAsset.isin || '',
+                transactions: [],
+                commDefault: sourceAsset.commDefault || 7,
+            };
+        }
+
+        const syntheticTx = {
+            date:         today,
+            type:         'buy',
+            qty:          qty,
+            price:        pmc,
+            commission:   0,
+            transferred:  true,
+            sourcePortfolioId: this.activePortfolioId,
+            transferId,
+        };
+
+        // Inserisci in ordine cronologico
+        const txs = destPortfolio.assets[destAssetId].transactions;
+        txs.push(syntheticTx);
+        txs.sort((a, b) => a.date.localeCompare(b.date));
+
+        // ── 3. Log trasferimento sul sorgente ─────────────────────
+        const activePortfolio = this._getActivePortfolio();
+        if (!activePortfolio.transfers) activePortfolio.transfers = {};
+        activePortfolio.transfers[transferId] = {
+            date:            today,
+            toPortfolioId:   destPortfolioId,
+            createdAt:       Date.now(),
+            tickers: {
+                [sourceAssetId]: {
+                    quantity:       qty,
+                    pmcAtTransfer:  pmc,
+                    currency:       sourceAsset.valuta || 'EUR',
+                }
+            }
+        };
+
+        // ── 4. Salva e aggiorna UI ─────────────────────────────────
+        await this._save();
+        Toast.show(`🔀 ${sourceAsset.nome}: ${Calc.fmt(qty, 4)} unità trasferite`, 'ok');
+    }
     }
 
     async _aggiungiTitolo(item) {
