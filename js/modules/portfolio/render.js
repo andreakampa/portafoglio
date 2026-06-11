@@ -873,7 +873,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
 
     container.innerHTML = '';
 
-    const { active, closed, empty } = groupedSortedIds(portfolio, positionMap);
+    const { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
 
     const renderMobileGroup = (ids, groupClass, groupLabel) => {
         if (!ids.length) return;
