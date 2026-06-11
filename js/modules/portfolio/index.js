@@ -760,7 +760,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             ),
         };
     }
-        async _eseguiTrasferimento({ sourceAssetId, destPortfolioId, qty }) {
+        async _eseguiTrasferimento({ sourceAssetId, destPortfolioId, qty, transferDate }) {
         const { Toast } = await import('../../core/toast.js');
         const sourceAsset = this.portfolio[sourceAssetId];
         const destPortfolio = this.portfolioState.portfolios[destPortfolioId];
@@ -771,7 +771,9 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
 
         // PMC sorgente al momento del trasferimento
         const { pmc } = Calc.positionSync(sourceAsset);
-        const today = new Date().toISOString().slice(0, 10);
+        const now = new Date();
+        const localToday = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const today = transferDate || localToday;
         const transferId = 'T' + Date.now();
 
         // ── 1. Aggiorna sorgente ───────────────────────────────────

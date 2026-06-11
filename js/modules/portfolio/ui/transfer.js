@@ -47,7 +47,16 @@ export function openTransferModal(sourceId, portfolio, allPortfolios, activePort
                     </div>` : ''}
                 </div>
 
-                <div class="form-grid-2">
+               <div class="form-grid-2">
+                    <div>
+                        <span class="modal-label">Data trasferimento</span>
+                        <input
+                            type="date"
+                            id="transfer-date"
+                            value="${new Date().toLocaleDateString('en-CA')}"
+                            style="width:100%; box-sizing:border-box;"
+                        >
+                    </div>
                     <div>
                         <span class="modal-label">Portafoglio destinazione</span>
                         <select id="transfer-dest" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--bg2); color:var(--text-primary); font-size:13px;">
@@ -160,7 +169,8 @@ export function openTransferModal(sourceId, portfolio, allPortfolios, activePort
         btn.textContent = 'Trasferimento in corso...';
 
         try {
-            await onConfirm({ sourceAssetId: sourceId, destPortfolioId: destId, qty: Math.min(qty, qtaEffettiva) });
+            const transferDate = document.getElementById('transfer-date').value || new Date().toLocaleDateString('en-CA');
+        await onConfirm({ sourceAssetId: sourceId, destPortfolioId: destId, qty: Math.min(qty, qtaEffettiva), transferDate });
             close();
         } catch (e) {
             btn.disabled = false;
