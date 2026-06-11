@@ -132,7 +132,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
     if (!hasManual && isRecent) return ' <span title="Tasso BCE non disponibile per questa data — considera di inserire il tasso manualmente" style="cursor:help;color:var(--warning);">⚠️</span>';
     return '';
 })()}</td>
-            <td class="${tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
+            <td class="${tx.transferred ? 'tx-transfer' : tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.transferred ? '🔀 Trasf.' : tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
             <td>${Calc.fmt(q, 4)}</td>
             <td>${s} ${Calc.fmt(pr)}</td>
             <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}</td>

@@ -623,7 +623,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                         <button class="btn-action btn-action-buy"      data-action="buy"     data-id="${id}" title="Acquisto">＋</button>
                         <button class="btn-action btn-action-sell"     data-action="sell"    data-id="${id}" title="Vendita">－</button>
                         <button class="btn-action btn-action-sim"      data-action="sim"     data-id="${id}" title="Simulazione">◎</button>
-                        <button class="btn-action" data-action="transfer" data-id="${id}" title="Trasferisci" style="color:var(--warning);">🔀</button>
+                        <button class="btn-action" data-action="transfer" data-id="${id}" title="Trasferisci">🔀</button>
                         <button class="btn-action btn-action-delete"   data-action="delete"  data-id="${id}" title="Elimina">✕</button>
                     </div>
                 </td>`;

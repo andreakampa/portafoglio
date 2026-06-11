@@ -192,6 +192,7 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
 .tx-table tr:last-child td { border-bottom: none; }
 .tx-buy  { color: var(--success); font-weight: 700; }
 .tx-sell { color: var(--purple);  font-weight: 700; }
+.tx-transfer { color: var(--warning); font-weight: 700; }
 .btn-del-tx {
     background: none; border: none; color: var(--danger);
     cursor: pointer; padding: 3px 7px; border-radius: var(--radius-sm);
