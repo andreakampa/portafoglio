@@ -465,7 +465,6 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     }
 
     tbody.innerHTML = '';
-    console.log('renderTable start', { active, closed, empty, transferred });
 
     const { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
 
@@ -679,7 +678,6 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
         });
         tbody.appendChild(toggleRow);
     }
-console.log('assegno tbody.onclick');
     tbody.onclick = e => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
