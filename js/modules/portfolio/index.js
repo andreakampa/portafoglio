@@ -200,6 +200,7 @@ renderMobileCards(state, handlers);
     async _loadData() {
         const raw = await DB.load('portfolio_state');
         this.portfolioState = normalizeState(raw);
+        window.__portfolioState__ = this.portfolioState;
         this.activePortfolioId = this.portfolioState.activePortfolioId;
 
         if (!raw || !raw.portfolios) {
@@ -230,6 +231,7 @@ renderMobileCards(state, handlers);
     async _save() {
         this._syncActivePortfolio();
         await DB.save('portfolio_state', this.portfolioState);
+        window.__portfolioState__ = this.portfolioState;
         Calc.clearCaches();
         Dividendi.clear(this.activePortfolioId);
 await this._aggiornaDividendi(true);

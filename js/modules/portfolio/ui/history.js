@@ -159,7 +159,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
     tbody.onclick = async e => {
         const delBtn  = e.target.closest('.btn-del-tx');
         const editBtn = e.target.closest('.btn-edit-tx');
-        if (delBtn) {
+       if (delBtn) {
             const origTx = txsSorted[+delBtn.dataset.idx];
             if (!confirm(`Eliminare la transazione del ${origTx.date}?`)) return;
             const realIdx = portfolio[id].transactions.findIndex(
@@ -167,7 +167,29 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
                      t.price === origTx.price && t.type === origTx.type
             );
             if (realIdx > -1) {
-                const isPac = portfolio[id].transactions[realIdx].source === 'pac';
+                const tx = portfolio[id].transactions[realIdx];
+
+                // ── Logica bidirezionale trasferimento ─────────────
+                if (tx.transferred && tx.sourcePortfolioId && tx.transferId) {
+                    const srcPortfolio = window.__portfolioState__?.portfolios?.[tx.sourcePortfolioId];
+                    if (srcPortfolio) {
+                        const srcAsset = srcPortfolio.assets?.[id];
+                        if (srcAsset) {
+                            srcAsset.transferredQuantity = Math.max(0, (srcAsset.transferredQuantity || 0) - tx.qty);
+                            if (srcAsset.transferredQuantity < 0.00001) {
+                                delete srcAsset.transferred;
+                                delete srcAsset.transferredAt;
+                                delete srcAsset.transferredTo;
+                                delete srcAsset.transferredQuantity;
+                            }
+                        }
+                        if (srcPortfolio.transfers?.[tx.transferId]) {
+                            delete srcPortfolio.transfers[tx.transferId];
+                        }
+                    }
+                }
+
+                const isPac = tx.source === 'pac';
                 portfolio[id].transactions.splice(realIdx, 1);
                 if (isPac && portfolio[id].pac) {
                     if (!portfolio[id].pac.skipDates) portfolio[id].pac.skipDates = [];
@@ -189,6 +211,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
     document.getElementById('modal-edit-tx')?.remove();
 
     const isUSD = portfolio[id].valuta === 'USD';
+    const isTransferred = !!origTx.transferred;
 
     const wrap = document.createElement('div');
     wrap.id = 'modal-edit-tx';
@@ -213,23 +236,24 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
                         </select>
                     </div>
                     <div>
-                        <span class="modal-label">Quantità</span>
-                        <input type="number" id="edit-tx-qta" step="any" value="${origTx.qty}">
+                        <span class="modal-label">Quantità${isTransferred ? ` <span class="text-muted fs-xs">(max: ${Calc.fmt(origTx.qty, 4)})</span>` : ''}</span>
+                        <input type="number" id="edit-tx-qta" step="any" value="${origTx.qty}" ${isTransferred ? `max="${origTx.qty}"` : ''}>
                     </div>
                     <div>
                         <span class="modal-label">Prezzo</span>
-                        <input type="number" id="edit-tx-prezzo" step="any" value="${origTx.price}">
+                        <input type="number" id="edit-tx-prezzo" step="any" value="${origTx.price}" ${isTransferred ? 'readonly style="opacity:0.5;cursor:not-allowed;"' : ''}>
                     </div>
                     <div>
                         <span class="modal-label">Commissione</span>
                         <div style="display:flex; gap:6px;">
-                            <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}" style="flex:1;">
-                            <select id="edit-tx-comm-currency" style="width:80px;">
+                            <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}" style="flex:1;" ${isTransferred ? 'readonly style="opacity:0.5;cursor:not-allowed;"' : ''}>
+                            <select id="edit-tx-comm-currency" style="width:80px;" ${isTransferred ? 'disabled' : ''}>
                                 <option value="EUR" ${(origTx.commissionCurrency || 'EUR') === 'EUR' ? 'selected' : ''}>€ EUR</option>
                                 <option value="USD" ${origTx.commissionCurrency === 'USD' ? 'selected' : ''}>$ USD</option>
                             </select>
                         </div>
                     </div>
+                    ${isTransferred ? `<div style="padding:8px 10px;background:var(--bg2);border-radius:6px;font-size:12px;color:var(--text-muted);border:1px solid var(--border);">🔀 Transazione trasferita — prezzo e commissione non modificabili</div>` : ''}
                     ${isUSD ? `
                     <div>
                         <span class="modal-label">
@@ -365,10 +389,38 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
         const editCommCurrency = document.getElementById('edit-tx-comm-currency')?.value || 'EUR';
         if (realIdx > -1) {
             const isPac = origTx.source === 'pac';
+            const oldQty = origTx.qty;
+
+            // ── Logica bidirezionale per trasferimenti ─────────────
+            if (origTx.transferred && origTx.sourcePortfolioId && newQty !== oldQty) {
+                const delta = newQty - oldQty; // negativo = riduzione
+                const srcPortfolio = window.__portfolioState__?.portfolios?.[origTx.sourcePortfolioId];
+                if (srcPortfolio) {
+                    const srcAsset = srcPortfolio.assets?.[id];
+                    if (srcAsset) {
+                        srcAsset.transferredQuantity = Math.max(0, (srcAsset.transferredQuantity || 0) + delta);
+                        if (srcAsset.transferredQuantity < 0.00001) {
+                            delete srcAsset.transferred;
+                            delete srcAsset.transferredAt;
+                            delete srcAsset.transferredTo;
+                            delete srcAsset.transferredQuantity;
+                        }
+                    }
+                    if (srcPortfolio.transfers?.[origTx.transferId]) {
+                        srcPortfolio.transfers[origTx.transferId].tickers[id].quantity = newQty;
+                    }
+                }
+            }
+
             portfolio[id].transactions[realIdx] = {
                 date: newDate, type: newType,
                 qty: newQty, price: newPr, commission: newComm,
                 ...(isPac ? { source: 'pac' } : {}),
+                ...(origTx.transferred ? {
+                    transferred: true,
+                    sourcePortfolioId: origTx.sourcePortfolioId,
+                    transferId: origTx.transferId
+                } : {}),
                 ...(editCommCurrency !== 'EUR' ? { commissionCurrency: editCommCurrency } : {}),
                 ...(isManual && fxVal > 0 ? { exchangeRate: fxVal } : {})
             };

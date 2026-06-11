@@ -33,7 +33,8 @@ function groupedSortedIds(portfolio, positionMap) {
     for (const id of ids) {
         const p   = portfolio[id];
         const txs = p.transactions || [];
-        const qta = positionMap ? (positionMap[id]?.qta ?? 0) : 0;
+        const qtaRaw = positionMap ? (positionMap[id]?.qta ?? 0) : 0;
+        const qta = Math.max(0, qtaRaw - (p.transferredQuantity || 0));
 
         if (p.transferredQuantity > 0 && qta < 0.00001) {
             // Interamente trasferito: va solo in "trasferiti"
@@ -623,7 +624,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                         <button class="btn-action btn-action-buy"      data-action="buy"     data-id="${id}" title="Acquisto">＋</button>
                         <button class="btn-action btn-action-sell"     data-action="sell"    data-id="${id}" title="Vendita">－</button>
                         <button class="btn-action btn-action-sim"      data-action="sim"     data-id="${id}" title="Simulazione">◎</button>
-                        <button class="btn-action" data-action="transfer" data-id="${id}" title="Trasferisci">🔀</button>
+                        ${groupClass !== 'row-transferred' ? `<button class="btn-action" data-action="transfer" data-id="${id}" title="Trasferisci">🔀</button>` : ''}
                         <button class="btn-action btn-action-delete"   data-action="delete"  data-id="${id}" title="Elimina">✕</button>
                     </div>
                 </td>`;
