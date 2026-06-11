@@ -759,6 +759,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
                 (params) => this._eseguiTrasferimento(params)
             ),
         };
+    }
         async _eseguiTrasferimento({ sourceAssetId, destPortfolioId, qty }) {
         const { Toast } = await import('../../core/toast.js');
         const sourceAsset = this.portfolio[sourceAssetId];
@@ -832,7 +833,6 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         await this._save();
         Toast.show(`🔀 ${sourceAsset.nome}: ${Calc.fmt(qty, 4)} unità trasferite`, 'ok');
     }
-    }
 
     async _aggiungiTitolo(item) {
     const active = this._getActivePortfolio();
@@ -891,5 +891,4 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
   Dividendi.clear(this.activePortfolioId);
   await this._save();
   Toast.show(`${nome} rimosso`, 'ok');
-}
 }
