@@ -33,19 +33,22 @@ function groupedSortedIds(portfolio, positionMap) {
     for (const id of ids) {
         const p   = portfolio[id];
         const txs = p.transactions || [];
-        const qtaRaw = positionMap ? (positionMap[id]?.qta ?? 0) : 0;
-        const qta = Math.max(0, qtaRaw - (p.transferredQuantity || 0));
+        const qta = positionMap ? (positionMap[id]?.qta ?? 0) : 0;
 
-        if (p.transferredQuantity > 0 && qta < 0.00001) {
-            // Interamente trasferito: va solo in "trasferiti"
+        // Calcola quantità trasferita dalle transazioni di tipo transfer in uscita
+        const qtaTrasferita = txs
+            .filter(tx => tx.type === 'transfer' && tx.destPortfolioId)
+            .reduce((s, tx) => s + (+tx.qty || 0), 0);
+
+        if (txs.length === 0) {
+            empty.push(id);
+        } else if (qtaTrasferita > 0 && qta < 0.00001) {
+            // Interamente trasferito
             transferred.push(id);
-        } else if (p.transferredQuantity > 0 && qta >= 0.00001) {
-            // Parzialmente trasferito: va in "attivi" (badge aggiunto in rendering)
-            // e anche in "trasferiti"
+        } else if (qtaTrasferita > 0 && qta >= 0.00001) {
+            // Parzialmente trasferito: appare in entrambe
             active.push(id);
             transferred.push(id);
-        } else if (txs.length === 0) {
-            empty.push(id);
         } else if (qta < 0.00001) {
             closed.push(id);
         } else {
@@ -538,14 +541,18 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 p.tipoAsset === 'bond'   ? '<span class="badge badge-bond">12.5%</span>'  :
                 p.tipoAsset === 'crypto' ? '<span class="badge badge-crypto">33%</span>'  : '';
 
+            const qtaTrasferita = (portfolio[id]?.transactions || [])
+                .filter(tx => tx.type === 'transfer' && tx.destPortfolioId)
+                .reduce((s, tx) => s + (+tx.qty || 0), 0);
+
             const statoBadge = groupClass === 'row-closed'
                 ? '<span class="badge-stato badge-closed">Chiuso</span>'
                 : groupClass === 'row-empty'
                 ? '<span class="badge-stato badge-empty">Vuoto</span>'
                 : groupClass === 'row-transferred'
                 ? '<span class="badge-stato badge-transferred">Trasferito</span>'
-                : portfolio[id]?.transferredQuantity > 0
-                ? `<span class="badge-stato badge-partial-transfer" title="Parzialmente trasferito: ${Calc.fmt(portfolio[id].transferredQuantity, 4)} unità">🔀 Parz.</span>`
+                : qtaTrasferita > 0
+                ? `<span class="badge-stato badge-partial-transfer" title="Parzialmente trasferito: ${Calc.fmt(qtaTrasferita, 4)} unità">🔀 Parz.</span>`
                 : '';
 
             const tr = document.createElement('tr');

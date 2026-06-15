@@ -763,7 +763,6 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         };
     }
         async _eseguiTrasferimento({ sourceAssetId, destPortfolioId, qty, transferDate }) {
-        const { Toast } = await import('../../core/toast.js');
         const sourceAsset = this.portfolio[sourceAssetId];
         const destPortfolio = this.portfolioState.portfolios[destPortfolioId];
         if (!sourceAsset || !destPortfolio) {
@@ -771,26 +770,29 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             throw new Error('not found');
         }
 
-        // PMC sorgente al momento del trasferimento
         const { pmc } = Calc.positionSync(sourceAsset);
         const now = new Date();
         const localToday = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         const today = transferDate || localToday;
         const transferId = 'T' + Date.now();
 
-        // ── 1. Aggiorna sorgente ───────────────────────────────────
-        sourceAsset.transferred = true;
-        sourceAsset.transferredAt = today;
-        sourceAsset.transferredTo = destPortfolioId;
-        sourceAsset.transferredQuantity = (sourceAsset.transferredQuantity || 0) + qty;
+        // ── 1. Transazione transfer nel sorgente ───────────────────
+        if (!sourceAsset.transactions) sourceAsset.transactions = [];
+        sourceAsset.transactions.push({
+            date: today,
+            type: 'transfer',
+            qty,
+            price: pmc,
+            commission: 0,
+            destPortfolioId,
+            transferId,
+        });
+        sourceAsset.transactions.sort((a, b) => a.date.localeCompare(b.date));
 
-        // ── 2. Scrivi transazione sintetica nel destinazione ───────
+        // ── 2. Crea asset nel destinazione se non esiste ───────────
         if (!destPortfolio.assets) destPortfolio.assets = {};
-
-        const destAssetId = sourceAssetId; // stesso id (ticker sanitizzato)
-        if (!destPortfolio.assets[destAssetId]) {
-            // Copia la struttura base dell'asset senza le transazioni originali
-            destPortfolio.assets[destAssetId] = {
+        if (!destPortfolio.assets[sourceAssetId]) {
+            destPortfolio.assets[sourceAssetId] = {
                 nome:      sourceAsset.nome,
                 ticker:    sourceAsset.ticker || sourceAsset.nome,
                 valuta:    sourceAsset.valuta || 'EUR',
@@ -801,37 +803,18 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             };
         }
 
-        const syntheticTx = {
-            date:         today,
-            type:         'buy',
-            qty:          qty,
-            price:        pmc,
-            commission:   0,
-            transferred:  true,
+        // ── 3. Transazione transfer nel destinazione ───────────────
+        const destAsset = destPortfolio.assets[sourceAssetId];
+        destAsset.transactions.push({
+            date: today,
+            type: 'transfer',
+            qty,
+            price: pmc,
+            commission: 0,
             sourcePortfolioId: this.activePortfolioId,
             transferId,
-        };
-
-        // Inserisci in ordine cronologico
-        const txs = destPortfolio.assets[destAssetId].transactions;
-        txs.push(syntheticTx);
-        txs.sort((a, b) => a.date.localeCompare(b.date));
-
-        // ── 3. Log trasferimento sul sorgente ─────────────────────
-        const activePortfolio = this._getActivePortfolio();
-        if (!activePortfolio.transfers) activePortfolio.transfers = {};
-        activePortfolio.transfers[transferId] = {
-            date:            today,
-            toPortfolioId:   destPortfolioId,
-            createdAt:       Date.now(),
-            tickers: {
-                [sourceAssetId]: {
-                    quantity:       qty,
-                    pmcAtTransfer:  pmc,
-                    currency:       sourceAsset.valuta || 'EUR',
-                }
-            }
-        };
+        });
+        destAsset.transactions.sort((a, b) => a.date.localeCompare(b.date));
 
         // ── 4. Salva e aggiorna UI ─────────────────────────────────
         await this._save();

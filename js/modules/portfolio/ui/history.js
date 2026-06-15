@@ -169,22 +169,19 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
             if (realIdx > -1) {
                 const tx = portfolio[id].transactions[realIdx];
 
-                // ── Logica bidirezionale trasferimento ─────────────
-                if (tx.transferred && tx.sourcePortfolioId && tx.transferId) {
-                    const srcPortfolio = window.__portfolioState__?.portfolios?.[tx.sourcePortfolioId];
-                    if (srcPortfolio) {
-                        const srcAsset = srcPortfolio.assets?.[id];
-                        if (srcAsset) {
-                            srcAsset.transferredQuantity = Math.max(0, (srcAsset.transferredQuantity || 0) - tx.qty);
-                            if (srcAsset.transferredQuantity < 0.00001) {
-                                delete srcAsset.transferred;
-                                delete srcAsset.transferredAt;
-                                delete srcAsset.transferredTo;
-                                delete srcAsset.transferredQuantity;
+                if (tx.type === 'transfer') {
+                    const linkedPortfolioId = tx.destPortfolioId || tx.sourcePortfolioId;
+                    const linkedPortfolio = window.__portfolioState__?.portfolios?.[linkedPortfolioId];
+                    if (linkedPortfolio) {
+                        const linkedAsset = linkedPortfolio.assets?.[id];
+                        if (linkedAsset) {
+                            const linkIdx = linkedAsset.transactions.findIndex(
+                                t => t.transferId === tx.transferId && t.type === 'transfer'
+                            );
+                            if (linkIdx > -1) linkedAsset.transactions.splice(linkIdx, 1);
+                            if (linkedAsset.transactions.length === 0) {
+                                delete linkedPortfolio.assets[id];
                             }
-                        }
-                        if (srcPortfolio.transfers?.[tx.transferId]) {
-                            delete srcPortfolio.transfers[tx.transferId];
                         }
                     }
                 }
@@ -202,7 +199,11 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
         }
         if (editBtn) {
             const origTx = txsSorted[+editBtn.dataset.idx];
-            openEditModal(id, origTx, portfolio, onSave, currency);
+            if (origTx.type === 'transfer') {
+                openTransferEditModal(id, origTx, portfolio, onSave, currency);
+            } else {
+                openEditModal(id, origTx, portfolio, onSave, currency);
+            }
         }
     };
 }
@@ -430,5 +431,106 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
         await onSave();
         renderHistoryContent(id, portfolio, onSave, currency);
         Toast.show('Transazione aggiornata', 'ok');
+    };
+}
+
+function openTransferEditModal(id, origTx, portfolio, onSave, currency) {
+    document.getElementById('modal-edit-transfer')?.remove();
+
+    const isSource = !!origTx.destPortfolioId;
+    const linkedPortfolioId = origTx.destPortfolioId || origTx.sourcePortfolioId;
+    const linkedPortfolioName = window.__portfolioState__?.portfolios?.[linkedPortfolioId]?.name || linkedPortfolioId;
+    const s = portfolio[id].valuta === 'USD' ? '$' : '€';
+
+    const wrap = document.createElement('div');
+    wrap.id = 'modal-edit-transfer';
+    wrap.className = 'overlay visible';
+    wrap.innerHTML = `
+        <div class="modal" style="border-top: 3px solid var(--warning);">
+            <div class="modal-header">
+                <h3>🔀 Modifica Trasferimento — ${portfolio[id].nome}</h3>
+                <button class="btn-x" id="edit-transfer-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="preview-box" style="margin-bottom:14px; font-size:13px;">
+                    <div style="display:flex;justify-content:space-between;">
+                        <span>${isSource ? 'Portafoglio destinazione' : 'Portafoglio origine'}</span>
+                        <b>${linkedPortfolioName}</b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:4px;">
+                        <span>Prezzo (PMC)</span>
+                        <b>${s} ${Calc.fmt(origTx.price)}</b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:4px;color:var(--text-muted);font-size:11px;">
+                        <span>Commissione</span><span>€ 0,00</span>
+                    </div>
+                </div>
+                <div class="form-grid-2">
+                    <div>
+                        <span class="modal-label">Data</span>
+                        <input type="date" id="edit-transfer-date" value="${origTx.date}">
+                    </div>
+                    <div>
+                        <span class="modal-label">Quantità (max: ${Calc.fmt(origTx.qty, 4)})</span>
+                        <input type="number" id="edit-transfer-qty" step="any" value="${origTx.qty}" min="0.0001" max="${origTx.qty}">
+                    </div>
+                </div>
+                <div style="padding:8px 10px;background:var(--bg2);border-radius:6px;font-size:12px;color:var(--text-muted);border:1px solid var(--border);margin-top:12px;">
+                    ⚠️ Prezzo e commissione non modificabili. La modifica aggiorna anche il portafoglio collegato.
+                </div>
+                <button id="edit-transfer-save" class="btn btn-warning btn-full" style="margin-top:16px;">💾 Salva Modifiche</button>
+                <button id="edit-transfer-cancel" class="btn btn-ghost btn-full" style="margin-top:8px;">Annulla</button>
+            </div>
+        </div>`;
+    document.body.appendChild(wrap);
+    lockScroll();
+
+    const close = () => { wrap.remove(); unlockScroll(); };
+    document.getElementById('edit-transfer-close').onclick = close;
+    document.getElementById('edit-transfer-cancel').onclick = close;
+
+    document.getElementById('edit-transfer-save').onclick = async () => {
+        const newDate = document.getElementById('edit-transfer-date').value;
+        const newQty  = parseFloat(document.getElementById('edit-transfer-qty').value);
+
+        if (!newDate || isNaN(newQty) || newQty <= 0 || newQty > origTx.qty + 0.00001) {
+            Toast.show('Dati non validi', 'err');
+            return;
+        }
+
+        const realIdx = portfolio[id].transactions.findIndex(
+            t => t.transferId === origTx.transferId && t.type === 'transfer'
+        );
+        if (realIdx > -1) {
+            portfolio[id].transactions[realIdx] = {
+                ...portfolio[id].transactions[realIdx],
+                date: newDate,
+                qty: newQty,
+            };
+            portfolio[id].transactions.sort((a, b) => a.date.localeCompare(b.date));
+        }
+
+        const linkedPortfolio = window.__portfolioState__?.portfolios?.[linkedPortfolioId];
+        if (linkedPortfolio) {
+            const linkedAsset = linkedPortfolio.assets?.[id];
+            if (linkedAsset) {
+                const linkIdx = linkedAsset.transactions.findIndex(
+                    t => t.transferId === origTx.transferId && t.type === 'transfer'
+                );
+                if (linkIdx > -1) {
+                    linkedAsset.transactions[linkIdx] = {
+                        ...linkedAsset.transactions[linkIdx],
+                        date: newDate,
+                        qty: newQty,
+                    };
+                    linkedAsset.transactions.sort((a, b) => a.date.localeCompare(b.date));
+                }
+            }
+        }
+
+        close();
+        await onSave();
+        renderHistoryContent(id, portfolio, onSave, currency);
+        Toast.show('Trasferimento aggiornato', 'ok');
     };
 }

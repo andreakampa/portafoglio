@@ -440,6 +440,56 @@ realizedTaxBreakdown({ gainEur, assetType, availableMinus = 0 }) {
                 : commRaw;
         totalComm += commRaw;
 
+        if (tx.type === 'transfer' && tx.destPortfolioId) {
+                // Uscita dal sorgente: si comporta come vendita a PMC (P&L = 0)
+                if (qta > 0) {
+                    const pmcEurCurrent = totalCostEur / qta;
+                    totalCostEur -= pmcEurCurrent * q;
+                    const pmcNativeCurrent = totalCostNative / qta;
+                    totalCostNative -= pmcNativeCurrent * q;
+                }
+                qta -= q;
+                if (qta < 0.00001) { qta = 0; pmcCost = 0; totalCostEur = 0; totalCostNative = 0; }
+                continue;
+            }
+            if (tx.type === 'transfer' && tx.sourcePortfolioId) {
+                // Entrata nel destinazione: si comporta come acquisto a prezzo = PMC sorgente
+                const newCost = (qta * pmcCost) + (q * pr);
+                qta += q;
+                pmcCost = qta > 0 ? newCost / qta : 0;
+                if (v === 'EUR') {
+                    totalCostEur += (q * pr);
+                    totalCostNative += (q * pr);
+                } else {
+                    const rate = getRate(tx);
+                    totalCostEur += (q * pr) / rate;
+                    totalCostNative += (q * pr);
+                }
+                continue;
+            }
+
+            if (tx.type === 'transfer' && tx.destPortfolioId) {
+                if (qta > 0) {
+                    const pmcEurCurrent = totalCostEur / qta;
+                    totalCostEur -= pmcEurCurrent * q;
+                }
+                qta -= q;
+                if (qta < 0.00001) { qta = 0; pmcCost = 0; totalCostEur = 0; }
+                continue;
+            }
+            if (tx.type === 'transfer' && tx.sourcePortfolioId) {
+                const newCost = (qta * pmcCost) + (q * pr);
+                qta += q;
+                pmcCost = qta > 0 ? newCost / qta : 0;
+                if (v === 'EUR') {
+                    totalCostEur += (q * pr);
+                } else {
+                    const rate = getRateSync(tx);
+                    totalCostEur += (q * pr) / rate;
+                }
+                continue;
+            }
+
         if (tx.type === 'buy') {
             const newCost = (qta * pmcCost) + (q * pr) + c;
             qta += q;
