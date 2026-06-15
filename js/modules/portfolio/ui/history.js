@@ -96,7 +96,22 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
         let tradePnL = null;
         let tradePnLEur = null;
 
-        if (tx.type === 'buy') {
+        if (tx.type === 'transfer' && tx.destPortfolioId) {
+            // Uscita dal sorgente: riduce quantità a PMC, P&L = 0
+            if (rQta > 0) rCostEur -= (rCostEur / rQta) * q;
+            rQta -= q;
+            if (rQta < 0.00001) { rQta = 0; rPmc = 0; rCostEur = 0; }
+        } else if (tx.type === 'transfer' && tx.sourcePortfolioId) {
+            // Entrata nel destinazione: acquisto a PMC sorgente, P&L = 0
+            const newCost = (rQta * rPmc) + (q * pr);
+            rPmc = (rQta + q) > 0 ? newCost / (rQta + q) : 0;
+            rQta += q;
+            if (isUSD) {
+                rCostEur += (q * pr) / txRate;
+            } else {
+                rCostEur += (q * pr);
+            }
+        } else if (tx.type === 'buy') {
             const newCost = (rQta * rPmc) + (q * pr) + c;
             rPmc = (rQta + q) > 0 ? newCost / (rQta + q) : 0;
             rQta += q;
@@ -118,21 +133,22 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
             rQta -= q;
             if (rQta < 0.00001) { rQta = 0; rPmc = 0; rCostEur = 0; }
         }
-        const totale = tx.type === 'buy' ? q * pr + c : q * pr - c;
+        const totale = tx.type === 'buy' ? q * pr + c : tx.type === 'transfer' ? q * pr : q * pr - c;
         const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
         const pnlTax  = tradePnLEur !== null && tradePnLEur > 0 ? tradePnLEur * taxPct : 0;
         const pnlNetto = tradePnLEur !== null ? tradePnLEur - pnlTax : null;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${tx.date}${tx.source === 'pac' ? ' <span style="display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">↻ PAC</span>' : ''}${(() => {
+            <td>${tx.date}${tx.source === 'pac' ? ' <span style="display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">↻ PAC</span>' : ''}${(() => 
+                {
     if (!isUSD) return '';
     const isRecent = !Exchange._memoryCache.get(tx.date)?.rate;
     const hasManual = tx.exchangeRate > 0;
     if (!hasManual && isRecent) return ' <span title="Tasso BCE non disponibile per questa data — considera di inserire il tasso manualmente" style="cursor:help;color:var(--warning);">⚠️</span>';
     return '';
 })()}</td>
-            <td class="${tx.transferred ? 'tx-transfer' : tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.transferred ? '🔀 Trasf.' : tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
+            <td class="${tx.type === 'transfer' ? 'tx-transfer' : tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${tx.type === 'transfer' ? '🔀 Trasf.' : tx.type === 'buy' ? '🟢 Acq.' : '🔴 Vend.'}</td>
             <td>${Calc.fmt(q, 4)}</td>
             <td>${s} ${Calc.fmt(pr)}</td>
             <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}</td>
