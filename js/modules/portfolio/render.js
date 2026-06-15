@@ -567,17 +567,34 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                     ${varHtml}
                     ${week52Bar(id, prLive, week52Lows, week52Highs)}
                 </td>
-                <td>${(() => {
-    if (qta <= 0 || prPrev === null) return '—';
-    const dailyPnLNative = (prLive - prPrev) * qta;
-    const dailyPnL = cv(dailyPnLNative);
-    const extMarketPnL = extMarket ? cv((extMarket.price - prLive) * qta) : null;
-    return `
-        <div style="display:flex;flex-direction:column;gap:2px;">
-            <span class="${dailyPnL >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${dailyPnL >= 0 ? '+' : ''}${s} ${Calc.fmt(dailyPnL)}</span>
-            <span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fs-xs">${Calc.fmtSign(varDay)}%</span>
-            ${extMarketPnL !== null ? `<span style="font-size:10px;color:var(--text-muted);">${extMarket.label} ${extMarketPnL >= 0 ? '+' : ''}${s} ${Calc.fmt(extMarketPnL)} <span class="${extMarket.diff >= 0 ? 'text-success' : 'text-danger'}">${Calc.fmtSign(extMarket.diff)}%</span></span>` : ''}
-        </div>`;
+               <td>${(() => {
+    const hasPosition = qta > 0 && prPrev !== null;
+    const dailyPnL = hasPosition ? cv((prLive - prPrev) * qta) : null;
+
+    const priceRow = prPrev !== null
+        ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fs-xs">${Calc.fmtSign(varDay)}%</span>`
+        : '<span class="text-muted fs-xs">—</span>';
+
+    const pnlRow = dailyPnL !== null
+        ? `<span class="${dailyPnL >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${dailyPnL >= 0 ? '+' : ''}${s} ${Calc.fmt(dailyPnL)}</span>`
+        : '';
+
+    const extRow = extMarket ? (() => {
+        const extPnL = hasPosition ? cv((extMarket.price - prLive) * qta) : null;
+        const colorClass = extMarket.diff >= 0 ? 'text-success' : 'text-danger';
+        const pnlPart = extPnL !== null
+            ? ` <span style="color:var(--text-muted);">→ ${extPnL >= 0 ? '+' : ''}${s} ${Calc.fmt(extPnL)}</span>`
+            : '';
+        return `<span style="font-size:10px;color:var(--text-muted);">${extMarket.label} <b>${Calc.fmt(extMarket.price)}</b> <span class="${colorClass}">${Calc.fmtSign(extMarket.diff)}%</span>${pnlPart}</span>`;
+    })() : '';
+
+    if (!pnlRow && !extRow) return '—';
+
+    return `<div style="display:flex;flex-direction:column;gap:2px;">
+        ${pnlRow}
+        ${priceRow}
+        ${extRow}
+    </div>`;
 })()}</td>
                 <td>${invEur > 0 ? costoDisplay : '—'}</td>
                 <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
@@ -669,11 +686,11 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
         });
         tbody.appendChild(toggleRow);
     }
-    if (renderTable._showEmpty) renderGroup(empty, 'row-empty', '⬜ Titoli senza operazioni', true, '_showEmpty');
+    if (renderTable._showEmpty) renderGroup(empty, 'row-empty', '👁 Watchlist', true, '_showEmpty');
     else if (empty.length) {
         const toggleRow = document.createElement('tr');
         toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="12">— Mostra titoli vuoti (${empty.length}) —</td>`;
+        toggleRow.innerHTML = `<td colspan="12">— Mostra watchlist (${empty.length}) —</td>`;
         toggleRow.addEventListener('click', () => {
             renderTable._showEmpty = true;
             renderTable._refresh && renderTable._refresh();
