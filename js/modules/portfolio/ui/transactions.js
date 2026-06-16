@@ -26,9 +26,9 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                     <div>
                         <span class="modal-label">
                             Quantità
-                            ${!isBuy ? `<button id="tx-qta-max" style="margin-left:6px;padding:1px 7px;font-size:10px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;vertical-align:middle;">MAX</button>` : ''}
+                            ${!isBuy ? `<span class="text-muted fs-xs">(max: ${Calc.fmt(qta, 4)})</span> <button id="tx-qta-max" style="margin-left:6px;padding:1px 7px;font-size:10px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;vertical-align:middle;">MAX</button>` : ''}
                         </span>
-                        <input type="number" id="tx-qta" step="any" placeholder="0">
+                        <input type="number" id="tx-qta" step="any" placeholder="0" ${!isBuy ? `max="${qta}"` : ''}>
                     </div>
                     <div>
                         <span class="modal-label">Prezzo Eseguito</span>
@@ -195,6 +195,10 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
             }
         }
 
+        if (q > qta + 0.0001) {
+            box.innerHTML = `<span style="color:var(--danger);">⚠️ Quantità superiore al disponibile (${Calc.fmt(qta, 4)})</span>`;
+            return;
+        }
         box.innerHTML = `
             Incasso lordo: <b>${s} ${Calc.fmt(q * pr - cNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)<br>
             P&L lordo: <b class="${pnlLordo >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordo)}</b><br>
