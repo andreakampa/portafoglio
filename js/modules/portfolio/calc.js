@@ -207,7 +207,7 @@ export const Calc = {
 
     _holdingSignature(holding) {
         const txs = (holding?.transactions || [])
-            .map(tx => [tx.date, tx.type, tx.qty, tx.price, tx.commission || 0, tx.exchangeRate || ''].join('|'))
+            .map(tx => [tx.date, tx.type, tx.qty, tx.price, tx.commission || 0, tx.exchangeRate || '', tx.destPortfolioId || '', tx.sourcePortfolioId || ''].join('|'))
             .join('||');
         return [holding?.id || '', holding?.simbolo || '', holding?.valuta || 'EUR', holding?._legacyRealizedPnL || 0, txs].join('###');
     },

@@ -656,12 +656,14 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
 })()}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="btn-action btn-action-history"  data-action="history" data-id="${id}" title="Storico">📜</button>
-                        <button class="btn-action btn-action-buy"      data-action="buy"     data-id="${id}" title="Acquisto">＋</button>
-                        <button class="btn-action btn-action-sell"     data-action="sell"    data-id="${id}" title="Vendita">－</button>
-                        <button class="btn-action btn-action-sim"      data-action="sim"     data-id="${id}" title="Simulazione">◎</button>
-                        ${groupClass !== 'row-transferred' ? `<button class="btn-action" data-action="transfer" data-id="${id}" title="Trasferisci">🔀</button>` : ''}
-                        <button class="btn-action btn-action-delete"   data-action="delete"  data-id="${id}" title="Elimina">✕</button>
+                        <button class="btn-action btn-action-history" data-action="history" data-id="${id}" title="Storico">📜</button>
+                        ${groupClass !== 'row-transferred' ? `
+                        <button class="btn-action btn-action-buy"  data-action="buy"      data-id="${id}" title="Acquisto">＋</button>
+                        <button class="btn-action btn-action-sell" data-action="sell"     data-id="${id}" title="Vendita">－</button>
+                        <button class="btn-action btn-action-sim"  data-action="sim"      data-id="${id}" title="Simulazione">◎</button>
+                        <button class="btn-action"                 data-action="transfer" data-id="${id}" title="Trasferisci">🔀</button>
+                        <button class="btn-action btn-action-delete" data-action="delete" data-id="${id}" title="Elimina">✕</button>
+                        ` : ''}
                     </div>
                 </td>`;
             tbody.appendChild(tr);
