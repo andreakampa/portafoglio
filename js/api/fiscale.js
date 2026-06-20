@@ -40,6 +40,20 @@ export function calcolaMinusvalenze(portfolio) {
             const pr = +tx.price || 0;
             const c = +(tx.commission || 0);
 
+            // Trasferimento in uscita: riduce qta a PMC invariato, nessuna minus/plus
+            if (tx.type === 'transfer' && tx.destPortfolioId) {
+                rQta -= q;
+                if (rQta < 0.00001) { rQta = 0; rPmc = 0; }
+                continue;
+            }
+
+            // Trasferimento in entrata: acquisto al PMC di provenienza, nessuna minus/plus
+            if (tx.type === 'transfer' && tx.sourcePortfolioId) {
+                const newCost = (rQta * rPmc) + (q * pr);
+                rQta += q;
+                rPmc = rQta > 0 ? newCost / rQta : 0;
+                continue;
+            }
 
             if (tx.type === 'buy') {
                 const newCost = (rQta * rPmc) + (q * pr) + c;
@@ -364,6 +378,9 @@ function attachManualLossHandlers() {
 
             if (!pf.fiscal) pf.fiscal = { manualLosses: [] };
             const losses = ensureManualLosses(pf.fiscal);
+            const target = losses[idx];
+
+            if (!confirm(`Eliminare la minusvalenza "${target?.title || 'senza nome'}" di € ${Calc.fmt(target?.amount || 0)}?`)) return;
 
             losses.splice(idx, 1);
 

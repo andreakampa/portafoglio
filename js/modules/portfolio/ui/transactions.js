@@ -50,6 +50,13 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                         <input type="number" id="tx-fx" step="any" placeholder="caricamento...">
                     </div>` : ''}
                 </div>
+                ${!isBuy ? `
+                <div style="display:flex; gap:8px; margin-top:14px;">
+                    <button type="button" id="tx-mode-normale" class="btn btn-ghost" style="flex:1; font-weight:700;">Vendita normale</button>
+                    <button type="button" id="tx-mode-lotti" class="btn btn-ghost" style="flex:1; font-weight:700;">📦 Vendita a lotti</button>
+                </div>
+                <div id="tx-lotti-panel" style="display:none; margin-top:10px;"></div>
+                ` : ''}
                 <div id="tx-preview" class="preview-box" style="display:none; margin-top:14px;"></div>
                 <button id="tx-confirm" class="btn ${isBuy ? 'btn-success' : 'btn-purple'} btn-full" style="margin-top:16px;">
                     Conferma ${isBuy ? 'Acquisto' : 'Vendita'}
@@ -80,11 +87,117 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
     document.getElementById('tx-close').onclick  = closeModal;
     document.getElementById('tx-cancel').onclick = closeModal;
 
+    let saleMode = 'normale';
+
     if (!isBuy) {
         document.getElementById('tx-qta-max').onclick = () => {
             document.getElementById('tx-qta').value = qta;
             preview();
         };
+
+        const btnNormale = document.getElementById('tx-mode-normale');
+        const btnLotti   = document.getElementById('tx-mode-lotti');
+        const lottiPanel = document.getElementById('tx-lotti-panel');
+        const qtaInput   = document.getElementById('tx-qta');
+        const maxBtn     = document.getElementById('tx-qta-max');
+
+        const setActiveBtn = (active) => {
+            [btnNormale, btnLotti].forEach(b => { b.style.background = ''; b.style.color = ''; });
+            active.style.background = 'var(--purple)';
+            active.style.color = '#fff';
+        };
+        setActiveBtn(btnNormale);
+
+        btnNormale.onclick = () => {
+            saleMode = 'normale';
+            setActiveBtn(btnNormale);
+            lottiPanel.style.display = 'none';
+            qtaInput.readOnly = false;
+            qtaInput.value = '';
+            if (maxBtn) maxBtn.style.display = '';
+            preview();
+        };
+
+        btnLotti.onclick = () => {
+            saleMode = 'lotti';
+            setActiveBtn(btnLotti);
+            lottiPanel.style.display = 'block';
+            qtaInput.readOnly = true;
+            if (maxBtn) maxBtn.style.display = 'none';
+            renderLottiPanel();
+        };
+    }
+
+    function renderLottiPanel() {
+        const panel = document.getElementById('tx-lotti-panel');
+        if (!panel) return;
+        const lots = Calc.getLots(p, activePortfolio?.taxRegime || 'amministrato');
+        if (!lots.length) {
+            panel.innerHTML = `<div class="text-muted fs-xs">Nessun lotto disponibile.</div>`;
+            return;
+        }
+        panel.innerHTML = lots.map(l => `
+            <div class="lotto-row" style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border);">
+                <div style="flex:1;">
+                    <div style="font-weight:600;">${l.date}</div>
+                    <div class="text-muted fs-xs">Disponibili: ${Calc.fmt(l.qtyResidua, 4)} · PMC lotto: ${Calc.fmt(l.price)}</div>
+                </div>
+                <input type="number" class="lotto-qty-input" data-lot-id="${l.id}" step="any" min="0" max="${l.qtyResidua}" placeholder="0" style="width:90px;">
+            </div>
+        `).join('');
+
+        panel.querySelectorAll('.lotto-qty-input').forEach(inp => {
+            inp.oninput = () => previewLotti(lots);
+        });
+
+        previewLotti(lots);
+    }
+
+    function previewLotti(lots) {
+        const panel = document.getElementById('tx-lotti-panel');
+        const pr = parseFloat(document.getElementById('tx-prezzo').value) || 0;
+        const cTotale = parseFloat(document.getElementById('tx-comm').value) || 0;
+
+        let qtyTotale = 0;
+        const righe = [];
+        panel.querySelectorAll('.lotto-qty-input').forEach(inp => {
+            const q = parseFloat(inp.value) || 0;
+            if (q <= 0) return;
+            const lot = lots.find(l => l.id === inp.dataset.lotId);
+            if (!lot) return;
+            qtyTotale += q;
+            righe.push({ lot, q });
+        });
+
+        document.getElementById('tx-qta').value = qtyTotale || '';
+
+        const box = document.getElementById('tx-preview');
+        if (qtyTotale <= 0) { box.style.display = 'none'; return; }
+        box.style.display = 'block';
+
+        let pnlLordoTotale = 0;
+        const dettaglio = righe.map(({ lot, q }) => {
+            const commProrata = qtyTotale > 0 ? (cTotale * q / qtyTotale) : 0;
+            const costoLotto  = (lot.price * q) + (lot.commission * q / lot.qtyOriginal);
+            const ricavo      = (pr * q) - commProrata;
+            const pnl         = ricavo - costoLotto;
+            pnlLordoTotale   += pnl;
+            const pnlPct      = costoLotto > 0 ? (pnl / costoLotto) * 100 : 0;
+            return `<div class="text-muted fs-xs">${lot.date}: ${Calc.fmt(q, 4)} pz → <b class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnl)}</b> (${pnlPct >= 0 ? '+' : ''}${Calc.fmt(pnlPct)}%)</div>`;
+        }).join('');
+
+        const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
+        const tax     = pnlLordoTotale > 0 ? pnlLordoTotale * taxPct : 0;
+        const pnlNetto = pnlLordoTotale - tax;
+
+        box.innerHTML = `
+            <div style="margin-bottom:6px;">Dettaglio per lotto:</div>
+            ${dettaglio}
+            <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+                P&L lordo totale: <b class="${pnlLordoTotale >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlLordoTotale)}</b><br>
+                ${pnlLordoTotale > 0 ? `Tasse teoriche: <b class="neg-loss">− € ${Calc.fmt(tax)}</b><br>` : ''}
+                P&L netto teorico: <b class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNetto)}</b>
+            </div>`;
     }
 
     const preview = () => txPreview(id, type, portfolio, prices, activePortfolio);
@@ -109,6 +222,19 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                 return;
             }
         }
+        let lotAllocation = null;
+        if (type === 'sell' && saleMode === 'lotti') {
+            lotAllocation = [];
+            document.querySelectorAll('.lotto-qty-input').forEach(inp => {
+                const qLotto = parseFloat(inp.value) || 0;
+                if (qLotto > 0) lotAllocation.push({ lotId: inp.dataset.lotId, qty: qLotto });
+            });
+            if (!lotAllocation.length) {
+                Toast.show('Seleziona almeno un lotto', 'err');
+                return;
+            }
+        }
+
         if (!portfolio[id].transactions) portfolio[id].transactions = [];
         const fxInp = document.getElementById('tx-fx');
         const fxSave = fxInp ? parseFloat(fxInp.value) : NaN;
@@ -116,7 +242,9 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
         portfolio[id].transactions.push({
             date: dt, type, qty: q, price: pr, commission: c,
             ...(commCurrency !== 'EUR' ? { commissionCurrency: commCurrency } : {}),
-            ...(fxSave > 0 ? { exchangeRate: fxSave } : {})
+            ...(fxSave > 0 ? { exchangeRate: fxSave } : {}),
+            ...(type === 'sell' ? { saleMode } : {}),
+            ...(lotAllocation ? { lotAllocation } : {})
         });
         closeModal();
         await onSave();

@@ -327,6 +327,73 @@ export const Calc = {
         catch (err) { this._positionCache.delete(sig); throw err; }
     },
 
+    // Calcola i lotti residui di una posizione (acquisti/trasferimenti-in come lotti,
+// vendite/trasferimenti-out come consumo di lotti).
+getLots(holding, taxRegime = 'amministrato') {
+    const txs = (holding.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    let lots = []; // { id, date, qtyOriginal, qtyResidua, price, commission }
+    const dateCounters = {};
+
+    const isLotCreating  = (tx) => tx.type === 'buy' || (tx.type === 'transfer' && tx.sourcePortfolioId);
+    const isLotConsuming = (tx) => tx.type === 'sell' || (tx.type === 'transfer' && tx.destPortfolioId);
+
+    const consumaProporzionale = (qty) => {
+        const totaleResiduo = lots.reduce((s, l) => s + l.qtyResidua, 0);
+        if (totaleResiduo <= 0) return;
+        for (const lot of lots) {
+            const quota = lot.qtyResidua / totaleResiduo;
+            lot.qtyResidua = Math.max(0, lot.qtyResidua - qty * quota);
+        }
+    };
+
+    for (const tx of txs) {
+        const q = +tx.qty || 0;
+        if (q <= 0) continue;
+
+        if (isLotCreating(tx)) {
+            const occorrenza = dateCounters[tx.date] || 0;
+            dateCounters[tx.date] = occorrenza + 1;
+            lots.push({
+                id: `${tx.date}#${occorrenza}`,
+                date: tx.date,
+                qtyOriginal: q,
+                qtyResidua: q,
+                price: +tx.price || 0,
+                commission: tx.type === 'buy' ? +(tx.commission || 0) : 0
+            });
+            continue;
+        }
+
+        if (isLotConsuming(tx)) {
+            let toConsume = q;
+
+            if (Array.isArray(tx.lotAllocation) && tx.lotAllocation.length) {
+                for (const alloc of tx.lotAllocation) {
+                    const lot = lots.find(l => l.id === alloc.lotId);
+                    if (!lot) continue;
+                    const used = Math.min(lot.qtyResidua, +alloc.qty || 0);
+                    lot.qtyResidua -= used;
+                    toConsume -= used;
+                }
+                if (toConsume > 0.00001) consumaProporzionale(toConsume);
+            } else if (tx.saleMode === 'normale' && taxRegime === 'dichiarativo') {
+                for (let i = lots.length - 1; i >= 0 && toConsume > 0.00001; i--) {
+                    const lot = lots[i];
+                    const used = Math.min(lot.qtyResidua, toConsume);
+                    lot.qtyResidua -= used;
+                    toConsume -= used;
+                }
+            } else {
+                consumaProporzionale(toConsume);
+            }
+
+            lots = lots.filter(l => l.qtyResidua > 0.00001);
+        }
+    }
+
+    return lots;
+},
+
     positionSync(holding) {
         const sig = this._holdingSignature(holding);
         if (this._positionSyncCache.has(sig)) return this._positionSyncCache.get(sig);
