@@ -136,15 +136,24 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
             panel.innerHTML = `<div class="text-muted fs-xs">Nessun lotto disponibile.</div>`;
             return;
         }
-        panel.innerHTML = lots.map(l => `
-            <div class="lotto-row" style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border);">
-                <div style="flex:1;">
-                    <div style="font-weight:600;">${l.date}</div>
-                    <div class="text-muted fs-xs">Disponibili: ${Calc.fmt(l.qtyResidua, 4)} · PMC lotto: ${Calc.fmt(l.price)}</div>
-                </div>
-                <input type="number" class="lotto-qty-input" data-lot-id="${l.id}" step="any" min="0" max="${l.qtyResidua}" placeholder="0" style="width:90px;">
-            </div>
-        `).join('');
+        const isUSD = p.valuta === 'USD';
+        const sym = isUSD ? '$' : '€';
+
+        panel.innerHTML = lots.map(l => {
+            let pmcLabel = `${sym} ${Calc.fmt(l.price)}`;
+            if (isUSD) {
+                const lotRate = l.exchangeRate || Exchange._memoryCache.get(l.date)?.rate || Exchange.rate || 1;
+                pmcLabel += ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(l.price / lotRate)})</span>`;
+            }
+            return `
+                <div class="lotto-row" style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border);">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;">${l.date}</div>
+                        <div class="text-muted fs-xs">Disponibili: ${Calc.fmt(l.qtyResidua, 4)} · PMC lotto: ${pmcLabel}</div>
+                    </div>
+                    <input type="number" class="lotto-qty-input" data-lot-id="${l.id}" step="any" min="0" max="${l.qtyResidua}" placeholder="0" style="width:90px;">
+                </div>`;
+        }).join('');
 
         panel.querySelectorAll('.lotto-qty-input').forEach(inp => {
             inp.oninput = () => previewLotti(lots);
@@ -155,8 +164,22 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
 
     function previewLotti(lots) {
         const panel = document.getElementById('tx-lotti-panel');
+        const dt = document.getElementById('tx-data').value;
         const pr = parseFloat(document.getElementById('tx-prezzo').value) || 0;
-        const cTotale = parseFloat(document.getElementById('tx-comm').value) || 0;
+        const cInput = parseFloat(document.getElementById('tx-comm').value) || 0;
+        const commCurrency = document.getElementById('tx-comm-currency')?.value || 'EUR';
+        const isUSD = p.valuta === 'USD';
+        const sym = isUSD ? '$' : '€';
+        const cachedRate = Exchange._memoryCache.get(dt)?.rate || Exchange.rate || 1;
+
+        let cNative;
+        if (commCurrency === (isUSD ? 'USD' : 'EUR')) {
+            cNative = cInput;
+        } else if (commCurrency === 'USD' && !isUSD) {
+            cNative = cInput / cachedRate;
+        } else {
+            cNative = cInput * cachedRate;
+        }
 
         let qtyTotale = 0;
         const righe = [];
@@ -175,28 +198,40 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
         if (qtyTotale <= 0) { box.style.display = 'none'; return; }
         box.style.display = 'block';
 
-        let pnlLordoTotale = 0;
+        let pnlNativoTotale = 0;
+        let pnlEurTotale = 0;
+
         const dettaglio = righe.map(({ lot, q }) => {
-            const commProrata = qtyTotale > 0 ? (cTotale * q / qtyTotale) : 0;
-            const costoLotto  = (lot.price * q) + (lot.commission * q / lot.qtyOriginal);
-            const ricavo      = (pr * q) - commProrata;
-            const pnl         = ricavo - costoLotto;
-            pnlLordoTotale   += pnl;
-            const pnlPct      = costoLotto > 0 ? (pnl / costoLotto) * 100 : 0;
-            return `<div class="text-muted fs-xs">${lot.date}: ${Calc.fmt(q, 4)} pz → <b class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnl)}</b> (${pnlPct >= 0 ? '+' : ''}${Calc.fmt(pnlPct)}%)</div>`;
+            const commProrata  = qtyTotale > 0 ? (cNative * q / qtyTotale) : 0;
+            const costoNativo  = (lot.price * q) + (lot.commission * q / lot.qtyOriginal);
+            const ricavoNativo = (pr * q) - commProrata;
+            const pnlNativo    = ricavoNativo - costoNativo;
+            pnlNativoTotale   += pnlNativo;
+
+            const lotRate   = lot.exchangeRate || Exchange._memoryCache.get(lot.date)?.rate || Exchange.rate || 1;
+            const costoEur  = isUSD ? costoNativo / lotRate : costoNativo;
+            const ricavoEur = isUSD ? ricavoNativo / cachedRate : ricavoNativo;
+            const pnlEur    = ricavoEur - costoEur;
+            pnlEurTotale   += pnlEur;
+
+            const pnlPct  = costoNativo > 0 ? (pnlNativo / costoNativo) * 100 : 0;
+            const eurHint = isUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlEur)})</span>` : '';
+            return `<div class="text-muted fs-xs">${lot.date}: ${Calc.fmt(q, 4)} pz → <b class="${pnlNativo >= 0 ? 'pos-gain' : 'neg-loss'}">${sym} ${Calc.fmt(pnlNativo)}</b>${eurHint} (${pnlPct >= 0 ? '+' : ''}${Calc.fmt(pnlPct)}%)</div>`;
         }).join('');
 
-        const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
-        const tax     = pnlLordoTotale > 0 ? pnlLordoTotale * taxPct : 0;
-        const pnlNetto = pnlLordoTotale - tax;
+        const taxPct        = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
+        const baseImponibile = isUSD ? pnlEurTotale : pnlNativoTotale;
+        const tax            = baseImponibile > 0 ? baseImponibile * taxPct : 0;
+        const pnlNettoEur    = baseImponibile - tax;
 
         box.innerHTML = `
             <div style="margin-bottom:6px;">Dettaglio per lotto:</div>
             ${dettaglio}
             <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
-                P&L lordo totale: <b class="${pnlLordoTotale >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlLordoTotale)}</b><br>
-                ${pnlLordoTotale > 0 ? `Tasse teoriche: <b class="neg-loss">− € ${Calc.fmt(tax)}</b><br>` : ''}
-                P&L netto teorico: <b class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNetto)}</b>
+                P&L lordo totale: <b class="${pnlNativoTotale >= 0 ? 'pos-gain' : 'neg-loss'}">${sym} ${Calc.fmt(pnlNativoTotale)}</b>
+                ${isUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlEurTotale)})</span>` : ''}<br>
+                ${baseImponibile > 0 ? `Tasse teoriche (su € ${Calc.fmt(baseImponibile)}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b><br>` : ''}
+                P&L netto teorico: <b class="${pnlNettoEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNettoEur)}</b>
             </div>`;
     }
 

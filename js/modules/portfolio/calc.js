@@ -359,7 +359,8 @@ getLots(holding, taxRegime = 'amministrato') {
                 qtyOriginal: q,
                 qtyResidua: q,
                 price: +tx.price || 0,
-                commission: tx.type === 'buy' ? +(tx.commission || 0) : 0
+                commission: tx.type === 'buy' ? +(tx.commission || 0) : 0,
+                exchangeRate: tx.exchangeRate ? parseFloat(tx.exchangeRate) : null
             });
             continue;
         }
