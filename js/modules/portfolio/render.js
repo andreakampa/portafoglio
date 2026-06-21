@@ -425,17 +425,7 @@ const pnlAfterTaxEur = pnlEur - taxEur;
             fxEffect = attEurConTassoAttuale - attEurConTassoStorico;
         }
 
-        // Effetto cambio realizzato
-        let fxEffectRealized = null;
-        if (v === 'USD' && pos.realizedPnL !== 0) {
-            const tassoStorico = pos.totalCostNative > 0 && pos.totalCostEur > 0
-                ? pos.totalCostNative / pos.totalCostEur
-                : rate;
-            const realizedUSD = pos.realizedPnL;
-            fxEffectRealized = (realizedUSD / rate) - (realizedUSD / tassoStorico);
-        }
-
-map[id] = {
+        map[id] = {
     ...pos,
     prLive,
     inv,
@@ -452,7 +442,6 @@ map[id] = {
     pnlAfterTaxEur,
     valuta: v,
     fxEffect,
-    fxEffectRealized,
 };
     });
 
@@ -607,7 +596,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
                 <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                     ${att > 0
-    ? `${currency === 'EUR' ? (pnlEurPuro < 0 ? '-' : '') : (cv(pnl) < 0 ? '-' : '')}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEurPuro : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">fx ⇄  ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
+    ? `${currency === 'EUR' ? (pnlEur < 0 ? '-' : '') : (cv(pnl) < 0 ? '-' : '')}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEur : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">di cui cambio: ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
     : '—'}
                 </td>
                 <td>
@@ -622,14 +611,15 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 </td>
                 <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
                     ${realizedPnL !== 0
-                        ? `${s} ${Calc.fmt(cv(realizedPnL))}${pos?.fxEffectRealized != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">fx ⇄ ${pos.fxEffectRealized >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffectRealized)}</span>` : ''}`
+                        ? `${s} ${Calc.fmt(currency === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, 'EUR', currency))}`
                         : '—'}
                 </td>
                 <td>${(() => {
     if (realizedPnL === 0) return '—';
 
-    const realizedEur =
-        v === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, v, 'EUR');
+    // pos.realizedPnL è già in € (Calc.position() lo accumula così
+    // anche per gli asset non-EUR, al cambio storico di ogni vendita).
+    const realizedEur = realizedPnL;
 
     const breakdown = Calc.realizedTaxBreakdown({
         gainEur: realizedEur,
@@ -933,6 +923,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                 att = 0,
                 pnl = 0,
                 pnlP = 0,
+                pnlEur = 0,
                 tax = 0,
                 pnlAfterTax = 0,
                 taxEur = 0,
@@ -961,7 +952,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
             const unrealizedNetShown = currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax);
             const unrealizedTaxShown = currency === 'EUR' ? taxEur : cv(tax);
 
-            const realizedEur = v === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, v, 'EUR');
+            const realizedEur = realizedPnL; // già in €
             const realizedBreakdown = Calc.realizedTaxBreakdown({
                 gainEur: realizedEur,
                 assetType: p.tipoAsset,
@@ -998,7 +989,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                         </div>
                     </div>
                     <div class="mobile-card-right">
-                        <span class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${att > 0 ? `${s} ${Calc.fmt(cv(pnl))}` : '—'}</span>
+                        <span class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${att > 0 ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))}` : '—'}</span>
                         <span class="fs-xs ${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${att > 0 ? `(${Calc.fmtSign(pnlP)}%)` : ''}</span>
                     </div>
                     <span class="mobile-card-arrow">›</span>
@@ -1041,7 +1032,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                     <div class="mobile-card-row">
                         <span class="text-muted">P&L Realizzato Lordo</span>
                         <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
-                            ${realizedPnL !== 0 ? `${s} ${Calc.fmt(cv(realizedPnL))}` : '—'}
+                            ${realizedPnL !== 0 ? `${s} ${Calc.fmt(currency === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, 'EUR', currency))}` : '—'}
                         </span>
                     </div>
                     <div class="mobile-card-row">
