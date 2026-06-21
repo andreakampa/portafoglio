@@ -295,7 +295,7 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
     const box = document.getElementById('tx-preview');
     if (isNaN(q) || isNaN(pr) || q <= 0) { box.style.display = 'none'; return; }
 
-    const { qta, pmc } = Calc.positionSync(portfolio[id]);
+    const { qta, pmc, pmcEur } = Calc.positionSync(portfolio[id]);
     const p = portfolio[id];
     const s = p.valuta === 'USD' ? '$' : '€';
     const assetIsUSD = p.valuta === 'USD';
@@ -328,15 +328,20 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
             Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
             Nuova Q.tà: <b>${Calc.fmt(newQta, 4)}</b>`;
     } else {
-        const pnlLordo = (pr - pmc) * q - cNative;
-        const taxPct   = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
-        const taxLabel = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
-        const tax      = pnlLordo > 0 ? pnlLordo * taxPct : 0;
-        const pnlNetto = pnlLordo - tax;
+        const pnlLordoNative = (pr - pmc) * q - cNative;
+        const costoBaseEur   = (pmcEur || pmc) * q;
+        const proceedsEur    = assetIsUSD ? ((q * pr - cNative) / cachedRate) : (q * pr - cNative);
+        const pnlLordoEur    = proceedsEur - costoBaseEur;
 
-        // Calcola minusvalenze disponibili se regime amministrato
+        const taxPct      = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
+        const taxLabel     = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
+        const tax          = pnlLordoEur > 0 ? pnlLordoEur * taxPct : 0;
+        const pnlNettoEur  = pnlLordoEur - tax;
+        const eurHint      = assetIsUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlLordoEur)})</span>` : '';
+
+        // Calcola minusvalenze disponibili se regime amministrato (sempre in €)
         let minusHtml = '';
-        if (activePortfolio?.taxRegime !== 'dichiarativo' && pnlLordo > 0) {
+        if (activePortfolio?.taxRegime !== 'dichiarativo' && pnlLordoEur > 0) {
             const righe = calcolaMinusvalenze(portfolio);
             const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
             const minusDisp = righe
@@ -344,16 +349,16 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
                 .reduce((s, r) => s + r.minus, 0);
 
             if (minusDisp > 0) {
-                const minusUsate = Math.min(pnlLordo, minusDisp);
-                const imponibile = Math.max(0, pnlLordo - minusUsate);
+                const minusUsate = Math.min(pnlLordoEur, minusDisp);
+                const imponibile = Math.max(0, pnlLordoEur - minusUsate);
                 const taxEffettiva = imponibile * taxPct;
-                const pnlNettoEffettivo = pnlLordo - taxEffettiva;
+                const pnlNettoEffettivoEur = pnlLordoEur - taxEffettiva;
                 minusHtml = `
                     <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
-                        <span class="text-muted fs-xs">Con compensazione minus (${Calc.fmt(minusDisp)} disponibili):</span><br>
-                        Tasse effettive: <b class="neg-loss">− ${s} ${Calc.fmt(taxEffettiva)}</b>
-                        <span class="text-muted fs-xs">(minus usate: ${s} ${Calc.fmt(minusUsate)})</span><br>
-                        P&L netto effettivo: <b class="${pnlNettoEffettivo >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlNettoEffettivo)}</b>
+                        <span class="text-muted fs-xs">Con compensazione minus (€ ${Calc.fmt(minusDisp)} disponibili):</span><br>
+                        Tasse effettive: <b class="neg-loss">− € ${Calc.fmt(taxEffettiva)}</b>
+                        <span class="text-muted fs-xs">(minus usate: € ${Calc.fmt(minusUsate)})</span><br>
+                        P&L netto effettivo: <b class="${pnlNettoEffettivoEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNettoEffettivoEur)}</b>
                     </div>`;
             }
         }
@@ -364,9 +369,9 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
         }
         box.innerHTML = `
             Incasso lordo: <b>${s} ${Calc.fmt(q * pr - cNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)<br>
-            P&L lordo: <b class="${pnlLordo >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordo)}</b><br>
-            ${pnlLordo > 0 ? `Tasse teoriche (${taxLabel}): <b class="neg-loss">− ${s} ${Calc.fmt(tax)}</b><br>` : ''}
-            P&L netto teorico: <b class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlNetto)}</b><br>
+            P&L lordo: <b class="${pnlLordoNative >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordoNative)}</b>${eurHint}<br>
+            ${pnlLordoEur > 0 ? `Tasse teoriche (${taxLabel}, su € ${Calc.fmt(pnlLordoEur)}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b><br>` : ''}
+            P&L netto teorico: <b class="${pnlNettoEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNettoEur)}</b><br>
             Q.tà rimanente: <b>${Calc.fmt(qta - q, 4)}</b>
             ${minusHtml}`;
     }
