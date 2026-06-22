@@ -15,89 +15,38 @@ const ANNI_COMPENSAZIONE = 4;
 
 // Calcola tutte le minusvalenze realizzate dal portafoglio
 // Restituisce array di { anno, data, titolo, tipoAsset, categoria, minus }
-export function calcolaMinusvalenze(portfolio) {
+export function calcolaMinusvalenze(portfolio, taxRegime = 'amministrato') {
     const righe = [];
     const oggi = new Date();
     const annoCorrente = oggi.getFullYear();
     const annoMinimo = annoCorrente - ANNI_COMPENSAZIONE;
 
-
     const assets = portfolio && portfolio.assets ? portfolio.assets : portfolio || {};
-
 
     for (const id in assets) {
         const p = assets[id];
-        const txs = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
-        if (!txs.length) continue;
+        if (!(p.transactions || []).length) continue;
 
+        const eventi = Calc.realizedEvents(p, taxRegime);
 
-        let rQta = 0, rPmc = 0;
-        const isUSD = (p.valuta || 'EUR').toUpperCase() === 'USD';
-
-
-        for (const tx of txs) {
-            const q = +tx.qty || 0;
-            const pr = +tx.price || 0;
-            const c = +(tx.commission || 0);
-
-            // Trasferimento in uscita: riduce qta a PMC invariato, nessuna minus/plus
-            if (tx.type === 'transfer' && tx.destPortfolioId) {
-                rQta -= q;
-                if (rQta < 0.00001) { rQta = 0; rPmc = 0; }
-                continue;
-            }
-
-            // Trasferimento in entrata: acquisto al PMC di provenienza, nessuna minus/plus
-            if (tx.type === 'transfer' && tx.sourcePortfolioId) {
-                const newCost = (rQta * rPmc) + (q * pr);
-                rQta += q;
-                rPmc = rQta > 0 ? newCost / rQta : 0;
-                continue;
-            }
-
-            if (tx.type === 'buy') {
-                const newCost = (rQta * rPmc) + (q * pr) + c;
-                rQta += q;
-                rPmc = rQta > 0 ? newCost / rQta : 0;
-            } else {
-                const pnlNativo = (pr - rPmc) * q - c;
-                let pnlEur;
-
-
-                if (isUSD) {
-                    const txRate = tx.exchangeRate
-                        ? parseFloat(tx.exchangeRate)
-                        : Exchange._memoryCache.get(tx.date)?.rate || Exchange.rate || 1;
-                    pnlEur = pnlNativo / txRate;
-                } else {
-                    pnlEur = pnlNativo;
+        for (const ev of eventi) {
+            if (ev.pnlEur < -0.01) {
+                const annoVendita = new Date(ev.date).getFullYear();
+                if (annoVendita >= annoMinimo) {
+                    const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
+                    righe.push({
+                        anno: annoVendita,
+                        data: ev.date,
+                        titolo: p.nome,
+                        tipoAsset: p.tipoAsset || 'stock',
+                        categoria,
+                        minus: Math.abs(ev.pnlEur),
+                        id
+                    });
                 }
-
-
-                if (pnlEur < -0.01) {
-                    const dataVendita = new Date(tx.date);
-                    const annoVendita = dataVendita.getFullYear();
-                    if (annoVendita >= annoMinimo) {
-                        const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
-                        righe.push({
-                            anno: annoVendita,
-                            data: tx.date,
-                            titolo: p.nome,
-                            tipoAsset: p.tipoAsset || 'stock',
-                            categoria,
-                            minus: Math.abs(pnlEur),
-                            id
-                        });
-                    }
-                }
-
-
-                rQta -= q;
-                if (rQta < 0.00001) { rQta = 0; rPmc = 0; }
             }
         }
     }
-
 
     righe.sort((a, b) => b.data.localeCompare(a.data));
     return righe;
@@ -287,8 +236,8 @@ _savePortfolio = savePortfolio;
 }
 
 
-export function aggiornaBadgeFiscale(portfolio) {
-    const righe = calcolaMinusvalenze(portfolio);
+export function aggiornaBadgeFiscale(portfolio, taxRegime = 'amministrato') {
+    const righe = calcolaMinusvalenze(portfolio, taxRegime);
     const totale = righe.reduce((s, r) => s + r.minus, 0);
     const badge = document.getElementById('fiscale-badge');
     if (badge) {
@@ -398,7 +347,7 @@ function renderDrawerFiscale(portfolio) {
 
     const data = portfolio && portfolio.assets ? portfolio : { assets: portfolio || {} };
     const { taxRegime, fiscal } = getActivePortfolioData();
-    const righe = calcolaMinusvalenze(data);
+    const righe = calcolaMinusvalenze(data, taxRegime);
     const manualRows = ensureManualLosses(fiscal).map((l) => ({
         anno: Number(l.year),
         data: l.date,

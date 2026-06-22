@@ -6,7 +6,8 @@ import { calcolaMinusvalenze } from '../../../api/fiscale.js';
 
 export function openTransactionModal(id, type, portfolio, prices, onSave, activePortfolio = null) {
     const p = portfolio[id];
-    const { qta, pmc } = Calc.positionSync(p);
+    const taxRegimeAttivo = activePortfolio?.taxRegime || 'amministrato';
+    const { qta, pmc } = Calc.positionSync(p, taxRegimeAttivo);
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-transazione');
     const isBuy = type === 'buy';
@@ -251,7 +252,7 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
             return;
         }
         if (type === 'sell') {
-            const { qta } = Calc.positionSync(portfolio[id]);
+            const { qta } = Calc.positionSync(portfolio[id], taxRegimeAttivo);
             if (q > qta + 0.0001) {
                 Toast.show('Quantità superiore al disponibile', 'err');
                 return;
@@ -295,7 +296,7 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
     const box = document.getElementById('tx-preview');
     if (isNaN(q) || isNaN(pr) || q <= 0) { box.style.display = 'none'; return; }
 
-    const { qta, pmc, pmcEur } = Calc.positionSync(portfolio[id]);
+    const { qta, pmc, pmcEur } = Calc.positionSync(portfolio[id], activePortfolio?.taxRegime || 'amministrato');
     const p = portfolio[id];
     const s = p.valuta === 'USD' ? '$' : '€';
     const assetIsUSD = p.valuta === 'USD';
@@ -341,8 +342,8 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
 
         // Calcola minusvalenze disponibili se regime amministrato (sempre in €)
         let minusHtml = '';
-        if (activePortfolio?.taxRegime !== 'dichiarativo' && pnlLordoEur > 0) {
-            const righe = calcolaMinusvalenze(portfolio);
+        if (activePortfolio?.taxRegime !== 'dichiarativo' && pnlLordo > 0) {
+            const righe = calcolaMinusvalenze(portfolio, activePortfolio?.taxRegime || 'amministrato');
             const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
             const minusDisp = righe
                 .filter(r => r.categoria === categoria)

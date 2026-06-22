@@ -382,9 +382,9 @@ export function renderSkeleton() {
     ).join('');
 }
 
-export async function buildPositionMap(portfolio, prices) {
+export async function buildPositionMap(portfolio, prices, taxRegime = 'amministrato') {
     const ids = Object.keys(portfolio);
-    const positions = await Promise.all(ids.map(id => Calc.position(portfolio[id])));
+    const positions = await Promise.all(ids.map(id => Calc.position(portfolio[id], taxRegime)));
 
     const map = {};
     ids.forEach((id, i) => {

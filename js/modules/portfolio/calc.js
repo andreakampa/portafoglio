@@ -157,10 +157,10 @@ export const Calc = {
         return { ...tx, qty, price, commission, priceCurrency, commissionCurrency, exchangeRate, grossNative, grossEur, commissionEur };
     },
 
-    previewBuy(p, { qty, price, commission = 0, exchangeRate = null }) {
+    previewBuy(p, { qty, price, commission = 0, exchangeRate = null, taxRegime = 'amministrato' }) {
         const assetCurrency = Calc._assetCurrency(p);
         const rate = exchangeRate || Exchange.rate || 1;
-        const { qta, pmc, pmcEur, totalCostEur = 0 } = Calc.positionSync(p);
+        const { qta, pmc, pmcEur, totalCostEur = 0 } = Calc.positionSync(p, taxRegime);
 
         const grossNative    = qty * price;
         const grossEur       = Calc._toEur(grossNative, assetCurrency, rate);
@@ -176,10 +176,10 @@ export const Calc = {
         return { assetCurrency, grossNative, grossEur, commissionEur, totalEur, newQta, newPmcNative, newPmcEur, currentPmcNative: pmc, currentPmcEur: pmcEur || Calc._toEur(pmc, assetCurrency, rate) };
     },
 
-    previewSell(p, { qty, price, commission = 0, exchangeRate = null, compensation = null }) {
+    previewSell(p, { qty, price, commission = 0, exchangeRate = null, compensation = null, taxRegime = 'amministrato' }) {
         const assetCurrency = Calc._assetCurrency(p);
         const rate = exchangeRate || Exchange.rate || 1;
-        const { qta, pmc, pmcEur, totalCostEur = 0 } = Calc.positionSync(p);
+        const { qta, pmc, pmcEur, totalCostEur = 0 } = Calc.positionSync(p, taxRegime);
 
         const grossNative   = qty * price;
         const grossEur      = Calc._toEur(grossNative, assetCurrency, rate);
@@ -207,7 +207,7 @@ export const Calc = {
 
     _holdingSignature(holding) {
         const txs = (holding?.transactions || [])
-            .map(tx => [tx.date, tx.type, tx.qty, tx.price, tx.commission || 0, tx.exchangeRate || '', tx.destPortfolioId || '', tx.sourcePortfolioId || ''].join('|'))
+            .map(tx => [tx.date, tx.type, tx.qty, tx.price, tx.commission || 0, tx.exchangeRate || '', tx.destPortfolioId || '', tx.sourcePortfolioId || '', tx.saleMode || '', JSON.stringify(tx.lotAllocation || '')].join('|'))
             .join('||');
         return [holding?.id || '', holding?.simbolo || '', holding?.valuta || 'EUR', holding?._legacyRealizedPnL || 0, txs].join('###');
     },
@@ -217,8 +217,244 @@ export const Calc = {
         this._positionSyncCache.clear();
     },
 
-    async position(holding) {
-        const sig = this._holdingSignature(holding);
+    // Calcola la posizione per i portafogli in regime dichiarativo:
+    // costo a lotti specifici se indicato sulla transazione, altrimenti LIFO
+    // (presunzione di legge per il dichiarativo) — mai costo medio ponderato.
+    _positionDichiarativo(holding, getRate) {
+        const txs = (holding.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+        const v = (holding.valuta || 'EUR').toUpperCase();
+
+        let lots = [];
+        let realizedPnL = parseFloat(holding._legacyRealizedPnL || 0);
+        let totalComm = 0;
+        const dateCounters = {};
+
+        const isLotCreating  = (tx) => tx.type === 'buy' || (tx.type === 'transfer' && tx.sourcePortfolioId);
+        const isLotConsuming = (tx) => tx.type === 'sell' || (tx.type === 'transfer' && tx.destPortfolioId);
+
+        for (const tx of txs) {
+            const q = +tx.qty || 0;
+            if (q <= 0) continue;
+            const pr = +tx.price || 0;
+            const commRaw = +(tx.commission || 0);
+            const commCurr = (tx.commissionCurrency || 'EUR').toUpperCase();
+            const txRate = getRate(tx);
+            const c = commCurr === 'USD' && v !== 'USD' ? commRaw / txRate
+                    : commCurr === 'EUR' && v === 'USD' ? commRaw * txRate
+                    : commRaw;
+            totalComm += commRaw;
+
+            if (isLotCreating(tx)) {
+                const occ = dateCounters[tx.date] || 0;
+                dateCounters[tx.date] = occ + 1;
+                lots.push({
+                    id: `${tx.date}#${occ}`,
+                    date: tx.date,
+                    qtyOriginal: q,
+                    qtyResidua: q,
+                    price: pr,
+                    commission: tx.type === 'buy' ? c : 0,
+                    exchangeRate: v === 'EUR' ? 1 : txRate
+                });
+                continue;
+            }
+
+            if (isLotConsuming(tx)) {
+                let toConsume = q;
+                let costBasisNative = 0;
+                let costBasisEur = 0;
+
+                const consumaLotto = (lot, aq) => {
+                    const costNativo = (lot.price * aq) + (lot.commission * aq / lot.qtyOriginal);
+                    costBasisNative += costNativo;
+                    costBasisEur    += costNativo / (lot.exchangeRate || 1);
+                    lot.qtyResidua  -= aq;
+                };
+
+                if (Array.isArray(tx.lotAllocation) && tx.lotAllocation.length) {
+                    for (const alloc of tx.lotAllocation) {
+                        const lot = lots.find(l => l.id === alloc.lotId);
+                        if (!lot) continue;
+                        const used = Math.min(lot.qtyResidua, +alloc.qty || 0);
+                        consumaLotto(lot, used);
+                        toConsume -= used;
+                    }
+                    for (let i = lots.length - 1; i >= 0 && toConsume > 0.00001; i--) {
+                        const lot = lots[i];
+                        if (lot.qtyResidua <= 0) continue;
+                        const used = Math.min(lot.qtyResidua, toConsume);
+                        consumaLotto(lot, used);
+                        toConsume -= used;
+                    }
+                } else {
+                    for (let i = lots.length - 1; i >= 0 && toConsume > 0.00001; i--) {
+                        const lot = lots[i];
+                        if (lot.qtyResidua <= 0) continue;
+                        const used = Math.min(lot.qtyResidua, toConsume);
+                        consumaLotto(lot, used);
+                        toConsume -= used;
+                    }
+                }
+
+                if (tx.type === 'sell') {
+                    if (v === 'EUR') {
+                        realizedPnL += (pr * q - c) - costBasisEur;
+                    } else {
+                        const ricavoEur = (pr * q - c) / txRate;
+                        realizedPnL += ricavoEur - costBasisEur;
+                    }
+                }
+
+                lots = lots.filter(l => l.qtyResidua > 0.00001);
+            }
+        }
+
+        const qta = lots.reduce((s, l) => s + l.qtyResidua, 0);
+        let totalCostNative = 0, totalCostEur = 0;
+        for (const lot of lots) {
+            const costNativoResiduo = (lot.price * lot.qtyResidua) + (lot.commission * lot.qtyResidua / lot.qtyOriginal);
+            totalCostNative += costNativoResiduo;
+            totalCostEur    += costNativoResiduo / (lot.exchangeRate || 1);
+        }
+        const pmcCost = qta > 0.00001 ? totalCostNative / qta : 0;
+        const pmcEur  = qta > 0.00001 ? totalCostEur / qta : 0;
+
+        return { qta, pmc: pmcCost, pmcEur, totalCostEur, totalCostNative, realizedPnL: Calc.round(realizedPnL), totalComm };
+    },
+
+    // Restituisce, per ogni vendita (esclusi i trasferimenti), il P&L realizzato in €
+    // di quella singola transazione. Usa: lotti espliciti se presenti sulla
+    // transazione, altrimenti LIFO per il dichiarativo, altrimenti costo medio
+    // ponderato per l'amministrato. Funzione condivisa da calc.js e fiscale.js
+    // per evitare due logiche di costo che possano disallinearsi.
+    realizedEvents(holding, taxRegime = 'amministrato') {
+        const txs = (holding.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+        const v = (holding.valuta || 'EUR').toUpperCase();
+        const events = [];
+
+        let lots = [];
+        let qta = 0, pmcCost = 0, totalCostEur = 0, totalCostNative = 0;
+        const dateCounters = {};
+
+        const getRate = (tx) => {
+            if (tx.exchangeRate) return parseFloat(tx.exchangeRate);
+            const cached = Exchange._memoryCache.get(tx.date);
+            if (cached?.rate > 0) return cached.rate;
+            return Exchange.rate || 1;
+        };
+
+        const isLotCreating  = (tx) => tx.type === 'buy' || (tx.type === 'transfer' && tx.sourcePortfolioId);
+        const isLotConsuming = (tx) => tx.type === 'sell' || (tx.type === 'transfer' && tx.destPortfolioId);
+
+        for (const tx of txs) {
+            const q = +tx.qty || 0;
+            if (q <= 0) continue;
+            const pr = +tx.price || 0;
+            const commRaw = +(tx.commission || 0);
+            const commCurr = (tx.commissionCurrency || 'EUR').toUpperCase();
+            const txRate = getRate(tx);
+            const c = commCurr === 'USD' && v !== 'USD' ? commRaw / txRate
+                    : commCurr === 'EUR' && v === 'USD' ? commRaw * txRate
+                    : commRaw;
+
+            if (isLotCreating(tx)) {
+                const occ = dateCounters[tx.date] || 0;
+                dateCounters[tx.date] = occ + 1;
+                const commissioneLotto = tx.type === 'buy' ? c : 0;
+                lots.push({
+                    id: `${tx.date}#${occ}`,
+                    qtyOriginal: q,
+                    qtyResidua: q,
+                    price: pr,
+                    commission: commissioneLotto,
+                    exchangeRate: v === 'EUR' ? 1 : txRate
+                });
+
+                const newCost = (qta * pmcCost) + (q * pr) + commissioneLotto;
+                qta += q;
+                pmcCost = qta > 0 ? newCost / qta : 0;
+                if (v === 'EUR') {
+                    totalCostEur    += q * pr + commissioneLotto;
+                    totalCostNative += q * pr + commissioneLotto;
+                } else {
+                    totalCostEur    += (q * pr + commissioneLotto) / txRate;
+                    totalCostNative += q * pr + commissioneLotto;
+                }
+                continue;
+            }
+
+            if (isLotConsuming(tx)) {
+                const usaLottiEspliciti = Array.isArray(tx.lotAllocation) && tx.lotAllocation.length > 0;
+                const usaLIFO = !usaLottiEspliciti && taxRegime === 'dichiarativo';
+
+                let costBasisEur = 0, costBasisNative = 0;
+                let toConsume = q;
+
+                if (usaLottiEspliciti || usaLIFO) {
+                    const consumaLotto = (lot, aq) => {
+                        const costNativo = (lot.price * aq) + (lot.commission * aq / lot.qtyOriginal);
+                        costBasisNative += costNativo;
+                        costBasisEur    += costNativo / (lot.exchangeRate || 1);
+                        lot.qtyResidua  -= aq;
+                    };
+
+                    if (usaLottiEspliciti) {
+                        for (const alloc of tx.lotAllocation) {
+                            const lot = lots.find(l => l.id === alloc.lotId);
+                            if (!lot) continue;
+                            const used = Math.min(lot.qtyResidua, +alloc.qty || 0);
+                            consumaLotto(lot, used);
+                            toConsume -= used;
+                        }
+                    }
+                    for (let i = lots.length - 1; i >= 0 && toConsume > 0.00001; i--) {
+                        const lot = lots[i];
+                        if (lot.qtyResidua <= 0) continue;
+                        const used = Math.min(lot.qtyResidua, toConsume);
+                        consumaLotto(lot, used);
+                        toConsume -= used;
+                    }
+                    lots = lots.filter(l => l.qtyResidua > 0.00001);
+                } else {
+                    const pmcEurCurrent    = qta > 0 ? totalCostEur / qta : 0;
+                    const pmcNativeCurrent = qta > 0 ? totalCostNative / qta : 0;
+                    costBasisEur    = pmcEurCurrent * q;
+                    costBasisNative = pmcNativeCurrent * q;
+
+                    const totaleResiduo = lots.reduce((s, l) => s + l.qtyResidua, 0);
+                    if (totaleResiduo > 0) {
+                        for (const lot of lots) {
+                            const quota = lot.qtyResidua / totaleResiduo;
+                            lot.qtyResidua = Math.max(0, lot.qtyResidua - q * quota);
+                        }
+                        lots = lots.filter(l => l.qtyResidua > 0.00001);
+                    }
+                }
+
+                if (tx.type === 'sell') {
+                    let pnlEur;
+                    if (v === 'EUR') {
+                        pnlEur = (pr * q - c) - costBasisEur;
+                    } else {
+                        const ricavoEur = (pr * q - c) / txRate;
+                        pnlEur = ricavoEur - costBasisEur;
+                    }
+                    events.push({ date: tx.date, qty: q, pnlEur });
+                }
+
+                totalCostEur    -= costBasisEur;
+                totalCostNative -= costBasisNative;
+                qta -= q;
+                pmcCost = qta > 0.00001 ? totalCostNative / qta : 0;
+                if (qta < 0.00001) { qta = 0; pmcCost = 0; totalCostEur = 0; totalCostNative = 0; }
+            }
+        }
+
+        return events;
+    },
+
+    async position(holding, taxRegime = 'amministrato') {
+        const sig = this._holdingSignature(holding) + '#' + taxRegime;
         if (this._positionCache.has(sig)) return this._positionCache.get(sig);
 
         const promise = (async () => {
@@ -242,6 +478,23 @@ export const Calc = {
             const getRate = (tx) => {
                 if (tx.exchangeRate) return parseFloat(tx.exchangeRate);
                 return rateMap.get(tx.date) || Exchange.rate || 1;
+            };
+
+            if (taxRegime === 'dichiarativo') {
+                return Calc._positionDichiarativo(holding, getRate);
+            }
+
+            const dateCounters = {};
+            const lotDefs = {};
+            const registraLotto = (tx, commissionNativa) => {
+                const occ = dateCounters[tx.date] || 0;
+                dateCounters[tx.date] = occ + 1;
+                lotDefs[`${tx.date}#${occ}`] = {
+                    price: +tx.price || 0,
+                    commission: commissionNativa,
+                    exchangeRate: v === 'EUR' ? 1 : getRate(tx),
+                    qtyOriginal: +tx.qty || 0
+                };
             };
 
             for (const tx of txs) {
@@ -281,6 +534,7 @@ export const Calc = {
                         totalCostEur    += (q * pr) / rate;
                         totalCostNative += q * pr;
                     }
+                    registraLotto(tx, 0);
                     continue;
                 }
 
@@ -296,23 +550,41 @@ export const Calc = {
                         totalCostEur    += (q * pr + c) / rate;
                         totalCostNative += q * pr + c;
                     }
+                    registraLotto(tx, c);
                 } else {
                     // sell
-                    if (v === 'EUR') {
-                        realizedPnL += (pr - pmcCost) * q - c;
+                    const hasLots = Array.isArray(tx.lotAllocation) && tx.lotAllocation.length > 0;
+                    let costBasisEur, costBasisNative;
+
+                    if (hasLots) {
+                        costBasisEur = 0; costBasisNative = 0;
+                        for (const alloc of tx.lotAllocation) {
+                            const lotDef = lotDefs[alloc.lotId];
+                            if (!lotDef) continue;
+                            const aq = +alloc.qty || 0;
+                            const costNativoLotto = (lotDef.price * aq) + (lotDef.commission * aq / lotDef.qtyOriginal);
+                            costBasisNative += costNativoLotto;
+                            costBasisEur    += costNativoLotto / (lotDef.exchangeRate || 1);
+                        }
                     } else {
-                        const sellRate     = getRate(tx);
-                        const ricavoEur    = (pr * q - c) / sellRate;
-                        const pmcEurCurrent = qta > 0 ? totalCostEur / qta : 0;
-                        realizedPnL += ricavoEur - pmcEurCurrent * q;
+                        const pmcEurCurrent    = qta > 0 ? totalCostEur / qta : 0;
+                        const pmcNativeCurrent = qta > 0 ? totalCostNative / qta : 0;
+                        costBasisEur    = pmcEurCurrent * q;
+                        costBasisNative = pmcNativeCurrent * q;
                     }
-                    if (qta > 0) {
-                        const pmcEurCurrent    = totalCostEur / qta;
-                        totalCostEur          -= pmcEurCurrent * q;
-                        const pmcNativeCurrent = totalCostNative / qta;
-                        totalCostNative       -= pmcNativeCurrent * q;
+
+                    if (v === 'EUR') {
+                        realizedPnL += (pr * q - c) - costBasisEur;
+                    } else {
+                        const sellRate  = getRate(tx);
+                        const ricavoEur = (pr * q - c) / sellRate;
+                        realizedPnL += ricavoEur - costBasisEur;
                     }
+
+                    totalCostEur    -= costBasisEur;
+                    totalCostNative -= costBasisNative;
                     qta -= q;
+                    pmcCost = qta > 0.00001 ? totalCostNative / qta : 0;
                     if (qta < 0.00001) { qta = 0; pmcCost = 0; totalCostEur = 0; totalCostNative = 0; }
                 }
             }
@@ -395,9 +667,21 @@ getLots(holding, taxRegime = 'amministrato') {
     return lots;
 },
 
-    positionSync(holding) {
-        const sig = this._holdingSignature(holding);
+    positionSync(holding, taxRegime = 'amministrato') {
+        const sig = this._holdingSignature(holding) + '#' + taxRegime;
         if (this._positionSyncCache.has(sig)) return this._positionSyncCache.get(sig);
+
+        if (taxRegime === 'dichiarativo') {
+            const getRateSyncDich = (tx) => {
+                if (tx.exchangeRate) return parseFloat(tx.exchangeRate);
+                const cached = Exchange._memoryCache.get(tx.date);
+                if (cached?.rate > 0) return cached.rate;
+                return Exchange.rate || 1;
+            };
+            const result = Calc._positionDichiarativo(holding, getRateSyncDich);
+            this._positionSyncCache.set(sig, result);
+            return result;
+        }
 
         const txs = (holding.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
         const v   = (holding.valuta || 'EUR').toUpperCase();
@@ -412,6 +696,19 @@ getLots(holding, taxRegime = 'amministrato') {
             const cached = Exchange._memoryCache.get(tx.date);
             if (cached?.rate > 0) return cached.rate;
             return Exchange.rate || 1;
+        };
+
+        const dateCounters = {};
+        const lotDefs = {};
+        const registraLotto = (tx, commissionNativa) => {
+            const occ = dateCounters[tx.date] || 0;
+            dateCounters[tx.date] = occ + 1;
+            lotDefs[`${tx.date}#${occ}`] = {
+                price: +tx.price || 0,
+                commission: commissionNativa,
+                exchangeRate: v === 'EUR' ? 1 : getRateSync(tx),
+                qtyOriginal: +tx.qty || 0
+            };
         };
 
         for (const tx of txs) {
@@ -447,6 +744,7 @@ getLots(holding, taxRegime = 'amministrato') {
                     const rate = getRateSync(tx);
                     totalCostEur += (q * pr) / rate;
                 }
+                registraLotto(tx, 0);
                 continue;
             }
 
@@ -460,21 +758,40 @@ getLots(holding, taxRegime = 'amministrato') {
                     const rate = getRateSync(tx);
                     totalCostEur += (q * pr + c) / rate;
                 }
+                registraLotto(tx, c);
             } else {
                 // sell
-                if (v === 'EUR') {
-                    realizedPnL += (pr - pmcCost) * q - c;
+                const hasLots = Array.isArray(tx.lotAllocation) && tx.lotAllocation.length > 0;
+                let costBasisEur, costBasisNative;
+
+                if (hasLots) {
+                    costBasisEur = 0; costBasisNative = 0;
+                    for (const alloc of tx.lotAllocation) {
+                        const lotDef = lotDefs[alloc.lotId];
+                        if (!lotDef) continue;
+                        const aq = +alloc.qty || 0;
+                        const costNativoLotto = (lotDef.price * aq) + (lotDef.commission * aq / lotDef.qtyOriginal);
+                        costBasisNative += costNativoLotto;
+                        costBasisEur    += costNativoLotto / (lotDef.exchangeRate || 1);
+                    }
                 } else {
-                    const sellRate      = getRateSync(tx);
-                    const ricavoEur     = (pr * q - c) / sellRate;
                     const pmcEurCurrent = qta > 0 ? totalCostEur / qta : 0;
-                    realizedPnL += ricavoEur - pmcEurCurrent * q;
+                    costBasisEur    = pmcEurCurrent * q;
+                    costBasisNative = pmcCost * q;
                 }
-                if (qta > 0) {
-                    const pmcEurCurrent = totalCostEur / qta;
-                    totalCostEur -= pmcEurCurrent * q;
+
+                if (v === 'EUR') {
+                    realizedPnL += (pr * q - c) - costBasisEur;
+                } else {
+                    const sellRate  = getRateSync(tx);
+                    const ricavoEur = (pr * q - c) / sellRate;
+                    realizedPnL += ricavoEur - costBasisEur;
                 }
-                qta -= q;
+
+                totalCostEur -= costBasisEur;
+                const qtaResidua = qta - q;
+                pmcCost = qtaResidua > 0.00001 ? ((pmcCost * qta) - costBasisNative) / qtaResidua : 0;
+                qta = qtaResidua;
                 if (qta < 0.00001) { qta = 0; pmcCost = 0; totalCostEur = 0; }
             }
         }
