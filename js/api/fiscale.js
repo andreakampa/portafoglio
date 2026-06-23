@@ -478,6 +478,46 @@ function attachManualLossHandlers() {
     }
 }
 
+function attachCompensationOverrideHandlers() {
+    const container = document.getElementById('drawer-fiscale-body');
+    if (!container || container.dataset.compBound) return;
+    container.dataset.compBound = '1';
+
+    container.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-comp-edit]');
+        if (!btn) return;
+
+        const compId = btn.dataset.compEdit;
+        const current = parseFloat(btn.dataset.compCurrent || '0');
+
+        const input = prompt(
+            `Importo compensato per questa plusvalenza (€).\nLascia vuoto per tornare al calcolo automatico.`,
+            current.toFixed(2)
+        );
+        if (input === null) return;
+
+        const pf = typeof _getPortfolio === 'function' ? _getPortfolio() : null;
+        if (!pf) return;
+
+        if (!pf.fiscal) pf.fiscal = { manualLosses: [] };
+        if (!pf.fiscal.compensationOverrides) pf.fiscal.compensationOverrides = {};
+
+        const trimmed = input.trim();
+        if (trimmed === '') {
+            delete pf.fiscal.compensationOverrides[compId];
+        } else {
+            const val = parseFloat(trimmed.replace(',', '.'));
+            if (isNaN(val) || val < 0) {
+                alert('Importo non valido.');
+                return;
+            }
+            pf.fiscal.compensationOverrides[compId] = { compensatoEur: val };
+        }
+
+        await saveFiscalPortfolio();
+        renderDrawerFiscale(_portfolio || (_getPortfolio ? _getPortfolio() : null));
+    });
+}
 
 function renderDrawerFiscale(portfolio) {
     const body = document.getElementById('drawer-fiscale-body');
@@ -487,6 +527,7 @@ function renderDrawerFiscale(portfolio) {
     const data = portfolio && portfolio.assets ? portfolio : { assets: portfolio || {} };
     const { taxRegime, fiscal } = getActivePortfolioData();
     const righe = calcolaMinusvalenze(data, taxRegime);
+    const statoCompensazione = taxRegime === 'amministrato' ? statoCompensazioneHtml(data, taxRegime) : '';
     const manualRows = ensureManualLosses(fiscal).map((l) => ({
         anno: Number(l.year),
         data: l.date,
@@ -510,6 +551,7 @@ function renderDrawerFiscale(portfolio) {
     if (!tutteLeRighe.length) {
         body.innerHTML = `
         ${manualLossesHtml()}
+        ${statoCompensazione}
         <div class="fiscale-empty">
             <div style="font-size:2em;margin-bottom:8px;">🎉</div>
             Nessuna minusvalenza compensabile nei 4 anni precedenti.
@@ -520,6 +562,7 @@ function renderDrawerFiscale(portfolio) {
             regime del risparmio amministrato).
         </div>`;
         attachManualLossHandlers();
+        attachCompensationOverrideHandlers();
         return;
     }
 
@@ -537,6 +580,7 @@ function renderDrawerFiscale(portfolio) {
 
     let html = `
         ${manualLossesHtml()}
+        ${statoCompensazione}
         <div class="fiscale-totale">
             <div class="fiscale-semaforo ${semaforoClass}"></div>
             <div style="flex:1;">
@@ -636,6 +680,7 @@ function renderDrawerFiscale(portfolio) {
         el.addEventListener('click', () => toggleAnnoFiscale(el.dataset.toggleAnno));
     });
     attachManualLossHandlers();
+    attachCompensationOverrideHandlers();
 
 
     for (const anno of anni.slice(0, 2)) {
@@ -666,11 +711,58 @@ function rigaDettaglio(r) {
         </div>`;
 }
 
-
-
-
-
 function toggleAnnoFiscale(annoId) {
     const detail = document.getElementById(`${annoId}-detail`);
     if (detail) detail.classList.toggle('open');
+}
+
+function statoCompensazioneHtml(portfolio, taxRegime) {
+    const { dettaglioPlus, residuoFinale } = calcolaCompensazione(portfolio, taxRegime);
+
+    const residuoTotale = ['strumenti', 'crypto'].reduce((sum, cat) =>
+        sum + residuoFinale[cat].reduce((s, b) => s + b.residuo, 0), 0);
+
+    const residuoRighe = ['strumenti', 'crypto'].flatMap(cat =>
+        residuoFinale[cat].map(b => `
+            <div style="display:flex;justify-content:space-between;font-size:0.85em;padding:4px 0;">
+                <span>${cat === 'crypto' ? 'Crypto' : 'Azioni/Bond'} · ${b.anno}</span>
+                <span style="font-weight:700;color:var(--success);">€ ${Calc.fmt(b.residuo)}</span>
+            </div>`)
+    ).join('');
+
+    const plusOrdinate = dettaglioPlus.slice().sort((a, b) => b.date.localeCompare(a.date));
+
+    const plusRighe = plusOrdinate.length
+        ? plusOrdinate.map(p => {
+            const escluso = p.motivoEsclusione === 'fondo';
+            return `
+            <div class="comp-plus-row" data-comp-id="${p.id}">
+                <div class="comp-plus-info">
+                    <div class="comp-plus-titolo">${p.titolo} <span class="comp-plus-data">${p.date}</span></div>
+                    <div class="comp-plus-dettaglio">
+                        Plus € ${Calc.fmt(p.plusEur)}
+                        ${escluso
+                            ? `<span class="comp-plus-escluso">— fondo, non compensabile</span>`
+                            : `→ compensato € ${Calc.fmt(p.compensatoEur)}${p.overrideAttivo ? ' (manuale)' : ''}, tassabile € ${Calc.fmt(p.residuoTassabileEur)}`}
+                    </div>
+                </div>
+                ${escluso ? '' : `<button type="button" class="comp-override-btn" data-comp-edit="${p.id}" data-comp-current="${p.compensatoEur}" title="Correggi importo compensato">✎</button>`}
+            </div>`;
+        }).join('')
+        : `<div class="fiscale-empty" style="margin-top:8px;">Nessuna plusvalenza registrata.</div>`;
+
+    return `
+        <div class="comp-stato">
+            <div class="comp-stato-header">
+                <strong>Disponibile per compensazione (oggi)</strong>
+                <span class="comp-stato-totale">€ ${Calc.fmt(residuoTotale)}</span>
+            </div>
+            ${residuoRighe || `<div class="fiscale-empty" style="margin-top:4px;">Nessun residuo disponibile.</div>`}
+        </div>
+
+        <div class="comp-plus-section">
+            <div class="comp-plus-header">Plusvalenze e compensazioni applicate</div>
+            ${plusRighe}
+        </div>
+    `;
 }
