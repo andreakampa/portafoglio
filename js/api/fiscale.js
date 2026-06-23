@@ -48,8 +48,147 @@ export function calcolaMinusvalenze(portfolio, taxRegime = 'amministrato') {
         }
     }
 
-    righe.sort((a, b) => b.data.localeCompare(a.data));
+   righe.sort((a, b) => b.data.localeCompare(a.data));
     return righe;
+}
+
+
+// ── COMPENSAZIONE REALE (regime amministrato) ──────────────────────────────
+// Ricostruisce, anno per anno e in ordine cronologico, come le plusvalenze
+// storiche avrebbero consumato il pool di minusvalenze disponibili (FIFO
+// sull'anno di origine della minus, così si usano prima quelle più vicine
+// a scadenza). Le plus generate da fondi/OICR sono escluse: per natura
+// fiscale sono "redditi di capitale" e non ammettono compensazione.
+// Ogni evento di plus può avere un override manuale dell'importo compensato
+// (es. per riconciliare con l'estratto del broker), salvato in
+// portfolio.fiscal.compensationOverrides, keyed per id stabile dell'evento.
+
+export function calcolaCompensazione(portfolio, taxRegime = 'amministrato') {
+    const assets = portfolio && portfolio.assets ? portfolio.assets : portfolio || {};
+    const overrides = (portfolio && portfolio.fiscal && portfolio.fiscal.compensationOverrides) || {};
+
+    // 1. Raccogli TUTTI gli eventi (plus e minus) di tutti gli asset, con id stabile.
+    const eventiGrezzi = [];
+    for (const assetId in assets) {
+        const p = assets[assetId];
+        if (!(p.transactions || []).length) continue;
+
+        const eventi = Calc.realizedEvents(p, taxRegime);
+        const occCounter = {};
+
+        for (const ev of eventi) {
+            const occ = occCounter[ev.date] || 0;
+            occCounter[ev.date] = occ + 1;
+
+            const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
+            const isFondo = p.tipoAsset === 'fondo';
+
+            eventiGrezzi.push({
+                id: `${assetId}#${ev.date}#${occ}`,
+                assetId,
+                titolo: p.nome,
+                tipoAsset: p.tipoAsset || 'stock',
+                categoria,
+                isFondo,
+                date: ev.date,
+                pnlEur: ev.pnlEur
+            });
+        }
+    }
+
+    // 2. Ordine cronologico: è essenziale per la ricostruzione retroattiva.
+    eventiGrezzi.sort((a, b) => a.date.localeCompare(b.date));
+
+    // 3. Pool di minus disponibili, separato per categoria, taggato per anno origine.
+    //    Struttura: { strumenti: [{anno, residuo}], crypto: [{anno, residuo}] }
+    const pool = { strumenti: [], crypto: [] };
+
+    const aggiungiAlPool = (categoria, anno, importo) => {
+        if (importo <= 0.009) return;
+        let bucket = pool[categoria].find(b => b.anno === anno);
+        if (!bucket) {
+            bucket = { anno, residuo: 0 };
+            pool[categoria].push(bucket);
+        }
+        bucket.residuo += importo;
+    };
+
+    // Consuma dal pool FIFO per anno (più vecchio prima), rispettando la scadenza
+    // a 4 anni rispetto all'anno della PLUS che sta consumando.
+    const consumaDalPool = (categoria, annoPlus, importoRichiesto) => {
+        const bucket = pool[categoria]
+            .filter(b => b.residuo > 0.009 && (annoPlus - b.anno) <= ANNI_COMPENSAZIONE)
+            .sort((a, b) => a.anno - b.anno);
+
+        let rimanente = importoRichiesto;
+        let consumatoTotale = 0;
+        for (const b of bucket) {
+            if (rimanente <= 0.009) break;
+            const usato = Math.min(b.residuo, rimanente);
+            b.residuo -= usato;
+            rimanente -= usato;
+            consumatoTotale += usato;
+        }
+        return consumatoTotale;
+    };
+
+    // 4. Scorri gli eventi in ordine cronologico, alimentando/consumando il pool.
+    const dettaglioPlus = [];
+
+    for (const ev of eventiGrezzi) {
+        const anno = new Date(ev.date).getFullYear();
+
+        if (ev.pnlEur < -0.01) {
+            // Minus: alimenta il pool, anche se viene da un fondo.
+            aggiungiAlPool(ev.categoria, anno, Math.abs(ev.pnlEur));
+            continue;
+        }
+
+        if (ev.pnlEur > 0.01) {
+            // Plus da fondo: mai compensabile, esce dal giro.
+            if (ev.isFondo) {
+                dettaglioPlus.push({
+                    ...ev, anno, plusEur: ev.pnlEur,
+                    compensatoEur: 0, residuoTassabileEur: ev.pnlEur,
+                    overrideAttivo: false, motivoEsclusione: 'fondo'
+                });
+                continue;
+            }
+
+            const override = overrides[ev.id];
+            let compensatoEur;
+
+            if (override && typeof override.compensatoEur === 'number') {
+                // Override manuale: rispettalo, ma scala comunque il pool
+                // (più vecchio prima) per restare consistenti per le plus successive.
+                compensatoEur = Math.min(override.compensatoEur, ev.pnlEur);
+                consumaDalPool(ev.categoria, anno, compensatoEur);
+            } else {
+                compensatoEur = consumaDalPool(ev.categoria, anno, ev.pnlEur);
+            }
+
+            dettaglioPlus.push({
+                ...ev, anno, plusEur: ev.pnlEur,
+                compensatoEur,
+                residuoTassabileEur: Math.max(0, ev.pnlEur - compensatoEur),
+                overrideAttivo: !!override,
+                motivoEsclusione: null
+            });
+        }
+    }
+
+    // 5. Residuo finale disponibile per anno/categoria (quello che interessa
+    //    vedere nel cassetto fiscale come "ancora spendibile").
+    const residuoFinale = { strumenti: [], crypto: [] };
+    for (const cat of ['strumenti', 'crypto']) {
+        for (const b of pool[cat]) {
+            if (b.residuo > 0.009) {
+                residuoFinale[cat].push({ anno: b.anno, residuo: b.residuo });
+            }
+        }
+    }
+
+    return { dettaglioPlus, residuoFinale };
 }
 
 
