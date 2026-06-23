@@ -66,6 +66,7 @@ export function calcolaMinusvalenze(portfolio, taxRegime = 'amministrato') {
 export function calcolaCompensazione(portfolio, taxRegime = 'amministrato') {
     const assets = portfolio && portfolio.assets ? portfolio.assets : portfolio || {};
     const overrides = (portfolio && portfolio.fiscal && portfolio.fiscal.compensationOverrides) || {};
+    const fiscal = (portfolio && portfolio.fiscal) || {};
 
     // 1. Raccogli TUTTI gli eventi (plus e minus) di tutti gli asset, con id stabile.
     const eventiGrezzi = [];
@@ -95,6 +96,25 @@ export function calcolaCompensazione(portfolio, taxRegime = 'amministrato') {
             });
         }
     }
+
+    // 1b. Minus manuali (es. fondi esterni venduti fuori da questo tracker):
+    // entrano nel pool come minus pure — non generano mai un evento di "plus"
+    // perché per definizione il form raccoglie solo perdite.
+    const manualLosses = Array.isArray(fiscal.manualLosses) ? fiscal.manualLosses : [];
+    manualLosses.forEach((l, idx) => {
+        const importo = Math.abs(parseFloat(l.amount) || 0);
+        if (importo <= 0.009 || !l.date) return;
+        eventiGrezzi.push({
+            id: `manual#${idx}#${l.date}`,
+            assetId: null,
+            titolo: l.title || 'Minus manuale',
+            tipoAsset: l.tipoAsset || 'altro',
+            categoria: l.categoria || 'strumenti',
+            isFondo: false, // irrilevante per le minus: la restrizione "fondo" vale solo lato plus
+            date: l.date,
+            pnlEur: -importo
+        });
+    });
 
     // 2. Ordine cronologico: è essenziale per la ricostruzione retroattiva.
     eventiGrezzi.sort((a, b) => a.date.localeCompare(b.date));
@@ -322,6 +342,24 @@ function manualLossesHtml() {
                         placeholder="0.00"
                     >
                 </div>
+
+                <div>
+                    <label class="manual-loss-label" for="manual-loss-categoria">Categoria</label>
+                    <select id="manual-loss-categoria" class="manual-loss-input">
+                        <option value="strumenti">Strumenti (azioni/ETF/bond/fondi)</option>
+                        <option value="crypto">Crypto</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="manual-loss-label" for="manual-loss-tipo">Tipo</label>
+                    <select id="manual-loss-tipo" class="manual-loss-input">
+                        <option value="fondo">Fondo</option>
+                        <option value="stock">Azione/ETF</option>
+                        <option value="bond">Bond</option>
+                        <option value="altro">Altro</option>
+                    </select>
+                </div>
             </div>
 
             <button type="button" class="manual-loss-submit" id="manual-loss-submit">
@@ -421,6 +459,8 @@ function attachManualLossHandlers() {
             const title = document.getElementById('manual-loss-title')?.value.trim();
             const dateVal = document.getElementById('manual-loss-date')?.value.trim();
             const amount = parseFloat(document.getElementById('manual-loss-amount')?.value || '0');
+            const categoria = document.getElementById('manual-loss-categoria')?.value || 'strumenti';
+            const tipoAsset = document.getElementById('manual-loss-tipo')?.value || 'altro';
             const parsed = parseFlexibleYear(dateVal);
 
             const pf = typeof _getPortfolio === 'function' ? _getPortfolio() : null;
@@ -446,7 +486,9 @@ function attachManualLossHandlers() {
                 title,
                 date: parsed.date,
                 year: parsed.year,
-                amount
+                amount,
+                categoria,
+                tipoAsset
             });
 
             await saveFiscalPortfolio();
@@ -532,8 +574,8 @@ function renderDrawerFiscale(portfolio) {
         anno: Number(l.year),
         data: l.date,
         titolo: l.title || 'Minus manuale',
-        tipoAsset: 'manual',
-        categoria: 'strumenti',
+        tipoAsset: l.tipoAsset || 'manual',
+        categoria: l.categoria || 'strumenti',
         minus: Math.abs(parseFloat(l.amount) || 0),
         id: 'manual'
     })).filter(r => r.anno && r.data && r.minus > 0);
@@ -691,14 +733,16 @@ function renderDrawerFiscale(portfolio) {
 
 
 function rigaDettaglio(r) {
-    const isManual = r.tipoAsset === 'manual';
-    const tipoLabel = isManual
-        ? 'Manuale'
+    const isManual = r.id === 'manual';
+    const tipoLabel = r.tipoAsset === 'fondo'
+        ? 'Fondo (manuale)'
         : r.tipoAsset === 'bond'
-            ? 'Bond'
+            ? 'Bond' + (isManual ? ' (manuale)' : '')
             : r.tipoAsset === 'crypto'
-                ? 'Crypto'
-                : 'Stock';
+                ? 'Crypto' + (isManual ? ' (manuale)' : '')
+                : r.tipoAsset === 'altro'
+                    ? 'Manuale'
+                    : 'Stock' + (isManual ? ' (manuale)' : '');
 
     return `
         <div class="fiscale-detail-row ${isManual ? 'manual-loss-row' : ''}">
