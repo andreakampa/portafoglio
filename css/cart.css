@@ -228,6 +228,15 @@
     margin: 2px 0;
 }
 
+.cart-regime-note {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    margin-bottom: 10px;
+}
 /* ── Responsive mobile ── */
 @media (max-width: 480px) {
     #cart-panel {

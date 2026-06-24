@@ -148,7 +148,8 @@ export const CartPanel = {
                 isFondo: i.tipoAsset === 'fondo'
             }));
 
-        const compensazioni = (portfolio && taxRegime !== 'dichiarativo' && cartSells.length)
+        const isDichiarativo = taxRegime === 'dichiarativo';
+        const compensazioni = (portfolio && !isDichiarativo && cartSells.length)
             ? calcolaCompensazioneProvvisoria(portfolio, cartSells, taxRegime)
             : [];
 
@@ -243,7 +244,11 @@ export const CartPanel = {
             }
         });
 
-        itemsEl.innerHTML = html;
+        const noteDichiarativo = (isDichiarativo && cartSells.length)
+            ? `<div class="cart-regime-note">ℹ️ Regime dichiarativo: la compensazione minus/plus non è automatica. Le tasse mostrate sono sul lordo, senza compensazione — la gestirai tu in dichiarazione.</div>`
+            : '';
+
+        itemsEl.innerHTML = noteDichiarativo + html;
 
         itemsEl.querySelectorAll('.cart-item-remove').forEach(btn => {
             btn.onclick = (e) => {
