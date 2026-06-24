@@ -2,7 +2,7 @@ import { Calc } from '../calc.js';
 import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 import { todayISO, lockScroll, unlockScroll } from './helpers.js';
-import { calcolaMinusvalenze } from '../../../api/fiscale.js';
+import { calcolaCompensazione } from '../../../api/fiscale.js';
 
 export function openTransactionModal(id, type, portfolio, prices, onSave, activePortfolio = null) {
     const p = portfolio[id];
@@ -340,14 +340,12 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
         const pnlNettoEur  = pnlLordoEur - tax;
         const eurHint      = assetIsUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlLordoEur)})</span>` : '';
 
-        // Calcola minusvalenze disponibili se regime amministrato (sempre in €)
+        // Calcola residuo disponibile per compensazione (regime amministrato, sempre in €)
         let minusHtml = '';
-        if (activePortfolio?.taxRegime !== 'dichiarativo' && pnlLordo > 0) {
-            const righe = calcolaMinusvalenze(portfolio, activePortfolio?.taxRegime || 'amministrato');
+        if (activePortfolio?.taxRegime !== 'dichiarativo' && pnlLordoEur > 0) {
+            const { residuoFinale } = calcolaCompensazione(portfolio, activePortfolio?.taxRegime || 'amministrato');
             const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
-            const minusDisp = righe
-                .filter(r => r.categoria === categoria)
-                .reduce((s, r) => s + r.minus, 0);
+            const minusDisp = (residuoFinale[categoria] || []).reduce((s, b) => s + b.residuo, 0);
 
             if (minusDisp > 0) {
                 const minusUsate = Math.min(pnlLordoEur, minusDisp);

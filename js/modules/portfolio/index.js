@@ -110,13 +110,16 @@ export class PortfolioPage {
         await Exchange.prefetchRatesForPortfolio(this.portfolio);
         this._syncActivePortfolio();
 
-        CartPanel.init();
+        CartPanel.init(
+            () => this._getActivePortfolio(),
+            () => this._getActivePortfolio()?.taxRegime || 'amministrato'
+        );
 
         await this._aggiornaAllPac();
 
 initCassettoFiscale(() => this._getActivePortfolio(), () => this._save());
 
-aggiornaBadgeFiscale(this.portfolio);
+aggiornaBadgeFiscale(this.portfolio, this._getActivePortfolio()?.taxRegime || 'amministrato');
 
         await this._refreshPrices();
 await this._aggiornaDividendi();
@@ -194,7 +197,7 @@ renderKPI(state);
 renderTable(state, handlers);
 renderMobileCards(state, handlers);
 
-        aggiornaBadgeFiscale(this.portfolio);
+        aggiornaBadgeFiscale(this.portfolio, this._getActivePortfolio()?.taxRegime || 'amministrato');
     }
 
     async _loadData() {
@@ -746,20 +749,21 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
 
     _handlers() {
         return {
-            onHistory: id => openHistoryModal(id, this.portfolio, () => this._save(), this.currency),
+            onHistory: id => openHistoryModal(id, this.portfolio, () => this._save(), this.currency, this._getActivePortfolio()?.taxRegime || 'amministrato'),
             onTransaction: (id, type) => openTransactionModal(id, type, this.portfolio, this.prices,
                 async () => { await this._save(); }, this._getActivePortfolio()),
-            onSimulation: id => openSimModal(id, this.portfolio, this.prices),
+            onSimulation: id => openSimModal(id, this.portfolio, this.prices, this._getActivePortfolio()?.taxRegime || 'amministrato'),
             onDelete: id => this.elimina(id),
             onDividendi: id => openDividendiModal(id, this.portfolio, this.dividendi),
             onDividendiDashboard: () => openDividendiModal('__ALL__', this.portfolio, this.dividendi),
             onTransfer: id => openTransferModal(
-                id,
-                this.portfolio,
-                this.portfolioState.portfolios,
-                this.activePortfolioId,
-                (params) => this._eseguiTrasferimento(params)
-            ),
+    id,
+    this.portfolio,
+    this.portfolioState.portfolios,
+    this.activePortfolioId,
+    (params) => this._eseguiTrasferimento(params),
+    this._getActivePortfolio()?.taxRegime || 'amministrato'
+),
         };
     }
         async _eseguiTrasferimento({ sourceAssetId, destPortfolioId, qty, transferDate }) {
@@ -770,7 +774,8 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             throw new Error('not found');
         }
 
-        const { pmc } = Calc.positionSync(sourceAsset);
+        const taxRegime = this._getActivePortfolio()?.taxRegime || 'amministrato';
+        const { pmc } = Calc.positionSync(sourceAsset, taxRegime);
         const now = new Date();
         const localToday = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
         const today = transferDate || localToday;

@@ -1,11 +1,11 @@
 import { Calc } from '../calc.js';
 import { lockScroll, unlockScroll } from './helpers.js';
 
-export function openTransferModal(sourceId, portfolio, allPortfolios, activePortfolioId, onConfirm) {
+export function openTransferModal(sourceId, portfolio, allPortfolios, activePortfolioId, onConfirm, taxRegime = 'amministrato') {
     const asset = portfolio[sourceId];
     if (!asset) return;
 
-    const { qta: qtaDisp, pmc } = Calc.positionSync(asset);
+    const { qta: qtaDisp, pmc } = Calc.positionSync(asset, taxRegime);
     const qtaGiaTrasferitoTotale = asset.transferredQuantity || 0;
     const qtaEffettiva = Math.max(0, qtaDisp); // quantità attualmente detenuta
 

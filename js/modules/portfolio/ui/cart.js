@@ -1,6 +1,7 @@
 import { Calc } from '../calc.js';
 import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
+import { calcolaCompensazioneProvvisoria } from '../../../api/fiscale.js';
 
 const CART_KEY = 'ptpro_cart';
 
@@ -38,14 +39,25 @@ export const Cart = {
         this.items = [];
         saveCartItems(this.items);
         CartPanel.render();
+    },
+
+    _persist() {
+        saveCartItems(this.items);
     }
 };
 
 export const CartPanel = {
     _visible: false,
+    _getPortfolio: null,
+    _getTaxRegime: null,
 
-    init() {
-        if (document.getElementById('cart-panel')) return;
+    init(getPortfolio = null, getTaxRegime = null) {
+        this._getPortfolio = getPortfolio;
+        this._getTaxRegime = getTaxRegime;
+        if (document.getElementById('cart-panel')) {
+            this.render();
+            return;
+        }
         const panel = document.createElement('div');
         panel.id = 'cart-panel';
         panel.innerHTML = `
@@ -121,6 +133,28 @@ export const CartPanel = {
 
         if (panel) panel.classList.add('visible');
 
+        // Ricalcolo dinamico della compensazione tra le vendite del carrello,
+        // nell'ordine attuale (modificabile via drag&drop). Non altera nulla
+        // di persistito: è una simulazione "in sospeso".
+        const portfolio = typeof this._getPortfolio === 'function' ? this._getPortfolio() : null;
+        const taxRegime = typeof this._getTaxRegime === 'function' ? this._getTaxRegime() : 'amministrato';
+
+        const cartSells = Cart.items
+            .filter(i => i.type === 'sell' && typeof i.pnlLordoEur === 'number')
+            .map(i => ({
+                cartId: i._cartId,
+                pnlLordoEur: i.pnlLordoEur,
+                categoria: i.tipoAsset === 'crypto' ? 'crypto' : 'strumenti',
+                isFondo: i.tipoAsset === 'fondo'
+            }));
+
+        const compensazioni = (portfolio && taxRegime !== 'dichiarativo' && cartSells.length)
+            ? calcolaCompensazioneProvvisoria(portfolio, cartSells, taxRegime)
+            : [];
+
+        const compensazioneMap = {};
+        compensazioni.forEach(c => { compensazioneMap[c.cartId] = c; });
+
         let totalBuyEur  = 0;
         let totalSellNet = 0;
         let totalTax     = 0;
@@ -152,16 +186,42 @@ export const CartPanel = {
                         <div class="cart-item-pmc">Nuovo PMC: <b>${Calc.fmt(item.newPmc)}</b> &nbsp;|&nbsp; Q.tà tot: <b>${Calc.fmt(item.newQty, 4)}</b></div>
                     </div>`;
             } else {
-                const grossReceipt = item.grossReceipt;
-                const tax          = item.tax;
-                const netReceipt   = item.netReceipt;
-                const netEur       = toEur(netReceipt);
-                totalSellNet      += netEur;
-                totalTax          += toEur(tax);
-                const taxPct       = item.tipoAsset === 'bond' ? '12,5%' : item.tipoAsset === 'crypto' ? '33%' : '26%';
+                const taxRateMap = { bond: 0.125, crypto: 0.33 };
+                const taxRate = taxRateMap[item.tipoAsset] ?? 0.26;
+                const taxPct  = item.tipoAsset === 'bond' ? '12,5%' : item.tipoAsset === 'crypto' ? '33%' : '26%';
+
+                const comp = compensazioneMap[item._cartId];
+                let grossReceipt = item.grossReceipt;
+                let tax, netReceipt, compensHtml = '';
+
+                if (comp && typeof item.pnlLordoEur === 'number') {
+                    if (item.pnlLordoEur > 0.01) {
+                        tax = comp.residuoTassabileEur * taxRate;
+                        netReceipt = grossReceipt - tax;
+                        if (comp.motivoEsclusione === 'fondo') {
+                            compensHtml = `<div class="cart-item-comp text-muted fs-xs">Fondo: nessuna compensazione possibile</div>`;
+                        } else if (comp.compensatoEur > 0.01) {
+                            compensHtml = `<div class="cart-item-comp text-muted fs-xs">Compensato con minus: − € ${Calc.fmt(comp.compensatoEur)}</div>`;
+                        }
+                    } else {
+                        tax = 0;
+                        netReceipt = grossReceipt;
+                        compensHtml = `<div class="cart-item-comp text-muted fs-xs">In perdita: alimenta il pool minus per le righe successive</div>`;
+                    }
+                } else {
+                    // Fallback: nessun portfolio/regime disponibile, usa i valori congelati originari.
+                    tax = item.tax;
+                    netReceipt = item.netReceipt;
+                }
+
+                const netEur = toEur(netReceipt);
+                totalSellNet += netEur;
+                totalTax     += toEur(tax);
+
                 html += `
-                    <div class="cart-item cart-item-sell">
+                    <div class="cart-item cart-item-sell" draggable="true" data-cid="${item._cartId}">
                         <div class="cart-item-header">
+                            <span class="cart-item-drag" title="Trascina per riordinare">⠿</span>
                             <span class="cart-item-badge sell">🔴 VEN</span>
                             <span class="cart-item-name">${item.nome}</span>
                             <button class="cart-item-remove" data-cid="${item._cartId}">✕</button>
@@ -173,6 +233,7 @@ export const CartPanel = {
                             Lordo: <b>${s} ${Calc.fmt(grossReceipt)}</b>
                             &nbsp;−&nbsp; Tasse ${taxPct}: <b class="neg-loss">${s} ${Calc.fmt(tax)}</b>
                         </div>
+                        ${compensHtml}
                         <div class="cart-item-pmc sell-net">
                             Netto: <b>${s} ${Calc.fmt(netReceipt)}</b>
                             ${item.valuta === 'USD' ? `<span class="cart-eur-hint">≈ € ${Calc.fmt(netEur)}</span>` : ''}
@@ -185,8 +246,13 @@ export const CartPanel = {
         itemsEl.innerHTML = html;
 
         itemsEl.querySelectorAll('.cart-item-remove').forEach(btn => {
-            btn.onclick = () => Cart.remove(+btn.dataset.cid);
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                Cart.remove(+btn.dataset.cid);
+            };
         });
+
+        this._bindDragAndDrop(itemsEl);
 
         const balance = totalSellNet - totalBuyEur;
         if (footerEl) {
@@ -207,5 +273,47 @@ export const CartPanel = {
                     </div>
                 </div>`;
         }
+    },
+
+    _bindDragAndDrop(itemsEl) {
+        let dragCartId = null;
+
+        itemsEl.querySelectorAll('.cart-item[draggable="true"]').forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                dragCartId = +card.dataset.cid;
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+            });
+
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                card.classList.add('drag-over');
+            });
+
+            card.addEventListener('dragleave', () => {
+                card.classList.remove('drag-over');
+            });
+
+            card.addEventListener('drop', (e) => {
+                e.preventDefault();
+                card.classList.remove('drag-over');
+                const targetCartId = +card.dataset.cid;
+                if (dragCartId === null || dragCartId === targetCartId) return;
+
+                const fromIdx = Cart.items.findIndex(i => i._cartId === dragCartId);
+                const toIdx   = Cart.items.findIndex(i => i._cartId === targetCartId);
+                if (fromIdx === -1 || toIdx === -1) return;
+
+                const [moved] = Cart.items.splice(fromIdx, 1);
+                Cart.items.splice(toIdx, 0, moved);
+
+                Cart._persist();
+                this.render();
+            });
+        });
     }
 };

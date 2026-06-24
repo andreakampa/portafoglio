@@ -6,13 +6,14 @@ import { lockScroll, unlockScroll } from './ui/helpers.js';
 import {
     simulateBuyByBudget,
     simulateBuyByQty,
-    simulateSell
+    simulateSell,
+    simulateSellLIFO
 } from './ui/sim-core.js';
 
 // ── SIMULATION MODAL ───────────────────────────────────────────────────────
-export async function openSimModal(id, portfolio, prices) {
+export async function openSimModal(id, portfolio, prices, taxRegime = 'amministrato') {
     const p = portfolio[id];
-    const { qta, pmc, pmcEur } = Calc.positionSync(p);
+    const { qta, pmc, pmcEur } = Calc.positionSync(p, taxRegime);
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-simulazione');
     const isUSD = p.valuta === 'USD';
@@ -89,6 +90,11 @@ export async function openSimModal(id, portfolio, prices) {
                             </div>
                         </div>
                     </div>
+                    <div style="display:flex; gap:8px; margin-top:14px;">
+                        <button type="button" id="sim-sell-mode-normale" class="btn btn-ghost" style="flex:1; font-weight:700;">Vendita normale</button>
+                        <button type="button" id="sim-sell-mode-lotti" class="btn btn-ghost" style="flex:1; font-weight:700;">📦 Vendita a lotti</button>
+                    </div>
+                    <div id="sim-sell-lotti-panel" style="display:none; margin-top:10px;"></div>
                     <div id="sim-sell-result" class="preview-box" style="display:none; margin-top:14px;"></div>
                     <button id="sim-add-cart-sell" class="btn btn-cart btn-full" style="margin-top:12px; display:none;">
                         🛒 Aggiungi al Carrello
@@ -110,6 +116,72 @@ export async function openSimModal(id, portfolio, prices) {
         calcSimSell();
     };
 
+    let sellMode = 'normale';
+    const btnSellNormale = document.getElementById('sim-sell-mode-normale');
+    const btnSellLotti   = document.getElementById('sim-sell-mode-lotti');
+    const sellLottiPanel = document.getElementById('sim-sell-lotti-panel');
+    const sellQtyInput   = document.getElementById('sim-sell-qty');
+    const sellMaxBtn     = document.getElementById('sim-sell-max');
+
+    const setActiveSellBtn = (active) => {
+        [btnSellNormale, btnSellLotti].forEach(b => { b.style.background = ''; b.style.color = ''; });
+        active.style.background = 'var(--purple)';
+        active.style.color = '#fff';
+    };
+    setActiveSellBtn(btnSellNormale);
+
+    btnSellNormale.onclick = () => {
+        sellMode = 'normale';
+        setActiveSellBtn(btnSellNormale);
+        sellLottiPanel.style.display = 'none';
+        sellQtyInput.readOnly = false;
+        sellQtyInput.value = '';
+        if (sellMaxBtn) sellMaxBtn.style.display = '';
+        calcSimSell();
+    };
+
+    btnSellLotti.onclick = () => {
+        sellMode = 'lotti';
+        setActiveSellBtn(btnSellLotti);
+        sellLottiPanel.style.display = 'block';
+        sellQtyInput.readOnly = true;
+        if (sellMaxBtn) sellMaxBtn.style.display = 'none';
+        renderSimLottiPanel();
+    };
+
+    function renderSimLottiPanel() {
+        const panel = document.getElementById('sim-sell-lotti-panel');
+        if (!panel) return;
+        const lots = Calc.getLots(p, taxRegime);
+        if (!lots.length) {
+            panel.innerHTML = `<div class="text-muted fs-xs">Nessun lotto disponibile.</div>`;
+            return;
+        }
+        const sym = isUSD ? '$' : '€';
+
+        panel.innerHTML = lots.map(l => {
+            let pmcLabel = `${sym} ${Calc.fmt(l.price)}`;
+            if (isUSD) {
+                const lotRate = l.exchangeRate || Exchange._memoryCache.get(l.date)?.rate || Exchange.rate || 1;
+                pmcLabel += ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(l.price / lotRate)})</span>`;
+            }
+            return `
+                <div class="lotto-row" style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border);">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;">${l.date}</div>
+                        <div class="text-muted fs-xs">Disponibili: ${Calc.fmt(l.qtyResidua, 4)} · PMC lotto: ${pmcLabel}</div>
+                    </div>
+                    <input type="number" class="sim-lotto-qty-input" data-lot-id="${l.id}" step="any" min="0" max="${l.qtyResidua}" placeholder="0" style="width:90px;">
+                </div>`;
+        }).join('');
+
+        panel.querySelectorAll('.sim-lotto-qty-input').forEach(inp => {
+            inp.oninput = () => calcSimSellLotti(lots);
+        });
+
+        calcSimSellLotti(lots);
+    }
+
     document.getElementById('sim-tab-buy').onclick = () => {
         document.getElementById('sim-tab-buy').classList.add('active');
         document.getElementById('sim-tab-sell').classList.remove('active');
@@ -121,7 +193,11 @@ export async function openSimModal(id, portfolio, prices) {
         document.getElementById('sim-tab-buy').classList.remove('active');
         document.getElementById('sim-buy-section').style.display  = 'none';
         document.getElementById('sim-sell-section').style.display = '';
-        calcSimSell();
+        if (sellMode === 'lotti') {
+            renderSimLottiPanel();
+        } else {
+            calcSimSell();
+        }
     };
 
     let buyMode = 'budget';
@@ -241,6 +317,86 @@ const calcSimBuy = () => {
 };
 
     let lastSellResult = null;
+
+    const calcSimSellLotti = (lots) => {
+        const pr = parseFloat(document.getElementById('sim-sell-prezzo').value);
+        const c = parseFloat(document.getElementById('sim-sell-comm').value) || 0;
+        const box = document.getElementById('sim-sell-result');
+        const cartBtn = document.getElementById('sim-add-cart-sell');
+        const panel = document.getElementById('sim-sell-lotti-panel');
+
+        lastSellResult = null;
+        cartBtn.style.display = 'none';
+
+        let qtyTotale = 0;
+        panel.querySelectorAll('.sim-lotto-qty-input').forEach(inp => {
+            qtyTotale += parseFloat(inp.value) || 0;
+        });
+        document.getElementById('sim-sell-qty').value = qtyTotale || '';
+
+        if (qtyTotale <= 0 || isNaN(pr) || pr <= 0) {
+            box.style.display = 'none';
+            return;
+        }
+
+        const result = simulateSellLIFO({
+            qty: qtyTotale,
+            price: pr,
+            commission: c,
+            lots,
+            tipoAsset: p.tipoAsset,
+            isUSD,
+            rate
+        });
+
+        if (!result) {
+            box.style.display = 'none';
+            return;
+        }
+
+        if (result.error === 'qty_exceeds') {
+            box.style.display = 'block';
+            box.innerHTML = `<span class="neg-loss">Quantità superiore al disponibile (${Calc.fmt(result.availableQty, 4)})</span>`;
+            return;
+        }
+
+        const dettaglioHtml = result.dettaglioLotti.map(d =>
+            `<div class="text-muted fs-xs">${d.date}: ${Calc.fmt(d.qty, 4)} pz a ${Calc.fmt(d.price)}</div>`
+        ).join('');
+
+        box.style.display = 'block';
+        box.innerHTML = `
+            <div style="margin-bottom:6px;">Lotti consumati (LIFO):</div>
+            ${dettaglioHtml}
+            <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+                <div>Incasso lordo: <b>${isUSD ? `$ ${Calc.fmt(result.grossReceipt)} ≈ € ${Calc.fmt(result.grossReceiptEur)}` : `€ ${Calc.fmt(result.grossReceipt)}`}</b></div>
+                <div>P&L operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
+                ${result.pnl > 0
+                    ? `<div>Tasse (${result.taxLabel}): <b class="neg-loss">− € ${Calc.fmt(result.tax)}</b></div>`
+                    : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
+                <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
+                    Incasso netto: <b class="${result.netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.netReceiptEur)}</b>
+                </div>
+                <div>Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
+            </div>`;
+
+        lastSellResult = {
+            qty: result.qty,
+            price: result.price,
+            commission: result.commission,
+            pmc: null, // non applicabile in modalità lotti (PMC varia per lotto)
+            remQty: result.remQty,
+            grossReceipt: result.grossReceiptEur,
+            netReceipt: result.netReceiptEur,
+            tax: result.tax,
+            pnlLordoEur: result.pnl,
+            saleMode: 'lotti',
+            lotAllocation: result.dettaglioLotti.map(d => ({ lotId: d.lotId, qty: d.qty }))
+        };
+
+        cartBtn.style.display = 'block';
+    };
+
 const calcSimSell = () => {
     const pr = parseFloat(document.getElementById('sim-sell-prezzo').value);
     const sq = parseFloat(document.getElementById('sim-sell-qty').value);
@@ -296,7 +452,9 @@ const calcSimSell = () => {
         remQty: result.remQty,
         grossReceipt: result.grossReceiptEur,
         netReceipt: result.netReceiptEur,
-        tax: result.tax
+        tax: result.tax,
+        pnlLordoEur: result.pnl,
+        saleMode: 'normale'
     };
 
     cartBtn.style.display = 'block';
@@ -306,8 +464,18 @@ const calcSimSell = () => {
         document.getElementById(elId)?.addEventListener('input', calcSimBuy);
     });
 
-    ['sim-sell-prezzo', 'sim-sell-qty', 'sim-sell-comm'].forEach(elId => {
-        document.getElementById(elId)?.addEventListener('input', calcSimSell);
+    ['sim-sell-prezzo', 'sim-sell-comm'].forEach(elId => {
+        document.getElementById(elId)?.addEventListener('input', () => {
+            if (sellMode === 'lotti') {
+                const lots = Calc.getLots(p, taxRegime);
+                calcSimSellLotti(lots);
+            } else {
+                calcSimSell();
+            }
+        });
+    });
+    document.getElementById('sim-sell-qty')?.addEventListener('input', () => {
+        if (sellMode === 'normale') calcSimSell();
     });
 
     document.getElementById('sim-add-cart-buy').onclick = () => {
@@ -341,6 +509,9 @@ const calcSimSell = () => {
             grossReceipt: lastSellResult.grossReceipt,
             netReceipt:   lastSellResult.netReceipt,
             tax:          lastSellResult.tax,
+            pnlLordoEur:  lastSellResult.pnlLordoEur,
+            saleMode:     lastSellResult.saleMode,
+            ...(lastSellResult.lotAllocation ? { lotAllocation: lastSellResult.lotAllocation } : {}),
             valuta:       p.valuta || 'EUR',
             tipoAsset:    p.tipoAsset
         });

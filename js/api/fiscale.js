@@ -211,6 +211,99 @@ export function calcolaCompensazione(portfolio, taxRegime = 'amministrato') {
     return { dettaglioPlus, residuoFinale };
 }
 
+// ── COMPENSAZIONE PROVVISORIA (simulazione carrello) ────────────────────────
+// Estende calcolaCompensazione con un set di vendite "virtuali" non ancora
+// salvate (es. righe nel carrello), in un ordine scelto dall'utente.
+// Non scrive nulla su Firebase: serve solo a mostrare un preview realistico
+// di quanto ciascuna vendita virtuale verrebbe effettivamente tassata,
+// tenendo conto delle altre vendite virtuali che la precedono nell'ordine.
+//
+// cartSells: array ordinato di { cartId, pnlLordoEur, categoria, isFondo, tipoAsset }
+// Ritorna: array parallelo con { cartId, compensatoEur, residuoTassabileEur, taxRate }
+//          (taxRate va applicato fuori, qui calcoliamo solo l'imponibile)
+
+export function calcolaCompensazioneProvvisoria(portfolio, cartSells, taxRegime = 'amministrato') {
+    const { residuoFinale } = calcolaCompensazione(portfolio, taxRegime);
+    const annoCorrente = new Date().getFullYear();
+
+    // Cloniamo il pool reale in una struttura locale mutabile, stessa forma
+    // di quella usata internamente da calcolaCompensazione.
+    const pool = { strumenti: [], crypto: [] };
+    for (const cat of ['strumenti', 'crypto']) {
+        pool[cat] = residuoFinale[cat].map(b => ({ ...b }));
+    }
+
+    const consumaDalPool = (categoria, annoPlus, importoRichiesto) => {
+        const bucket = pool[categoria]
+            .filter(b => b.residuo > 0.009 && (annoPlus - b.anno) <= ANNI_COMPENSAZIONE)
+            .sort((a, b) => a.anno - b.anno);
+
+        let rimanente = importoRichiesto;
+        let consumatoTotale = 0;
+        for (const b of bucket) {
+            if (rimanente <= 0.009) break;
+            const usato = Math.min(b.residuo, rimanente);
+            b.residuo -= usato;
+            rimanente -= usato;
+            consumatoTotale += usato;
+        }
+        return consumatoTotale;
+    };
+
+    const aggiungiAlPool = (categoria, anno, importo) => {
+        if (importo <= 0.009) return;
+        let bucket = pool[categoria].find(b => b.anno === anno);
+        if (!bucket) {
+            bucket = { anno, residuo: 0 };
+            pool[categoria].push(bucket);
+        }
+        bucket.residuo += importo;
+    };
+
+    const risultati = [];
+
+    for (const item of (cartSells || [])) {
+        const categoria = item.categoria === 'crypto' ? 'crypto' : 'strumenti';
+
+        if (item.pnlLordoEur < -0.01) {
+            // Minus virtuale: alimenta il pool con anno corrente, nessuna compensazione su sé stessa.
+            aggiungiAlPool(categoria, annoCorrente, Math.abs(item.pnlLordoEur));
+            risultati.push({
+                cartId: item.cartId,
+                compensatoEur: 0,
+                residuoTassabileEur: 0, // in perdita: nessuna imposta, a prescindere
+                motivoEsclusione: null
+            });
+            continue;
+        }
+
+        if (item.pnlLordoEur > 0.01) {
+            if (item.isFondo) {
+                risultati.push({
+                    cartId: item.cartId,
+                    compensatoEur: 0,
+                    residuoTassabileEur: item.pnlLordoEur,
+                    motivoEsclusione: 'fondo'
+                });
+                continue;
+            }
+
+            const compensatoEur = consumaDalPool(categoria, annoCorrente, item.pnlLordoEur);
+            risultati.push({
+                cartId: item.cartId,
+                compensatoEur,
+                residuoTassabileEur: Math.max(0, item.pnlLordoEur - compensatoEur),
+                motivoEsclusione: null
+            });
+            continue;
+        }
+
+        // pnl ≈ 0
+        risultati.push({ cartId: item.cartId, compensatoEur: 0, residuoTassabileEur: 0, motivoEsclusione: null });
+    }
+
+    return risultati;
+}
 
 export function raggruppaPerAnno(righe) {
     const mappa = {};

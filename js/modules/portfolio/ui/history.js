@@ -4,7 +4,7 @@ import { Toast } from '../../../core/toast.js';
 import { lockScroll, unlockScroll } from './helpers.js';
 import { openPacModal, generaPacTransazioni } from './pac.js';
 
-export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
+export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxRegime = 'amministrato') {
     const p = portfolio[id];
     const overlay = document.getElementById('modal-history');
 
@@ -39,7 +39,7 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
     document.getElementById('hist-pac-btn')?.addEventListener('click', () => {
         openPacModal(id, portfolio, async () => {
             await onSave();
-            renderHistoryContent(id, portfolio, onSave, currency);
+            renderHistoryContent(id, portfolio, onSave, currency, taxRegime);
         });
     });
 
@@ -56,12 +56,12 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR') {
         Toast.show(`${p.nome} ora è in EUR`, 'ok');
     });
 
-    renderHistoryContent(id, portfolio, onSave, currency);
+    renderHistoryContent(id, portfolio, onSave, currency, taxRegime);
 }
 
-function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
+function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime = 'amministrato') {
     const p = portfolio[id];
-    const { qta, pmc, pmcEur, realizedPnL, totalComm } = Calc.positionSync(p);
+    const { qta, pmc, pmcEur, realizedPnL, totalComm } = Calc.positionSync(p, taxRegime);
     const isUSD = p.valuta === 'USD';
     const s = isUSD ? '$' : '€';
     const rate = Exchange.rate || 1;
@@ -221,21 +221,21 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR') {
                 }
             }
             await onSave();
-            renderHistoryContent(id, portfolio, onSave, currency);
+            renderHistoryContent(id, portfolio, onSave, currency, taxRegime);
             Toast.show('Transazione rimossa', 'ok');
         }
         if (editBtn) {
             const origTx = txsSorted[+editBtn.dataset.idx];
             if (origTx.type === 'transfer') {
-                openTransferEditModal(id, origTx, portfolio, onSave, currency);
+                openTransferEditModal(id, origTx, portfolio, onSave, currency, taxRegime);
             } else {
-                openEditModal(id, origTx, portfolio, onSave, currency);
+                openEditModal(id, origTx, portfolio, onSave, currency, taxRegime);
             }
         }
     };
 }
 
-function openEditModal(id, origTx, portfolio, onSave, currency) {
+function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amministrato') {
     document.getElementById('modal-edit-tx')?.remove();
 
     const isUSD = portfolio[id].valuta === 'USD';
@@ -456,12 +456,12 @@ function openEditModal(id, origTx, portfolio, onSave, currency) {
 
         close();
         await onSave();
-        renderHistoryContent(id, portfolio, onSave, currency);
+        renderHistoryContent(id, portfolio, onSave, currency, taxRegime);
         Toast.show('Transazione aggiornata', 'ok');
     };
 }
 
-function openTransferEditModal(id, origTx, portfolio, onSave, currency) {
+function openTransferEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amministrato') {
     document.getElementById('modal-edit-transfer')?.remove();
 
     const isSource = !!origTx.destPortfolioId;
@@ -516,7 +516,7 @@ function openTransferEditModal(id, origTx, portfolio, onSave, currency) {
 
     // Portafoglio A (sorgente): modificabile
     // Max qty = qta attuale + qty trasferita corrente
-    const { qta: qtaAttuale } = Calc.positionSync(portfolio[id]);
+    const { qta: qtaAttuale } = Calc.positionSync(portfolio[id], taxRegime);
     const maxQty = qtaAttuale + origTx.qty;
 
     const wrap = document.createElement('div');
@@ -595,7 +595,7 @@ function openTransferEditModal(id, origTx, portfolio, onSave, currency) {
 
             close();
             await onSave();
-            renderHistoryContent(id, portfolio, onSave, currency);
+            renderHistoryContent(id, portfolio, onSave, currency, taxRegime);
             Toast.show('Trasferimento annullato', 'ok');
             return;
         }
@@ -633,7 +633,7 @@ function openTransferEditModal(id, origTx, portfolio, onSave, currency) {
 
         close();
         await onSave();
-        renderHistoryContent(id, portfolio, onSave, currency);
+        renderHistoryContent(id, portfolio, onSave, currency, taxRegime);
         Toast.show('Trasferimento aggiornato', 'ok');
     };
 }

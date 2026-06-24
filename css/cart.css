@@ -212,6 +212,22 @@
     transform: translateY(0);
 }
 
+.cart-item-drag {
+    cursor: grab;
+    color: var(--text-muted);
+    margin-right: 4px;
+    user-select: none;
+}
+.cart-item.dragging {
+    opacity: 0.4;
+}
+.cart-item.drag-over {
+    border: 1px dashed var(--accent);
+}
+.cart-item-comp {
+    margin: 2px 0;
+}
+
 /* ── Responsive mobile ── */
 @media (max-width: 480px) {
     #cart-panel {
