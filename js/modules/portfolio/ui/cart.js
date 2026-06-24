@@ -3,27 +3,42 @@ import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 import { calcolaCompensazioneProvvisoria } from '../../../api/fiscale.js';
 
-const CART_KEY = 'ptpro_cart';
+const CART_KEY_PREFIX = 'ptpro_cart_';
+const CART_KEY_LEGACY = 'ptpro_cart'; // formato pre-multi-portfolio, da migrare una tantum
 
-function loadCartItems() {
+function cartKeyFor(portfolioId) {
+    return portfolioId ? `${CART_KEY_PREFIX}${portfolioId}` : CART_KEY_LEGACY;
+}
+
+function loadCartItems(portfolioId) {
     try {
-        const raw = localStorage.getItem(CART_KEY);
+        const raw = localStorage.getItem(cartKeyFor(portfolioId));
         return raw ? JSON.parse(raw) : [];
     } catch (e) { return []; }
 }
 
-function saveCartItems(items) {
+function saveCartItems(portfolioId, items) {
     try {
-        localStorage.setItem(CART_KEY, JSON.stringify(items));
+        localStorage.setItem(cartKeyFor(portfolioId), JSON.stringify(items));
     } catch (e) {}
 }
 
 export const Cart = {
-    items: loadCartItems(),
+    items: [],
+    _portfolioId: null,
+
+    // Da chiamare quando si cambia portfolio attivo (anche al mount iniziale).
+    // Salva il carrello del portfolio precedente (se diverso) e carica quello nuovo.
+    switchPortfolio(portfolioId) {
+        if (portfolioId === this._portfolioId) return;
+        this._portfolioId = portfolioId;
+        this.items = loadCartItems(portfolioId);
+        CartPanel.render();
+    },
 
     add(item) {
         this.items.push({ ...item, _cartId: Date.now() + Math.random() });
-        saveCartItems(this.items);
+        saveCartItems(this._portfolioId, this.items);
         CartPanel.render();
         CartPanel.show();
         Toast.show(`${item.nome} aggiunto al carrello`, 'ok');
@@ -31,18 +46,18 @@ export const Cart = {
 
     remove(cartId) {
         this.items = this.items.filter(i => i._cartId !== cartId);
-        saveCartItems(this.items);
+        saveCartItems(this._portfolioId, this.items);
         CartPanel.render();
     },
 
     clear() {
         this.items = [];
-        saveCartItems(this.items);
+        saveCartItems(this._portfolioId, this.items);
         CartPanel.render();
     },
 
     _persist() {
-        saveCartItems(this.items);
+        saveCartItems(this._portfolioId, this.items);
     }
 };
 

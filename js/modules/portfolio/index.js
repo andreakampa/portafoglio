@@ -9,7 +9,7 @@ import {
     renderPage, renderTable, renderKPI, renderSkeleton,
     renderMobileCards, buildPositionMap, resetRenderState
 } from './render.js';
-import { openTransactionModal, openHistoryModal, openSimModal, CartPanel, openTransferModal } from './ui.js';
+import { openTransactionModal, openHistoryModal, openSimModal, CartPanel, Cart, openTransferModal } from './ui.js';
 import { initCassettoFiscale, aggiornaBadgeFiscale } from '../../api/fiscale.js';
 
 import { generaPacTransazioni } from './ui/pac.js';
@@ -114,6 +114,7 @@ export class PortfolioPage {
             () => this._getActivePortfolio(),
             () => this._getActivePortfolio()?.taxRegime || 'amministrato'
         );
+        Cart.switchPortfolio(this.activePortfolioId);
 
         await this._aggiornaAllPac();
 
@@ -429,6 +430,7 @@ await this._aggiornaDividendi(true);
             this.activePortfolioId = remaining[0];
             this.portfolioState.activePortfolioId = this.activePortfolioId;
             this._syncActivePortfolio();
+            Cart.switchPortfolio(this.activePortfolioId);
 
             await DB.save('portfolio_state', this.portfolioState);
             this._renderPortfolioSwitcher();
@@ -474,6 +476,7 @@ await this._aggiornaDividendi();
                 this.activePortfolioId = pid;
                 this.portfolioState.activePortfolioId = pid;
                 this._syncActivePortfolio();
+                Cart.switchPortfolio(pid);
 
                 await DB.save('portfolio_state', this.portfolioState);
                 this._renderPortfolioSwitcher();
@@ -592,6 +595,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
               this.portfolioState.activePortfolioId = id;
   this.activePortfolioId = id;
   this._syncActivePortfolio();
+  Cart.switchPortfolio(id);
   this.dividendi = {};
   await DB.save('portfolio_state', this.portfolioState);
   this._renderPortfolioSwitcher();
