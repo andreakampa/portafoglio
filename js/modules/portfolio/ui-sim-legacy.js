@@ -2,6 +2,7 @@ import { Calc } from './calc.js';
 import { Exchange } from '../../api/exchange.js';
 import { Cart } from './ui/cart.js';
 import { lockScroll, unlockScroll } from './ui/helpers.js';
+import { calcolaCompensazione } from '../../api/fiscale.js';
 
 import {
     simulateBuyByBudget,
@@ -11,9 +12,24 @@ import {
 } from './ui/sim-core.js';
 
 // ── SIMULATION MODAL ───────────────────────────────────────────────────────
-export async function openSimModal(id, portfolio, prices, taxRegime = 'amministrato') {
+export async function openSimModal(id, portfolio, prices, taxRegime = 'amministrato', activePortfolio = null) {
     const p = portfolio[id];
     const { qta, pmc, pmcEur } = Calc.positionSync(p, taxRegime);
+
+    let minusDisponibili = 0;
+    if (taxRegime === 'amministrato') {
+        const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
+        const fiscalAssets = { ...portfolio, fiscal: activePortfolio?.fiscal || {} };
+        const { residuoFinale } = calcolaCompensazione(fiscalAssets, taxRegime);
+        minusDisponibili = (residuoFinale[categoria] || []).reduce((s, b) => s + b.residuo, 0);
+    }
+
+    let minusDisponibili = 0;
+    if (taxRegime === 'amministrato') {
+        const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
+        const { residuoFinale } = calcolaCompensazione(portfolio, taxRegime);
+        minusDisponibili = (residuoFinale[categoria] || []).reduce((s, b) => s + b.residuo, 0);
+    }
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-simulazione');
     const isUSD = p.valuta === 'USD';
@@ -346,7 +362,8 @@ const calcSimBuy = () => {
             lots,
             tipoAsset: p.tipoAsset,
             isUSD,
-            rate
+            rate,
+            minusDisponibili
         });
 
         if (!result) {
@@ -416,7 +433,8 @@ const calcSimSell = () => {
         pmcEur,
         tipoAsset: p.tipoAsset,
         isUSD,
-        rate
+        rate,
+        minusDisponibili
     });
 
     if (!result) {
@@ -435,6 +453,9 @@ const calcSimSell = () => {
         <div style="display:grid; gap:4px;">
             <div>Incasso lordo: <b>${isUSD ? `$ ${Calc.fmt(result.grossReceipt)} ≈ € ${Calc.fmt(result.grossReceiptEur)}` : `€ ${Calc.fmt(result.grossReceipt)}`}</b></div>
             <div>P&L operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
+            ${result.pnl > 0 && result.minusUsate > 0
+                ? `<div class="text-muted fs-xs">Minus compensate: − € ${Calc.fmt(result.minusUsate)} (di € ${Calc.fmt(result.minusDisponibili)} disponibili) → imponibile € ${Calc.fmt(result.imponibile)}</div>`
+                : ''}
             ${result.pnl > 0
                 ? `<div>Tasse (${result.taxLabel}): <b class="neg-loss">− € ${Calc.fmt(result.tax)}</b></div>`
                 : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}

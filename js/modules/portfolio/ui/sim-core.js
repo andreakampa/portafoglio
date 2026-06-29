@@ -95,7 +95,8 @@ export function simulateSell({
     pmcEur,
     tipoAsset,
     isUSD,
-    rate
+    rate,
+    minusDisponibili = 0
 }) {
     if (isNaN(price) || price <= 0 || isNaN(qty) || qty <= 0) return null;
 
@@ -111,7 +112,6 @@ export function simulateSell({
     let grossReceipt;
     let grossReceiptEur;
     let pnl;
-    let tax;
     let netReceipt;
     let netReceiptEur;
 
@@ -121,15 +121,22 @@ export function simulateSell({
         const commissionEur = (commission || 0) / rate;
         const costoEur = (pmcEur > 0 ? pmcEur : pmc / rate) * qty;
         pnl = grossReceiptEur - costoEur - commissionEur;
-        tax = pnl > 0 ? pnl * taxRate : 0;
-        netReceiptEur = grossReceiptEur - commissionEur - tax;
-        netReceipt = netReceiptEur;
     } else {
         grossReceipt = qty * price - (commission || 0);
         pnl = (price - pmc) * qty - (commission || 0);
-        tax = pnl > 0 ? pnl * taxRate : 0;
-        netReceipt = grossReceipt - tax;
         grossReceiptEur = grossReceipt;
+    }
+
+    const minusUsate = pnl > 0 ? Math.min(pnl, Math.max(0, minusDisponibili || 0)) : 0;
+    const imponibile = pnl > 0 ? Math.max(0, pnl - minusUsate) : 0;
+    const tax = imponibile * taxRate;
+
+    if (isUSD) {
+        const commissionEur = (commission || 0) / rate;
+        netReceiptEur = grossReceiptEur - commissionEur - tax;
+        netReceipt = netReceiptEur;
+    } else {
+        netReceipt = grossReceipt - tax;
         netReceiptEur = netReceipt;
     }
 
@@ -145,7 +152,10 @@ export function simulateSell({
         tax,
         taxLabel,
         netReceipt,
-        netReceiptEur
+        netReceiptEur,
+        minusDisponibili: minusDisponibili || 0,
+        minusUsate,
+        imponibile
     };
 }
 
@@ -156,7 +166,8 @@ export function simulateSellLIFO({
     lots,
     tipoAsset,
     isUSD,
-    rate
+    rate,
+    minusDisponibili = 0
 }) {
     if (isNaN(price) || price <= 0 || isNaN(qty) || qty <= 0) return null;
 
@@ -204,22 +215,29 @@ export function simulateSellLIFO({
         ? dettaglioLotti.reduce((s, d) => s + (d.price * d.qty) / (d.exchangeRate || 1), 0)
         : costoBaseNative;
 
-    let grossReceipt, grossReceiptEur, pnl, tax, netReceipt, netReceiptEur;
+    let grossReceipt, grossReceiptEur, pnl, netReceipt, netReceiptEur;
 
     if (isUSD) {
         grossReceipt = qty * price;
         grossReceiptEur = grossReceipt / rate;
         const commissionEur = (commission || 0) / rate;
         pnl = grossReceiptEur - costoBaseEur - commissionEur;
-        tax = pnl > 0 ? pnl * taxRate : 0;
-        netReceiptEur = grossReceiptEur - commissionEur - tax;
-        netReceipt = netReceiptEur;
     } else {
         grossReceipt = qty * price - (commission || 0);
         pnl = (qty * price) - costoBaseNative - (commission || 0);
-        tax = pnl > 0 ? pnl * taxRate : 0;
-        netReceipt = grossReceipt - tax;
         grossReceiptEur = grossReceipt;
+    }
+
+    const minusUsate = pnl > 0 ? Math.min(pnl, Math.max(0, minusDisponibili || 0)) : 0;
+    const imponibile = pnl > 0 ? Math.max(0, pnl - minusUsate) : 0;
+    const tax = imponibile * taxRate;
+
+    if (isUSD) {
+        const commissionEur = (commission || 0) / rate;
+        netReceiptEur = grossReceiptEur - commissionEur - tax;
+        netReceipt = netReceiptEur;
+    } else {
+        netReceipt = grossReceipt - tax;
         netReceiptEur = netReceipt;
     }
 
@@ -235,6 +253,9 @@ export function simulateSellLIFO({
         taxLabel,
         netReceipt,
         netReceiptEur,
+        minusDisponibili: minusDisponibili || 0,
+        minusUsate,
+        imponibile,
         dettaglioLotti
     };
 }

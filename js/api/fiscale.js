@@ -11,6 +11,34 @@ import { Calc } from '../modules/portfolio/calc.js';
 
 const ANNI_COMPENSAZIONE = 4;
 
+// Cache del risultato di calcolaCompensazione, keyed per firma del portafoglio
+// (transazioni + overrides + manualLosses). Si invalida da sola: qualsiasi
+// cambiamento che conta per il calcolo produce una firma diversa.
+const _compensazioneCache = new Map();
+
+function _compensazioneSignature(portfolio, taxRegime) {
+    const assets = portfolio && portfolio.assets ? portfolio.assets : portfolio || {};
+    const fiscal = (portfolio && portfolio.fiscal) || {};
+    let txSig = '';
+    for (const id in assets) {
+        const p = assets[id];
+        const txs = (p.transactions || [])
+            .map(tx => [tx.date, tx.type, tx.qty, tx.price, tx.commission || 0, tx.exchangeRate || '', tx.lotAllocation ? JSON.stringify(tx.lotAllocation) : ''].join('|'))
+            .join(';');
+        txSig += `${id}#${p.tipoAsset || ''}#${txs}||`;
+    }
+    const overridesSig = JSON.stringify(fiscal.compensationOverrides || {});
+    const manualSig = JSON.stringify(fiscal.manualLosses || []);
+    return `${taxRegime}###${txSig}###${overridesSig}###${manualSig}`;
+}
+
+// Tasto di emergenza manuale: non richiamata automaticamente da nessun punto
+// del codice, perché la firma sopra si invalida già da sola. Utile solo per
+// un eventuale forzare-ricalcolo da console o da un futuro bottone "ricarica".
+export function invalidateCompensazioneCache() {
+    _compensazioneCache.clear();
+}
+
 
 // Calcola tutte le minusvalenze realizzate dal portafoglio
 // Restituisce array di { anno, data, titolo, tipoAsset, categoria, minus }
@@ -63,6 +91,9 @@ export function calcolaMinusvalenze(portfolio, taxRegime = 'amministrato') {
 // portfolio.fiscal.compensationOverrides, keyed per id stabile dell'evento.
 
 export function calcolaCompensazione(portfolio, taxRegime = 'amministrato') {
+    const sig = _compensazioneSignature(portfolio, taxRegime);
+    if (_compensazioneCache.has(sig)) return _compensazioneCache.get(sig);
+
     const assets = portfolio && portfolio.assets ? portfolio.assets : portfolio || {};
     const overrides = (portfolio && portfolio.fiscal && portfolio.fiscal.compensationOverrides) || {};
     const fiscal = (portfolio && portfolio.fiscal) || {};
@@ -207,7 +238,9 @@ export function calcolaCompensazione(portfolio, taxRegime = 'amministrato') {
         }
     }
 
-    return { dettaglioPlus, residuoFinale };
+    const result = { dettaglioPlus, residuoFinale };
+    _compensazioneCache.set(sig, result);
+    return result;
 }
 
 // ── COMPENSAZIONE PROVVISORIA (simulazione carrello) ────────────────────────
@@ -583,6 +616,7 @@ function attachManualLossHandlers() {
                 tipoAsset
             });
 
+            invalidateCompensazioneCache();
             await saveFiscalPortfolio();
             renderDrawerFiscale(_portfolio || (_getPortfolio ? _getPortfolio() : null));
         });
@@ -606,6 +640,7 @@ function attachManualLossHandlers() {
 
             losses.splice(idx, 1);
 
+            invalidateCompensazioneCache();
             await saveFiscalPortfolio();
             renderDrawerFiscale(_portfolio || (_getPortfolio ? _getPortfolio() : null));
         });
@@ -648,6 +683,7 @@ function attachCompensationOverrideHandlers() {
             pf.fiscal.compensationOverrides[compId] = { compensatoEur: val };
         }
 
+        invalidateCompensazioneCache();
         await saveFiscalPortfolio();
         renderDrawerFiscale(_portfolio || (_getPortfolio ? _getPortfolio() : null));
     });

@@ -756,7 +756,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             onHistory: id => openHistoryModal(id, this.portfolio, () => this._save(), this.currency, this._getActivePortfolio()?.taxRegime || 'amministrato'),
             onTransaction: (id, type) => openTransactionModal(id, type, this.portfolio, this.prices,
                 async () => { await this._save(); }, this._getActivePortfolio()),
-            onSimulation: id => openSimModal(id, this.portfolio, this.prices, this._getActivePortfolio()?.taxRegime || 'amministrato'),
+            onSimulation: id => openSimModal(id, this.portfolio, this.prices, this._getActivePortfolio()?.taxRegime || 'amministrato', this._getActivePortfolio()),
             onDelete: id => this.elimina(id),
             onDividendi: id => openDividendiModal(id, this.portfolio, this.dividendi),
             onDividendiDashboard: () => openDividendiModal('__ALL__', this.portfolio, this.dividendi),
@@ -798,10 +798,33 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         });
         sourceAsset.transactions.sort((a, b) => a.date.localeCompare(b.date));
 
-        // ── 2. Crea asset nel destinazione se non esiste ───────────
+        // ── 2. Trova l'asset corrispondente nel destinazione, se esiste già ──
+        // Non ci si può fidare di sourceAssetId: lo stesso titolo può avere
+        // ricevuto un id diverso nei due portafogli (es. ISIN in uno, ticker
+        // nell'altro), a seconda di come è stato aggiunto. Si cerca quindi
+        // per ticker/ISIN prima di decidere se creare una nuova posizione.
         if (!destPortfolio.assets) destPortfolio.assets = {};
-        if (!destPortfolio.assets[sourceAssetId]) {
-            destPortfolio.assets[sourceAssetId] = {
+
+        const sourceTicker = (sourceAsset.ticker || '').toUpperCase();
+        const sourceIsin   = (sourceAsset.isin || '').toUpperCase();
+
+        let destAssetId = Object.keys(destPortfolio.assets).find(aid => {
+            const a = destPortfolio.assets[aid];
+            const aTicker = (a.ticker || '').toUpperCase();
+            const aIsin   = (a.isin || '').toUpperCase();
+            return (sourceTicker && aTicker && aTicker === sourceTicker)
+                || (sourceIsin && aIsin && aIsin === sourceIsin);
+        });
+
+        if (!destAssetId) {
+            // Nessuna corrispondenza trovata: crea una nuova posizione,
+            // usando sourceAssetId come prima (comportamento invariato
+            // per il caso "titolo nuovo per quel portfolio").
+            destAssetId = sourceAssetId;
+        }
+
+        if (!destPortfolio.assets[destAssetId]) {
+            destPortfolio.assets[destAssetId] = {
                 nome:      sourceAsset.nome,
                 ticker:    sourceAsset.ticker || sourceAsset.nome,
                 valuta:    sourceAsset.valuta || 'EUR',
@@ -813,7 +836,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         }
 
         // ── 3. Transazione transfer nel destinazione ───────────────
-        const destAsset = destPortfolio.assets[sourceAssetId];
+        const destAsset = destPortfolio.assets[destAssetId];
         destAsset.transactions.push({
             date: today,
             type: 'transfer',
