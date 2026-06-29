@@ -149,6 +149,7 @@ export function simulateSell({
         grossReceipt,
         grossReceiptEur,
         pnl,
+        pnlNetto: pnl - tax,
         tax,
         taxLabel,
         netReceipt,
@@ -241,7 +242,7 @@ export function simulateSellLIFO({
         netReceiptEur = netReceipt;
     }
 
-    return {
+   return {
         qty,
         price,
         commission: commission || 0,
@@ -249,6 +250,7 @@ export function simulateSellLIFO({
         grossReceipt,
         grossReceiptEur,
         pnl,
+        pnlNetto: pnl - tax,
         tax,
         taxLabel,
         netReceipt,

@@ -379,16 +379,27 @@ const calcSimBuy = () => {
         box.innerHTML = `
             <div style="margin-bottom:6px;">Lotti consumati (LIFO):</div>
             ${dettaglioHtml}
-            <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
+            <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border); display:grid; gap:4px;">
+
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted);">Cassa</div>
                 <div>Incasso lordo: <b>${isUSD ? `$ ${Calc.fmt(result.grossReceipt)} ≈ € ${Calc.fmt(result.grossReceiptEur)}` : `€ ${Calc.fmt(result.grossReceipt)}`}</b></div>
-                <div>P&L operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
                 ${result.pnl > 0
                     ? `<div>Tasse (${result.taxLabel}): <b class="neg-loss">− € ${Calc.fmt(result.tax)}</b></div>`
                     : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
-                <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
-                    Incasso netto: <b class="${result.netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.netReceiptEur)}</b>
+                <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                    Incasso netto (ti arriva in conto): <b class="${result.netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.netReceiptEur)}</b>
                 </div>
-                <div>Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
+
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:12px;">Profitto rispetto al costo</div>
+                <div>P&L lordo operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
+                ${result.pnl > 0 && result.minusUsate > 0
+                    ? `<div class="text-muted fs-xs">Minus compensate: − € ${Calc.fmt(result.minusUsate)} (di € ${Calc.fmt(result.minusDisponibili)} disponibili) → imponibile € ${Calc.fmt(result.imponibile)}</div>`
+                    : ''}
+                <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                    P&L netto operazione (guadagno reale): <b class="${result.pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnlNetto)}</b>
+                </div>
+
+                <div style="margin-top:10px;">Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
             </div>`;
 
         lastSellResult = {
@@ -445,18 +456,26 @@ const calcSimSell = () => {
     box.style.display = 'block';
     box.innerHTML = `
         <div style="display:grid; gap:4px;">
+
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:2px;">Cassa</div>
             <div>Incasso lordo: <b>${isUSD ? `$ ${Calc.fmt(result.grossReceipt)} ≈ € ${Calc.fmt(result.grossReceiptEur)}` : `€ ${Calc.fmt(result.grossReceipt)}`}</b></div>
-            <div>P&L operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
-            ${result.pnl > 0 && result.minusUsate > 0
-                ? `<div class="text-muted fs-xs">Minus compensate: − € ${Calc.fmt(result.minusUsate)} (di € ${Calc.fmt(result.minusDisponibili)} disponibili) → imponibile € ${Calc.fmt(result.imponibile)}</div>`
-                : ''}
             ${result.pnl > 0
                 ? `<div>Tasse (${result.taxLabel}): <b class="neg-loss">− € ${Calc.fmt(result.tax)}</b></div>`
                 : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
-            <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
-                Incasso netto: <b class="${result.netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.netReceiptEur)}</b>
+            <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                Incasso netto (ti arriva in conto): <b class="${result.netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.netReceiptEur)}</b>
             </div>
-            <div>Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
+
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:12px;">Profitto rispetto al costo</div>
+            <div>P&L lordo operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
+            ${result.pnl > 0 && result.minusUsate > 0
+                ? `<div class="text-muted fs-xs">Minus compensate: − € ${Calc.fmt(result.minusUsate)} (di € ${Calc.fmt(result.minusDisponibili)} disponibili) → imponibile € ${Calc.fmt(result.imponibile)}</div>`
+                : ''}
+            <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                P&L netto operazione (guadagno reale): <b class="${result.pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnlNetto)}</b>
+            </div>
+
+            <div style="margin-top:10px;">Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
         </div>`;
 
     lastSellResult = {
