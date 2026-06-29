@@ -24,12 +24,6 @@ export async function openSimModal(id, portfolio, prices, taxRegime = 'amministr
         minusDisponibili = (residuoFinale[categoria] || []).reduce((s, b) => s + b.residuo, 0);
     }
 
-    let minusDisponibili = 0;
-    if (taxRegime === 'amministrato') {
-        const categoria = p.tipoAsset === 'crypto' ? 'crypto' : 'strumenti';
-        const { residuoFinale } = calcolaCompensazione(portfolio, taxRegime);
-        minusDisponibili = (residuoFinale[categoria] || []).reduce((s, b) => s + b.residuo, 0);
-    }
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-simulazione');
     const isUSD = p.valuta === 'USD';
