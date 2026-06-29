@@ -225,9 +225,15 @@ export const CartPanel = {
                         compensHtml = `<div class="cart-item-comp text-muted fs-xs">In perdita: alimenta il pool minus per le righe successive</div>`;
                     }
                 } else {
-                    // Fallback: nessun portfolio/regime disponibile, usa i valori congelati originari.
+                    // Fallback: nessun portfolio/regime disponibile, oppure pnlLordoEur
+                    // mancante (riga salvata prima che questo campo esistesse nel modale).
+                    // In questo caso NON c'è ricalcolo di compensazione: i valori sono
+                    // quelli congelati al momento dell'aggiunta al carrello.
                     tax = item.tax;
                     netReceipt = item.netReceipt;
+                    if (!isDichiarativo && portfolio) {
+                        compensHtml = `<div class="cart-item-comp" style="color:var(--warning); font-size:11px;">⚠️ Riga obsoleta: tasse non ricalcolate con compensazione. Rimuovi e ri-simula questa vendita.</div>`;
+                    }
                 }
 
                 const netEur = toEur(netReceipt);
