@@ -1,5 +1,6 @@
 import { Calc } from '../calc.js';
 import { lockScroll, unlockScroll } from './helpers.js';
+import { Toast } from '../../../core/toast.js';
 
 export function openTransferModal(sourceId, portfolio, allPortfolios, activePortfolioId, onConfirm, taxRegime = 'amministrato') {
     const asset = portfolio[sourceId];
@@ -162,7 +163,10 @@ export function openTransferModal(sourceId, portfolio, allPortfolios, activePort
     document.getElementById('transfer-confirm').onclick = async () => {
         const qty    = parseFloat(document.getElementById('transfer-qty').value);
         const destId = document.getElementById('transfer-dest').value;
-        if (!destId || isNaN(qty) || qty <= 0 || qty > qtaEffettiva + 0.00001) return;
+        if (!destId || isNaN(qty) || qty <= 0 || qty > qtaEffettiva + 0.00001) {
+            Toast.show('Controlla quantità e portafoglio di destinazione', 'err');
+            return;
+        }
 
         const btn = document.getElementById('transfer-confirm');
         btn.disabled = true;
