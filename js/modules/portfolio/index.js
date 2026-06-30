@@ -805,12 +805,15 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         // per ticker/ISIN prima di decidere se creare una nuova posizione.
         if (!destPortfolio.assets) destPortfolio.assets = {};
 
-        const sourceTicker = (sourceAsset.ticker || '').toUpperCase();
+        // Il campo ticker non è sempre popolato per asset più vecchi: usiamo
+        // come fallback anche il "nome" (che in pratica spesso coincide col
+        // ticker, es. "RACE.MI"), così il match funziona anche per quei casi.
+        const sourceTicker = (sourceAsset.ticker || sourceAsset.nome || '').toUpperCase();
         const sourceIsin   = (sourceAsset.isin || '').toUpperCase();
 
         let destAssetId = Object.keys(destPortfolio.assets).find(aid => {
             const a = destPortfolio.assets[aid];
-            const aTicker = (a.ticker || '').toUpperCase();
+            const aTicker = (a.ticker || a.nome || '').toUpperCase();
             const aIsin   = (a.isin || '').toUpperCase();
             return (sourceTicker && aTicker && aTicker === sourceTicker)
                 || (sourceIsin && aIsin && aIsin === sourceIsin);
