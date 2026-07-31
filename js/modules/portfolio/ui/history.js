@@ -4,6 +4,23 @@ import { Toast } from '../../../core/toast.js';
 import { lockScroll, unlockScroll } from './helpers.js';
 import { openPacModal, generaPacTransazioni } from './pac.js';
 
+// Consuma quantità dai lotti aperti in ordine LIFO (dal più recente al più vecchio).
+// Muta l'array `lots` rimuovendo i lotti esauriti. Ritorna il costo totale consumato.
+function consumeLotsLIFO(lots, qtyToConsume) {
+    let remaining = qtyToConsume;
+    let costNative = 0, costEur = 0;
+    for (let i = lots.length - 1; i >= 0 && remaining > 0.00001; i--) {
+        const lot = lots[i];
+        const used = Math.min(lot.qty, remaining);
+        costNative += lot.unitCostNative * used;
+        costEur += lot.unitCostEur * used;
+        lot.qty -= used;
+        remaining -= used;
+        if (lot.qty < 0.00001) lots.splice(i, 1);
+    }
+    return { costNative, costEur };
+}
+
 export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxRegime = 'amministrato') {
     const p = portfolio[id];
     const overlay = document.getElementById('modal-history');
@@ -17,12 +34,13 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxReg
             <div class="modal-body">
                 <div class="preview-box" id="hist-summary" style="margin-bottom:14px;"></div>
                 <div class="table-wrapper">
+                    ${p.valuta === 'USD' ? `<p style="margin:0 0 8px;font-size:11px;color:var(--text-muted);">ℹ️ Per le posizioni in USD: il P&L <b>fiscale</b> (€) usa il cambio storico di acquisto ed è il valore da dichiarare; il P&L <b>broker</b> (€) converte il guadagno nativo in dollari al cambio della vendita, come generalmente mostrato dal tuo broker.</p>` : ''}
                     <table class="tx-table tx-table-compact">
                         <thead><tr>
                             <th>Data</th><th>Tipo</th><th>Q.tà</th>
                             <th>Prezzo</th><th>Comm.</th><th>Totale</th>
                             ${portfolio[id]?.valuta === 'USD' ? '<th>Tasso €/$</th>' : ''}
-                            <th>PMC</th><th>P&L Lordo</th><th>P&L Netto</th><th></th>
+                            <th>PMC</th><th>P&L Lordo${p.valuta === 'USD' ? ' <span title="Fiscale: usa il cambio storico di acquisto, è il valore da dichiarare. Broker: converte il guadagno in dollari al cambio della vendita, come mostrato dal tuo broker." style="cursor:help;color:var(--text-muted);">ⓘ</span>' : ''}</th><th>P&L Netto</th><th></th>
                         </tr></thead>
                         <tbody id="hist-tbody"></tbody>
                     </table>
@@ -84,7 +102,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
         return;
     }
 
-    let rQta = 0, rPmc = 0, rCostEur = 0;
+    let openLots = []; // ricostruzione LIFO: [{ qty, unitCostNative, unitCostEur, date }]
     tbody.innerHTML = '';
 
     txsSorted.forEach((tx, i) => {
@@ -95,44 +113,38 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
 
         let tradePnL = null;
         let tradePnLEur = null;
+        let tradePnLBroker = null;
 
         if (tx.type === 'transfer' && tx.destPortfolioId) {
-            // Uscita dal sorgente: riduce quantità a PMC, P&L = 0
-            if (rQta > 0) rCostEur -= (rCostEur / rQta) * q;
-            rQta -= q;
-            if (rQta < 0.00001) { rQta = 0; rPmc = 0; rCostEur = 0; }
+            // Uscita dal sorgente: consuma i lotti in LIFO, P&L = 0 (trasferito a costo)
+            consumeLotsLIFO(openLots, q);
         } else if (tx.type === 'transfer' && tx.sourcePortfolioId) {
-            // Entrata nel destinazione: acquisto a PMC sorgente, P&L = 0
-            const newCost = (rQta * rPmc) + (q * pr);
-            rPmc = (rQta + q) > 0 ? newCost / (rQta + q) : 0;
-            rQta += q;
-            if (isUSD) {
-                rCostEur += (q * pr) / txRate;
-            } else {
-                rCostEur += (q * pr);
-            }
+            // Entrata nel destinazione: nuovo lotto al PMC sorgente, nessuna commissione
+            const unitCostNative = pr;
+            const unitCostEur = isUSD ? pr / txRate : pr;
+            openLots.push({ qty: q, unitCostNative, unitCostEur, date: tx.date });
         } else if (tx.type === 'buy') {
-            const newCost = (rQta * rPmc) + (q * pr) + c;
-            rPmc = (rQta + q) > 0 ? newCost / (rQta + q) : 0;
-            rQta += q;
-            if (isUSD) {
-                rCostEur += (q * pr + c) / txRate;
-            } else {
-                rCostEur += (q * pr + c);
-            }
+            const unitCostNative = pr + (c / q);
+            const unitCostEur = isUSD ? unitCostNative / txRate : unitCostNative;
+            openLots.push({ qty: q, unitCostNative, unitCostEur, date: tx.date });
         } else {
-            tradePnL = Calc.round((pr - rPmc) * q - c);
+            const { costNative: costoBaseNative, costEur: costoBaseEur } = consumeLotsLIFO(openLots, q);
+            tradePnL = Calc.round((pr * q - c) - costoBaseNative);
             if (isUSD) {
                 const ricavoEur = (pr * q - c) / txRate;
-                const rPmcEur = rQta > 0 ? rCostEur / rQta : 0;
-                tradePnLEur = Calc.round(ricavoEur - (rPmcEur * q));
-                if (rQta > 0) rCostEur -= (rCostEur / rQta) * q;
+                tradePnLEur = Calc.round(ricavoEur - costoBaseEur);
+                // P&L "stile broker": P&L nativo in $ convertito al cambio della vendita, senza storicizzare il costo
+                tradePnLBroker = Calc.round(tradePnL / txRate);
             } else {
                 tradePnLEur = tradePnL;
             }
-            rQta -= q;
-            if (rQta < 0.00001) { rQta = 0; rPmc = 0; rCostEur = 0; }
         }
+
+        // PMC visualizzato: media ponderata dei lotti ancora aperti dopo questa transazione
+        const openQty = openLots.reduce((s, l) => s + l.qty, 0);
+        const rPmc = openQty > 0
+            ? openLots.reduce((s, l) => s + l.qty * l.unitCostNative, 0) / openQty
+            : 0;
         const totale = tx.type === 'buy' ? q * pr + c : tx.type === 'transfer' ? q * pr : q * pr - c;
         const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
         const pnlTax  = tradePnLEur !== null && tradePnLEur > 0 ? tradePnLEur * taxPct : 0;
@@ -169,7 +181,10 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
             <td>${tradePnL !== null
                 ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(tradePnL)}</span>
                    ${isUSD && tradePnLEur !== null
-                       ? `<br><span style="font-size:10px;color:var(--text-muted)">€ ${Calc.fmt(tradePnLEur)}</span>`
+                       ? `<br><span style="font-size:10px;color:var(--text-muted)">€ ${Calc.fmt(tradePnLEur)} <b>fiscale</b></span>`
+                       : ''}
+                   ${isUSD && tradePnLBroker !== null
+                       ? `<br><span style="font-size:10px;color:var(--text-muted)">€ ${Calc.fmt(tradePnLBroker)} <i>broker</i></span>`
                        : ''}`
                 : '—'}</td>
             <td>${pnlNetto !== null

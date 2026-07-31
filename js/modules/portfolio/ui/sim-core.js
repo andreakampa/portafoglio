@@ -115,12 +115,18 @@ export function simulateSell({
     let netReceipt;
     let netReceiptEur;
 
+    let pnlBroker = null;
+
     if (isUSD) {
         grossReceipt = qty * price;
         grossReceiptEur = grossReceipt / rate;
         const commissionEur = (commission || 0) / rate;
         const costoEur = (pmcEur > 0 ? pmcEur : pmc / rate) * qty;
         pnl = grossReceiptEur - costoEur - commissionEur;
+
+        // Pnl nativo USD (usa pmc, non pmcEur), poi conversione al cambio corrente
+        const pnlNativeUsd = (price - pmc) * qty - (commission || 0);
+        pnlBroker = pnlNativeUsd / rate;
     } else {
         grossReceipt = qty * price - (commission || 0);
         pnl = (price - pmc) * qty - (commission || 0);
@@ -149,6 +155,7 @@ export function simulateSell({
         grossReceipt,
         grossReceiptEur,
         pnl,
+        pnlBroker,
         pnlNetto: pnl - tax,
         tax,
         taxLabel,
@@ -217,12 +224,17 @@ export function simulateSellLIFO({
         : costoBaseNative;
 
     let grossReceipt, grossReceiptEur, pnl, netReceipt, netReceiptEur;
+    let pnlBroker = null; // P&L "stile broker": cambio corrente su tutto, no storicizzazione costo
 
     if (isUSD) {
         grossReceipt = qty * price;
         grossReceiptEur = grossReceipt / rate;
         const commissionEur = (commission || 0) / rate;
         pnl = grossReceiptEur - costoBaseEur - commissionEur;
+
+        // Pnl nativo USD (prezzo vendita - costo base USD - commissioni), poi conversione al cambio corrente
+        const pnlNativeUsd = (qty * price) - costoBaseNative - (commission || 0);
+        pnlBroker = pnlNativeUsd / rate;
     } else {
         grossReceipt = qty * price - (commission || 0);
         pnl = (qty * price) - costoBaseNative - (commission || 0);
@@ -250,6 +262,7 @@ export function simulateSellLIFO({
         grossReceipt,
         grossReceiptEur,
         pnl,
+        pnlBroker,
         pnlNetto: pnl - tax,
         tax,
         taxLabel,
