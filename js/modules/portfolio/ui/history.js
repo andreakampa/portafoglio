@@ -3,7 +3,6 @@ import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 import { lockScroll, unlockScroll } from './helpers.js';
 import { openPacModal, generaPacTransazioni } from './pac.js';
-import { openPacModal, generaPacTransazioni } from './pac.js';
 
 // Stato ordinamento colonna Data nello storico. Default: più recente prima.
 let historySortState = { dir: 'desc' };
