@@ -3,6 +3,10 @@ import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 import { lockScroll, unlockScroll } from './helpers.js';
 import { openPacModal, generaPacTransazioni } from './pac.js';
+import { openPacModal, generaPacTransazioni } from './pac.js';
+
+// Stato ordinamento colonna Data nello storico. Default: più recente prima.
+let historySortState = { dir: 'desc' };
 
 // Consuma quantità dai lotti aperti in ordine LIFO (dal più recente al più vecchio).
 // Muta l'array `lots` rimuovendo i lotti esauriti. Ritorna il costo totale consumato.
@@ -37,7 +41,7 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxReg
                     ${p.valuta === 'USD' ? `<p style="margin:0 0 8px;font-size:11px;color:var(--text-muted);">ℹ️ Per le posizioni in USD: il P&L <b>fiscale</b> (€) usa il cambio storico di acquisto ed è il valore da dichiarare; il P&L <b>broker</b> (€) converte il guadagno nativo in dollari al cambio della vendita, come generalmente mostrato dal tuo broker.</p>` : ''}
                     <table class="tx-table tx-table-compact">
                         <thead><tr>
-                            <th>Data</th><th>Tipo</th><th>Q.tà</th>
+                            <th class="sort-header" data-col="date" id="hist-date-th">Data<span class="sort-arrow" id="hist-date-arrow"></span></th><th>Tipo</th><th>Q.tà</th>
                             <th>Prezzo</th><th>Comm.</th><th>Totale</th>
                             ${portfolio[id]?.valuta === 'USD' ? '<th>Tasso €/$</th>' : ''}
                             <th>PMC</th><th>P&L Lordo${p.valuta === 'USD' ? ' <span title="Fiscale: usa il cambio storico di acquisto, è il valore da dichiarare. Broker: converte il guadagno in dollari al cambio della vendita, come mostrato dal tuo broker." style="cursor:help;color:var(--text-muted);">ⓘ</span>' : ''}</th><th>P&L Netto</th><th></th>
@@ -53,6 +57,16 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxReg
         overlay.classList.remove('visible');
         unlockScroll();
     };
+
+    document.getElementById('hist-close').onclick = () => {
+        overlay.classList.remove('visible');
+        unlockScroll();
+    };
+
+    document.getElementById('hist-date-th')?.addEventListener('click', () => {
+        historySortState.dir = historySortState.dir === 'asc' ? 'desc' : 'asc';
+        renderHistoryContent(id, portfolio, onSave, currency, taxRegime);
+    });
 
     document.getElementById('hist-pac-btn')?.addEventListener('click', () => {
         openPacModal(id, portfolio, async () => {
@@ -102,6 +116,9 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
          P&L Realizzato: <b class="${realizedDisplay >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedDisplay)}</b>${realizedHint} &nbsp;|&nbsp;
          Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>`;
 
+    const arrowEl = document.getElementById('hist-date-arrow');
+    if (arrowEl) arrowEl.textContent = historySortState.dir === 'asc' ? ' ▲' : ' ▼';
+
     const tbody = document.getElementById('hist-tbody');
     if (!txsSorted.length) {
         tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">Nessuna transazione</td></tr>`;
@@ -110,6 +127,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
 
     let openLots = []; // ricostruzione LIFO: [{ qty, unitCostNative, unitCostEur, date }]
     tbody.innerHTML = '';
+    const rows = []; // righe costruite in ordine cronologico ascendente (richiesto per LIFO/PMC corretti)
 
     txsSorted.forEach((tx, i) => {
         const q = +tx.qty, pr = +tx.price, c = +(tx.commission || 0);
@@ -215,8 +233,13 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
                 <button class="btn btn-dark btn-sm btn-icon btn-edit-tx" data-idx="${i}" title="Modifica">✏️</button>
                 <button class="btn-del-tx" data-idx="${i}" title="Elimina">✕</button>
             </td>`;
-        tbody.appendChild(tr);
+        rows.push(tr);
     });
+
+    // Il calcolo sopra è avvenuto in ordine cronologico ascendente (necessario per LIFO/PMC).
+    // Il rendering rispetta invece la direzione scelta dall'utente (default: più recente prima).
+    const orderedRows = historySortState.dir === 'asc' ? rows : rows.slice().reverse();
+    orderedRows.forEach(tr => tbody.appendChild(tr));
 
     tbody.onclick = async e => {
         const delBtn  = e.target.closest('.btn-del-tx');
