@@ -2,6 +2,83 @@ import { Calc } from './calc.js';
 import { Exchange } from '../../api/exchange.js';
 import { Search } from '../../api/search.js';
 
+// ── Sort state tabella posizioni ────────────────────────────────────────
+let positionSortState = { col: null, dir: 'asc' };
+
+function getSortValue(id, col, portfolio, positionMap, prevClose, currency) {
+    const p = portfolio[id];
+    const pos = positionMap[id] || {};
+    const v = (p.valuta || 'EUR').toUpperCase();
+    const cv = x => Exchange.convert(x, v, currency);
+
+    switch (col) {
+        case 'symbol':
+            return (p.nome || '').toLowerCase();
+        case 'shares':
+            return pos.qta || 0;
+        case 'pmc':
+            return pos.pmc || 0;
+        case 'price':
+            return pos.prLive || 0;
+        case 'dailyPnl': {
+            const prPrev = prevClose[id] ?? null;
+            const qta = pos.qta || 0;
+            if (prPrev === null || qta <= 0) return -Infinity;
+            return cv((pos.prLive - prPrev) * qta);
+        }
+        case 'cost':
+            return currency === 'EUR' ? (pos.invEur || 0) : cv(pos.inv || 0);
+        case 'value':
+            return cv(pos.att || 0);
+        case 'pnlGrossU':
+            return currency === 'EUR' ? (pos.pnlEur || 0) : cv(pos.pnl || 0);
+        case 'pnlNetU':
+            return currency === 'EUR' ? (pos.pnlAfterTaxEur || 0) : cv(pos.pnlAfterTax || 0);
+        case 'pnlGrossR':
+            return currency === 'EUR' ? (pos.realizedPnL || 0) : Exchange.convert(pos.realizedPnL || 0, 'EUR', currency);
+        case 'pnlNetR': {
+            const realizedEur = pos.realizedPnL || 0;
+            if (realizedEur === 0) return 0;
+            const breakdown = Calc.realizedTaxBreakdown({
+                gainEur: realizedEur,
+                assetType: p.tipoAsset,
+                availableMinus: 0
+            });
+            const realNetEur = realizedEur > 0 ? breakdown.nettoTeorico : realizedEur;
+            return currency === 'EUR' ? realNetEur : Exchange.convert(realNetEur, 'EUR', currency);
+        }
+        default:
+            return 0;
+    }
+}
+
+function applySort(ids, col, dir, portfolio, positionMap, prevClose, currency) {
+    if (!col) return ids;
+    const sorted = [...ids];
+    sorted.sort((a, b) => {
+        const va = getSortValue(a, col, portfolio, positionMap, prevClose, currency);
+        const vb = getSortValue(b, col, portfolio, positionMap, prevClose, currency);
+        let cmp;
+        if (typeof va === 'string' || typeof vb === 'string') {
+            cmp = String(va).localeCompare(String(vb), 'it', { sensitivity: 'base' });
+        } else {
+            cmp = va - vb;
+        }
+        return dir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+}
+
+function updateSortArrows() {
+    document.querySelectorAll('#portfolio-table thead th[data-col]').forEach(th => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (!arrow) return;
+        arrow.textContent = th.dataset.col === positionSortState.col
+            ? (positionSortState.dir === 'asc' ? ' ▲' : ' ▼')
+            : '';
+    });
+}
+
 window._logoFallback = function(el, base) {
     const colors = ['#2a7f5e','#1a6fa0','#7b4fa0','#a05c1a','#1a8a6a','#6a3fa0','#a03a3a','#2a5fa0'];
     const bg = colors[base.charCodeAt(0) % colors.length];
@@ -175,17 +252,17 @@ export function renderPage(container) {
                 <table id="portfolio-table">
                     <thead>
                         <tr>
-                            <th>Symbol</th>
-                            <th>Shares</th>
-                            <th>AC/Share</th>
-                            <th>Last Price</th>
-                            <th>Daily P&L</th>
-                            <th>Total Cost</th>
-                            <th>Market Value</th>
-                            <th>P&L Gross UNRL</th>
-                            <th>P&L Net UNRL</th>
-                            <th>P&L Gross REAL</th>
-                            <th>P&L Net REAL</th>
+                            <th class="sort-header" data-col="symbol">Symbol<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="shares">Shares<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="pmc">AC/Share<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="price">Last Price<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="dailyPnl">Daily P&L<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="cost">Total Cost<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="value">Market Value<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="pnlGrossU">P&L Gross UNRL<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="pnlNetU">P&L Net UNRL<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="pnlGrossR">P&L Gross REAL<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="pnlNetR">P&L Net REAL<span class="sort-arrow"></span></th>
                             <th>Trading Tools</th>
                         </tr>
                     </thead>
@@ -197,6 +274,23 @@ export function renderPage(container) {
 
     <div class="mobile-only">
         <div class="card-title" style="padding: 0 4px 10px;">💼 Posizioni</div>
+        <div class="mobile-sort-bar">
+            <select id="mobile-sort-select">
+                <option value="">Ordina per...</option>
+                <option value="symbol">Symbol</option>
+                <option value="shares">Shares</option>
+                <option value="pmc">AC/Share</option>
+                <option value="price">Last Price</option>
+                <option value="dailyPnl">Daily P&L</option>
+                <option value="cost">Total Cost</option>
+                <option value="value">Market Value</option>
+                <option value="pnlGrossU">P&L Gross UNRL</option>
+                <option value="pnlNetU">P&L Net UNRL</option>
+                <option value="pnlGrossR">P&L Gross REAL</option>
+                <option value="pnlNetR">P&L Net REAL</option>
+            </select>
+            <button id="mobile-sort-dir" class="btn-toggle" title="Inverti direzione">▲</button>
+        </div>
         <div id="mobile-cards"></div>
     </div>
 
@@ -273,6 +367,27 @@ export function renderPage(container) {
         .table-scroll-left  { left: 0; }
         .table-scroll-right { right: 0; }
 
+        .mobile-sort-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 0 4px 10px;
+        }
+        .mobile-sort-bar select {
+            flex: 1;
+            padding: 6px 8px;
+            font-size: 13px;
+            border-radius: 6px;
+            border: 0.5px solid var(--border);
+            background: var(--bg, #fff);
+            color: var(--text-primary);
+        }
+        .mobile-sort-bar #mobile-sort-dir {
+            padding: 6px 12px;
+            font-size: 13px;
+            min-width: 40px;
+        }
+
         /* Tabella compatta */
         #portfolio-table {
             min-width: 900px;
@@ -284,6 +399,20 @@ export function renderPage(container) {
             white-space: nowrap;
             padding: 8px 10px;
             font-size: 13px;
+        }
+
+        .sort-header {
+            cursor: pointer;
+            user-select: none;
+        }
+        .sort-header:hover {
+            color: var(--text-primary);
+            background: var(--bg2);
+        }
+        .sort-arrow {
+            font-size: 10px;
+            margin-left: 3px;
+            opacity: .8;
         }
 
         /* ── Separatori di gruppo ── */
@@ -372,6 +501,50 @@ export function renderPage(container) {
         wrapper.addEventListener('scroll', updateBtns);
         setTimeout(updateBtns, 300);
     }
+    // Click sugli header per ordinare la tabella posizioni
+    const theadRow = document.querySelector('#portfolio-table thead tr');
+    if (theadRow) {
+        theadRow.addEventListener('click', (e) => {
+            const th = e.target.closest('th[data-col]');
+            if (!th) return;
+            const col = th.dataset.col;
+            if (positionSortState.col === col) {
+                positionSortState.dir = positionSortState.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                positionSortState.col = col;
+                positionSortState.dir = 'asc';
+            }
+            updateSortArrows();
+            renderTable._refresh && renderTable._refresh();
+        });
+    }
+    updateSortArrows();
+
+    // Ordinamento mobile: select + toggle direzione
+    const mobileSortSelect = document.getElementById('mobile-sort-select');
+    const mobileSortDirBtn = document.getElementById('mobile-sort-dir');
+
+    const syncMobileSortUI = () => {
+        if (mobileSortSelect) mobileSortSelect.value = positionSortState.col || '';
+        if (mobileSortDirBtn) mobileSortDirBtn.textContent = positionSortState.dir === 'asc' ? '▲' : '▼';
+    };
+
+    mobileSortSelect?.addEventListener('change', () => {
+        positionSortState.col = mobileSortSelect.value || null;
+        if (!positionSortState.col) positionSortState.dir = 'asc';
+        syncMobileSortUI();
+        updateSortArrows();
+        renderTable._refresh && renderTable._refresh();
+    });
+
+    mobileSortDirBtn?.addEventListener('click', () => {
+        positionSortState.dir = positionSortState.dir === 'asc' ? 'desc' : 'asc';
+        syncMobileSortUI();
+        updateSortArrows();
+        renderTable._refresh && renderTable._refresh();
+    });
+
+    syncMobileSortUI();
 }
 
 export function renderSkeleton() {
@@ -460,7 +633,14 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
 
     tbody.innerHTML = '';
 
-    const { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
+    let { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
+
+    if (positionSortState.col) {
+        active      = applySort(active,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+        closed      = applySort(closed,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+        empty       = applySort(empty,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+        transferred = applySort(transferred, positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+    }
 
     // Stato visibilità gruppi collassabili
     if (typeof renderTable._showClosed === 'undefined') renderTable._showClosed = true;
@@ -901,7 +1081,14 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
 
     container.innerHTML = '';
 
-    const { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
+    let { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
+
+    if (positionSortState.col) {
+        active      = applySort(active,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+        closed      = applySort(closed,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+        empty       = applySort(empty,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+        transferred = applySort(transferred, positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+    }
 
     const renderMobileGroup = (ids, groupClass, groupLabel) => {
         if (!ids.length) return;
@@ -970,6 +1157,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
             card.className = `mobile-card${groupClass ? ' ' + groupClass : ''}`;
             if (groupClass === 'row-closed') card.style.opacity = '0.6';
             if (groupClass === 'row-empty') card.style.opacity = '0.4';
+            if (groupClass === 'row-transferred') card.style.opacity = '0.6';
 
             card.innerHTML = `
                 <div class="mobile-card-header" data-id="${id}">
@@ -980,7 +1168,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                                 <span class="ticker-name">${p.nome}</span>
                                ${dividendoDot(id, dividendi)}
                             </div>
-                            <span><span class="badge">${v}</span>${assetBadge}</span>
+                            <span><span class="badge">${v}</span>${assetBadge}${groupClass === 'row-transferred' ? '<span class="badge-stato badge-transferred">Trasferito</span>' : ''}</span>
                             ${(() => {
                                 const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
                                 if (!ext) return '';
@@ -1043,10 +1231,12 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                     </div>
                     <div class="mobile-card-actions">
                         <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
+                        ${groupClass !== 'row-transferred' ? `
                         <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
                         <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
                         <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
                         <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -1079,4 +1269,5 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
     renderMobileGroup(active, '', '📈 Titoli attivi');
     renderMobileGroup(closed, 'row-closed', '🔒 Posizioni chiuse');
     renderMobileGroup(empty, 'row-empty', '⬜ Senza operazioni');
+    renderMobileGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti');
 }
