@@ -81,19 +81,25 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
     const p = portfolio[id];
     const { qta, pmc, pmcEur, realizedPnL, totalComm } = Calc.positionSync(p, taxRegime);
     const isUSD = p.valuta === 'USD';
-    const s = isUSD ? '$' : '€';
+    const s = currency === 'EUR' ? '€' : '$';   // simbolo secondo il toggle del sito
+    const nativeS = isUSD ? '$' : '€';          // simbolo nativo della posizione (per gli hint)
     const rate = Exchange.rate || 1;
     const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
 
-    const pmcEurHint = isUSD && pmcEur > 0
-        ? ` <span style="font-size:11px;color:var(--text-muted)">(≈ € ${Calc.fmt(pmcEur)})</span>` : '';
-    const pnlEurHint = isUSD && realizedPnL !== 0
-        ? ` <span style="font-size:11px;color:var(--text-muted)">(≈ € ${Calc.fmt(realizedPnL)})</span>` : '';
+    // PMC: se il sito è su EUR e la posizione è USD, mostriamo il PMC fiscale (cambio storico) come primario
+    const pmcDisplay = (currency === 'EUR' && isUSD && pmcEur > 0) ? pmcEur : pmc;
+    const pmcHint = isUSD
+        ? ` <span style="font-size:11px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(pmc)} nativo)</span>` : '';
+
+    // realizedPnL è già calcolato in € fiscale (cambio storico per ogni vendita)
+    const realizedDisplay = currency === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, 'EUR', currency);
+    const realizedHint = isUSD && realizedPnL !== 0
+        ? ` <span style="font-size:11px;color:var(--text-muted)">(fiscale, cambio storico)</span>` : '';
 
     document.getElementById('hist-summary').innerHTML =
         `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp;
-         PMC: <b>${s} ${Calc.fmt(pmc)}</b>${pmcEurHint} &nbsp;|&nbsp;
-         P&L Realizzato: <b class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedPnL)}</b>${pnlEurHint} &nbsp;|&nbsp;
+         PMC: <b>${s} ${Calc.fmt(pmcDisplay)}</b>${pmcHint} &nbsp;|&nbsp;
+         P&L Realizzato: <b class="${realizedDisplay >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedDisplay)}</b>${realizedHint} &nbsp;|&nbsp;
          Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>`;
 
     const tbody = document.getElementById('hist-tbody');
@@ -145,10 +151,21 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
         const rPmc = openQty > 0
             ? openLots.reduce((s, l) => s + l.qty * l.unitCostNative, 0) / openQty
             : 0;
+        const rPmcEur = openQty > 0
+            ? openLots.reduce((s, l) => s + l.qty * l.unitCostEur, 0) / openQty
+            : 0;
+
+        // Converte un valore nativo nella valuta scelta dal toggle del sito.
+        // Per le posizioni USD usa il cambio storico della transazione (coerente col resto dei calcoli fiscali).
+        const rowConv = (nativeVal) => {
+            if (!isUSD) return currency === 'EUR' ? nativeVal : nativeVal * rate;
+            return currency === 'EUR' ? nativeVal / txRate : nativeVal;
+        };
         const totale = tx.type === 'buy' ? q * pr + c : tx.type === 'transfer' ? q * pr : q * pr - c;
         const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
         const pnlTax  = tradePnLEur !== null && tradePnLEur > 0 ? tradePnLEur * taxPct : 0;
         const pnlNetto = tradePnLEur !== null ? tradePnLEur - pnlTax : null;
+        const pnlNettoBroker = tradePnLBroker !== null ? tradePnLBroker - pnlTax : null;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -173,13 +190,13 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
                 return '🔀 Trasf.';
             })()}</td>
             <td>${Calc.fmt(q, 4)}</td>
-            <td>${s} ${Calc.fmt(pr)}</td>
+            <td>${s} ${Calc.fmt(rowConv(pr))}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(pr)})</span>` : ''}</td>
             <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}</td>
-            <td>${s} ${Calc.fmt(totale)}</td>
+            <td>${s} ${Calc.fmt(rowConv(totale))}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(totale)})</span>` : ''}</td>
             ${isUSD ? `<td style="font-size:11px;color:var(--text-muted);">${tx.exchangeRate ? Calc.fmt(parseFloat(tx.exchangeRate), 4) : (Exchange._memoryCache.get(tx.date)?.rate ? Calc.fmt(Exchange._memoryCache.get(tx.date).rate, 4) : '—')}</td>` : ''}
-            <td>${s} ${Calc.fmt(rPmc)}</td>
+            <td>${s} ${Calc.fmt(currency === 'EUR' && isUSD ? rPmcEur : rPmc)}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(rPmc)})</span>` : ''}</td>
             <td>${tradePnL !== null
-                ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(tradePnL)}</span>
+                ? `<span class="${tradePnL >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(rowConv(tradePnL))}</span>${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(tradePnL)})</span>` : ''}
                    ${isUSD && tradePnLEur !== null
                        ? `<br><span style="font-size:10px;color:var(--text-muted)">€ ${Calc.fmt(tradePnLEur)} <b>fiscale</b></span>`
                        : ''}
@@ -188,8 +205,11 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
                        : ''}`
                 : '—'}</td>
             <td>${pnlNetto !== null
-                ? `<span class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNetto)}</span>
-                   ${pnlTax > 0 ? `<br><span style="font-size:10px;color:var(--text-muted)">tasse: € ${Calc.fmt(pnlTax)}</span>` : ''}`
+                ? `<span class="${pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNetto)}</span> <span style="font-size:10px;color:var(--text-muted)">fiscale</span>
+                   ${pnlTax > 0 ? `<br><span style="font-size:10px;color:var(--text-muted)">tasse: € ${Calc.fmt(pnlTax)}</span>` : ''}
+                   ${isUSD && pnlNettoBroker !== null
+                       ? `<br><span class="${pnlNettoBroker >= 0 ? 'pos-gain' : 'neg-loss'}" style="font-size:10px">€ ${Calc.fmt(pnlNettoBroker)}</span> <span style="font-size:10px;color:var(--text-muted)">broker</span>`
+                       : ''}`
                 : '—'}</td>
             <td style="display:flex; gap:4px;">
                 <button class="btn btn-dark btn-sm btn-icon btn-edit-tx" data-idx="${i}" title="Modifica">✏️</button>
