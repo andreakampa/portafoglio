@@ -638,6 +638,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         document.getElementById('btn-refresh')?.addEventListener('click', async () => {
             await Exchange.update();
             this._updateExchangeLabel();
+            this.crossPrices = {}; // forza il refetch dei prezzi cross-portfolio al prossimo render
             await this._refreshPrices();
             Toast.show('Prezzi aggiornati', 'ok');
         });

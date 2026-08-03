@@ -1085,7 +1085,7 @@ dash.onclick = e => {
 };
 }
 
-export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {} }, handlers) {
+export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {} }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -1096,6 +1096,8 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
     }
 
     container.innerHTML = '';
+
+    const { totMercatoEur = 0, totCostoEur = 0 } = weightTotals;
 
     let { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
 
@@ -1214,6 +1216,10 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                     <div class="mobile-card-row">
                         <span class="text-muted">Controvalore</span>
                         <span>${att > 0 ? `${s} ${Calc.fmt(cv(att))}` : '—'}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="text-muted">% Costo / % Mercato</span>
+                        <span>${invEur > 0 && totCostoEur > 0 ? Calc.fmt((invEur / totCostoEur) * 100, 1) + '%' : '—'} / ${(pos?.attEur || 0) > 0 && totMercatoEur > 0 ? Calc.fmt(((pos.attEur || 0) / totMercatoEur) * 100, 1) + '%' : '—'}</span>
                     </div>
                     <div class="mobile-card-row">
                         <span class="text-muted">52 settimane</span>
