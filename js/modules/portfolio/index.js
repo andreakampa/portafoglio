@@ -75,6 +75,8 @@ export class PortfolioPage {
         this.week52Highs = {};
         this.dividendi = {};
         this.currency = 'EUR';
+        this.weightScope = 'active'; // 'active' | 'cross'
+        this.crossPrices = {}; // { portfolioId: { assetId: price } } — cache prezzi per portfolio non attivo
         this._autoTimer = null;
         this._portfolioSwitcherBound = false;
         this._docClickSwitcher = null;
@@ -178,6 +180,10 @@ await this._aggiornaDividendi();
         const fiscalState = this._getActivePortfolio()?.fiscal || null;
         const handlers = this._handlers();
 
+        const weightTotals = this.weightScope === 'cross'
+            ? await this._buildCrossWeightTotals()
+            : this._buildActiveWeightTotals(positionMap);
+
 const state = {
   portfolio,
   positionMap,
@@ -190,6 +196,7 @@ const state = {
   week52Lows,
   week52Highs,
   dividendi: this.dividendi,
+  weightTotals,
   handlers
 };
 
@@ -638,6 +645,9 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         document.getElementById('btn-eur')?.addEventListener('click', () => this._setValuta('EUR'));
         document.getElementById('btn-usd')?.addEventListener('click', () => this._setValuta('USD'));
 
+        document.getElementById('btn-weight-active')?.addEventListener('click', () => this._setWeightScope('active'));
+        document.getElementById('btn-weight-cross')?.addEventListener('click', () => this._setWeightScope('cross'));
+
         let _suggestTimer = null;
         const inputTitolo = document.getElementById('input-titolo');
         const suggestBox = document.getElementById('ticker-suggestions');
@@ -749,6 +759,71 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         document.getElementById('btn-eur')?.classList.toggle('active', v === 'EUR');
         document.getElementById('btn-usd')?.classList.toggle('active', v === 'USD');
         await this._render();
+    }
+
+    async _setWeightScope(scope) {
+        this.weightScope = scope;
+        document.getElementById('btn-weight-active')?.classList.toggle('active', scope === 'active');
+        document.getElementById('btn-weight-cross')?.classList.toggle('active', scope === 'cross');
+        await this._render();
+    }
+
+    // Fetcha (una sola volta, poi cache) i prezzi live per gli asset dei
+    // portafogli NON attivi, necessari per il peso % Mercato in modalità "Tutti".
+    async _ensureCrossPrices() {
+        const portfolios = this.portfolioState?.portfolios || {};
+        for (const pid in portfolios) {
+            if (pid === this.activePortfolioId) continue;
+            const assets = portfolios[pid].assets || {};
+            const tickerMap = Object.fromEntries(
+                Object.entries(assets)
+                    .filter(([, a]) => a?.nome)
+                    .map(([id, a]) => [id, a.nome])
+            );
+            const cached = this.crossPrices[pid] || {};
+            const missingIds = Object.keys(tickerMap).filter(id => !(id in cached));
+            if (!missingIds.length) {
+                this.crossPrices[pid] = cached;
+                continue;
+            }
+            const missingMap = Object.fromEntries(missingIds.map(id => [id, tickerMap[id]]));
+            const { prices } = await Yahoo.fetchAll(missingMap);
+            this.crossPrices[pid] = { ...cached, ...prices };
+        }
+    }
+
+    // Totali di riferimento (costo e valore di mercato in EUR) sul solo portfolio attivo.
+    _buildActiveWeightTotals(positionMap) {
+        let totMercatoEur = 0, totCostoEur = 0;
+        for (const id in positionMap) {
+            const pos = positionMap[id];
+            if (!pos || pos.qta <= 0) continue;
+            totMercatoEur += pos.attEur || 0;
+            totCostoEur   += pos.invEur || 0;
+        }
+        return { totMercatoEur, totCostoEur };
+    }
+
+    // Totali cross-portfolio: somma valore di mercato e costo base EUR su
+    // TUTTI i portafogli, ognuno col proprio taxRegime.
+    async _buildCrossWeightTotals() {
+        await this._ensureCrossPrices();
+        const portfolios = this.portfolioState?.portfolios || {};
+        let totMercatoEur = 0, totCostoEur = 0;
+
+        for (const pid in portfolios) {
+            const pf = portfolios[pid];
+            const assets = pf.assets || {};
+            const prices = pid === this.activePortfolioId ? this.prices : (this.crossPrices[pid] || {});
+            const positionMap = await buildPositionMap(assets, prices, pf.taxRegime || 'amministrato');
+            for (const id in positionMap) {
+                const pos = positionMap[id];
+                if (!pos || pos.qta <= 0) continue;
+                totMercatoEur += pos.attEur || 0;
+                totCostoEur   += pos.invEur || 0;
+            }
+        }
+        return { totMercatoEur, totCostoEur };
     }
 
     _handlers() {

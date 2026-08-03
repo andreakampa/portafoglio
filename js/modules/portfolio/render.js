@@ -5,11 +5,12 @@ import { Search } from '../../api/search.js';
 // ── Sort state tabella posizioni ────────────────────────────────────────
 let positionSortState = { col: null, dir: 'asc' };
 
-function getSortValue(id, col, portfolio, positionMap, prevClose, currency) {
+function getSortValue(id, col, portfolio, positionMap, prevClose, currency, weightTotals = {}) {
     const p = portfolio[id];
     const pos = positionMap[id] || {};
     const v = (p.valuta || 'EUR').toUpperCase();
     const cv = x => Exchange.convert(x, v, currency);
+    const { totMercatoEur = 0, totCostoEur = 0 } = weightTotals;
 
     switch (col) {
         case 'symbol':
@@ -30,6 +31,10 @@ function getSortValue(id, col, portfolio, positionMap, prevClose, currency) {
             return currency === 'EUR' ? (pos.invEur || 0) : cv(pos.inv || 0);
         case 'value':
             return cv(pos.att || 0);
+        case 'pesoMercato':
+            return totMercatoEur > 0 ? (pos.attEur || 0) / totMercatoEur : 0;
+        case 'pesoCosto':
+            return totCostoEur > 0 ? (pos.invEur || 0) / totCostoEur : 0;
         case 'pnlGrossU':
             return currency === 'EUR' ? (pos.pnlEur || 0) : cv(pos.pnl || 0);
         case 'pnlNetU':
@@ -52,12 +57,12 @@ function getSortValue(id, col, portfolio, positionMap, prevClose, currency) {
     }
 }
 
-function applySort(ids, col, dir, portfolio, positionMap, prevClose, currency) {
+function applySort(ids, col, dir, portfolio, positionMap, prevClose, currency, weightTotals = {}) {
     if (!col) return ids;
     const sorted = [...ids];
     sorted.sort((a, b) => {
-        const va = getSortValue(a, col, portfolio, positionMap, prevClose, currency);
-        const vb = getSortValue(b, col, portfolio, positionMap, prevClose, currency);
+        const va = getSortValue(a, col, portfolio, positionMap, prevClose, currency, weightTotals);
+        const vb = getSortValue(b, col, portfolio, positionMap, prevClose, currency, weightTotals);
         let cmp;
         if (typeof va === 'string' || typeof vb === 'string') {
             cmp = String(va).localeCompare(String(vb), 'it', { sensitivity: 'base' });
@@ -215,6 +220,9 @@ export function renderPage(container) {
             <span class="text-muted fs-sm">Mostra in:</span>
             <button id="btn-eur" class="btn-toggle active">€ EUR</button>
             <button id="btn-usd" class="btn-toggle">$ USD</button>
+            <span class="text-muted fs-sm" style="margin-left:10px;">Peso su:</span>
+            <button id="btn-weight-active" class="btn-toggle active">Portfolio</button>
+            <button id="btn-weight-cross" class="btn-toggle">Tutti</button>
             <button id="btn-refresh" class="btn btn-success btn-sm">🔄 Aggiorna prezzi</button>
             <span class="text-muted fs-xs" id="last-update"></span>
         </div>
@@ -259,6 +267,8 @@ export function renderPage(container) {
                             <th class="sort-header" data-col="dailyPnl">Daily P&L<span class="sort-arrow"></span></th>
                             <th class="sort-header" data-col="cost">Total Cost<span class="sort-arrow"></span></th>
                             <th class="sort-header" data-col="value">Market Value<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="pesoCosto">% Costo<span class="sort-arrow"></span></th>
+                            <th class="sort-header" data-col="pesoMercato">% Mercato<span class="sort-arrow"></span></th>
                             <th class="sort-header" data-col="pnlGrossU">P&L Gross UNRL<span class="sort-arrow"></span></th>
                             <th class="sort-header" data-col="pnlNetU">P&L Net UNRL<span class="sort-arrow"></span></th>
                             <th class="sort-header" data-col="pnlGrossR">P&L Gross REAL<span class="sort-arrow"></span></th>
@@ -284,6 +294,8 @@ export function renderPage(container) {
                 <option value="dailyPnl">Daily P&L</option>
                 <option value="cost">Total Cost</option>
                 <option value="value">Market Value</option>
+                <option value="pesoCosto">% Costo</option>
+                <option value="pesoMercato">% Mercato</option>
                 <option value="pnlGrossU">P&L Gross UNRL</option>
                 <option value="pnlNetU">P&L Net UNRL</option>
                 <option value="pnlGrossR">P&L Gross REAL</option>
@@ -551,7 +563,7 @@ export function renderSkeleton() {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     tbody.innerHTML = Array(3).fill(
-        `<tr>${Array(11).fill('<td><div class="skeleton" style="height:14px;width:75%;"></div></td>').join('')}</tr>`
+        `<tr>${Array(13).fill('<td><div class="skeleton" style="height:14px;width:75%;"></div></td>').join('')}</tr>`
     ).join('');
 }
 
@@ -621,25 +633,27 @@ const pnlAfterTaxEur = pnlEur - taxEur;
     return map;
 }
 
-export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {} }, handlers) {
+export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {} }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     const s = currency === 'EUR' ? '€' : '$';
 
     if (!Object.keys(portfolio).length) {
-        tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="14"><div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div></td></tr>`;
         return;
     }
 
     tbody.innerHTML = '';
 
+    const { totMercatoEur = 0, totCostoEur = 0 } = weightTotals;
+
     let { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
 
     if (positionSortState.col) {
-        active      = applySort(active,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
-        closed      = applySort(closed,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
-        empty       = applySort(empty,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
-        transferred = applySort(transferred, positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+        active      = applySort(active,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
+        closed      = applySort(closed,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
+        empty       = applySort(empty,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
+        transferred = applySort(transferred, positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
     }
 
     // Stato visibilità gruppi collassabili
@@ -774,6 +788,8 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
 })()}</td>
                 <td>${invEur > 0 ? costoDisplay : '—'}</td>
                 <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
+                <td>${invEur > 0 && totCostoEur > 0 ? Calc.fmt((invEur / totCostoEur) * 100, 1) + '%' : '—'}</td>
+                <td>${(pos?.attEur || 0) > 0 && totMercatoEur > 0 ? Calc.fmt(((pos.attEur || 0) / totMercatoEur) * 100, 1) + '%' : '—'}</td>
                 <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
                     ${att > 0
     ? `${currency === 'EUR' ? (pnlEur < 0 ? '-' : '') : (cv(pnl) < 0 ? '-' : '')}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEur : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">di cui cambio: ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
