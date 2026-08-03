@@ -212,6 +212,189 @@ function dividendoDot(id, dividendi) {
     return `<span title="Dividendo maturato non ancora pagato" style="${wrapStyle}" data-action="dividendi" data-id="${id}">${dotStyle('var(--warning)')}</span>`;
 }
 
+// ── Registro colonne tabella posizioni ──────────────────────────────────
+// symbol e actions sono bloccate (sempre presenti, non riordinabili).
+// Le altre sono configurabili dall'utente (ordine + visibilità).
+export const COLUMN_DEFS = [
+    { id: 'symbol', label: 'Symbol', sortCol: 'symbol', locked: true,
+        cell(ctx) {
+            const { id, p, dividendi, v, assetBadge, statoBadge } = ctx;
+            return `<div class="ticker-cell">
+                ${logoImg(p.nome, 'ticker-logo')}
+                <div style="display:flex;flex-direction:column;gap:1px;">
+                    <div style="display:flex;align-items:center;gap:4px;">
+                        <span class="ticker-name">${p.nome}</span>
+                       ${dividendoDot(id, dividendi)}
+                    </div>
+                    <span><span class="badge">${v}</span>${assetBadge}${statoBadge}</span>
+                </div>
+            </div>`;
+        }
+    },
+    { id: 'shares', label: 'Shares', sortCol: 'shares',
+        cell(ctx) { return ctx.qta > 0 ? Calc.fmt(ctx.qta, 4) : '—'; }
+    },
+    { id: 'pmc', label: 'AC/Share', sortCol: 'pmc',
+        cell(ctx) { return ctx.pmc > 0 ? Calc.fmt(ctx.pmc) : '—'; }
+    },
+    { id: 'price', label: 'Last Price', sortCol: 'price',
+        cell(ctx) { return `${ctx.varHtml}${week52Bar(ctx.id, ctx.prLive, ctx.week52Lows, ctx.week52Highs)}`; }
+    },
+    { id: 'dailyPnl', label: 'Daily P&L', sortCol: 'dailyPnl',
+        cell(ctx) {
+            const { id, qta, prPrev, prLive, cv, s, extMarket, varDay } = ctx;
+            const hasPosition = qta > 0 && prPrev !== null;
+            const dailyPnL = hasPosition ? cv((prLive - prPrev) * qta) : null;
+
+            const priceRow = prPrev !== null
+                ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fs-xs">${Calc.fmtSign(varDay)}%</span>`
+                : '<span class="text-muted fs-xs">—</span>';
+
+            const pnlRow = dailyPnL !== null
+                ? `<span class="${dailyPnL >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${dailyPnL >= 0 ? '+' : ''}${s} ${Calc.fmt(dailyPnL)}</span>`
+                : '';
+
+            const extRow = extMarket ? (() => {
+                const extPnL = hasPosition ? cv((extMarket.price - prLive) * qta) : null;
+                const colorClass = extMarket.diff >= 0 ? 'text-success' : 'text-danger';
+                const pnlPart = extPnL !== null
+                    ? ` <span style="color:var(--text-muted);">→ ${extPnL >= 0 ? '+' : ''}${s} ${Calc.fmt(extPnL)}</span>`
+                    : '';
+                return `<span style="font-size:10px;color:var(--text-muted);">${extMarket.label} <b>${Calc.fmt(extMarket.price)}</b> <span class="${colorClass}">${Calc.fmtSign(extMarket.diff)}%</span>${pnlPart}</span>`;
+            })() : '';
+
+            if (!pnlRow && !extRow) return '—';
+            return `<div style="display:flex;flex-direction:column;gap:2px;">${pnlRow}${priceRow}${extRow}</div>`;
+        }
+    },
+    { id: 'cost', label: 'Total Cost', sortCol: 'cost',
+        cell(ctx) { return ctx.invEur > 0 ? ctx.costoDisplay : '—'; }
+    },
+    { id: 'value', label: 'Market Value', sortCol: 'value',
+        cell(ctx) { return ctx.att > 0 ? `<b>${ctx.s} ${Calc.fmt(ctx.cv(ctx.att))}</b>` : '—'; }
+    },
+    { id: 'pesoCosto', label: '% Costo', sortCol: 'pesoCosto',
+        cell(ctx) { return ctx.invEur > 0 && ctx.totCostoEur > 0 ? Calc.fmt((ctx.invEur / ctx.totCostoEur) * 100, 1) + '%' : '—'; }
+    },
+    { id: 'pesoMercato', label: '% Mercato', sortCol: 'pesoMercato',
+        cell(ctx) { return (ctx.pos?.attEur || 0) > 0 && ctx.totMercatoEur > 0 ? Calc.fmt(((ctx.pos.attEur || 0) / ctx.totMercatoEur) * 100, 1) + '%' : '—'; }
+    },
+    { id: 'pnlGrossU', label: 'P&L Gross UNRL', sortCol: 'pnlGrossU',
+        tdClass(ctx) { return ctx.pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'; },
+        cell(ctx) {
+            const { att, currency, pnlEur, cv, pnl, s, pnlP, rowId, pos } = ctx;
+            if (!(att > 0)) return '—';
+            return `${currency === 'EUR' ? (pnlEur < 0 ? '-' : '') : (cv(pnl) < 0 ? '-' : '')}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEur : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">di cui cambio: ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`;
+        }
+    },
+    { id: 'pnlNetU', label: 'P&L Net UNRL', sortCol: 'pnlNetU',
+        cell(ctx) {
+            const { att, currency, pnlAfterTaxEur, cv, pnlAfterTax, taxEur, tax, s } = ctx;
+            if (!(att > 0)) return '—';
+            const netShown = currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax);
+            const taxShown = currency === 'EUR' ? taxEur : cv(tax);
+            return `<span class="${netShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(netShown)}</span>
+                    <br><span class="text-muted fs-xs">tasse: ${s} ${Calc.fmt(taxShown)}</span>`;
+        }
+    },
+    { id: 'pnlGrossR', label: 'P&L Gross REAL', sortCol: 'pnlGrossR',
+        tdClass(ctx) { return ctx.realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'; },
+        cell(ctx) {
+            const { realizedPnL, currency, s } = ctx;
+            if (realizedPnL === 0) return '—';
+            return `${s} ${Calc.fmt(currency === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, 'EUR', currency))}`;
+        }
+    },
+    { id: 'pnlNetR', label: 'P&L Net REAL', sortCol: 'pnlNetR',
+        cell(ctx) {
+            const { realizedPnL, p, currency, s } = ctx;
+            if (realizedPnL === 0) return '—';
+            const realizedEur = realizedPnL;
+            const breakdown = Calc.realizedTaxBreakdown({ gainEur: realizedEur, assetType: p.tipoAsset, availableMinus: 0 });
+            const realNetEur = realizedEur > 0 ? breakdown.nettoTeorico : realizedEur;
+            const realTaxEur = realizedEur > 0 ? breakdown.taxTeorica : 0;
+            const realNetShown = currency === 'EUR' ? realNetEur : Exchange.convert(realNetEur, 'EUR', currency);
+            const realTaxShown = currency === 'EUR' ? realTaxEur : Exchange.convert(realTaxEur, 'EUR', currency);
+            const taxLbl = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
+            return `<span class="${realNetShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(realNetShown)}</span>
+                    <br><span class="text-muted fs-xs">tasse (${taxLbl}): ${s} ${Calc.fmt(realTaxShown)}</span>`;
+        }
+    },
+    { id: 'pmcEur', label: 'PMC EUR', sortCol: null, defaultHidden: true,
+        cell(ctx) { return ctx.pos?.pmcEur > 0 ? `€ ${Calc.fmt(ctx.pos.pmcEur)}` : '—'; }
+    },
+    { id: 'totalComm', label: 'Commissioni Tot.', sortCol: null, defaultHidden: true,
+        cell(ctx) {
+            const totalComm = ctx.pos?.totalComm || 0;
+            return totalComm ? `${ctx.s} ${Calc.fmt(ctx.cv(totalComm))}` : '—';
+        }
+    },
+    { id: 'dividendiTitolo', label: 'Dividendi Titolo', sortCol: null, defaultHidden: true,
+        cell(ctx) {
+            const divs = (ctx.dividendi?.[ctx.id] || []).filter(d => d?.pagato);
+            if (!divs.length) return '—';
+            const totEur = divs.reduce((sum, d) => sum + Number(d?.importoEur || 0), 0);
+            const shown = ctx.currency === 'EUR' ? totEur : Exchange.convert(totEur, 'EUR', ctx.currency);
+            return `${ctx.s} ${Calc.fmt(shown)}`;
+        }
+    },
+    { id: 'actions', label: 'Trading Tools', sortCol: null, locked: true,
+        cell(ctx) {
+            const { id, groupClass } = ctx;
+            return `<div class="action-btns">
+                <button class="btn-action btn-action-history" data-action="history" data-id="${id}" title="Storico">📜</button>
+                ${groupClass !== 'row-transferred' ? `
+                <button class="btn-action btn-action-buy"  data-action="buy"      data-id="${id}" title="Acquisto">＋</button>
+                <button class="btn-action btn-action-sell" data-action="sell"     data-id="${id}" title="Vendita">－</button>
+                <button class="btn-action btn-action-sim"  data-action="sim"      data-id="${id}" title="Simulazione">◎</button>
+                <button class="btn-action"                 data-action="transfer" data-id="${id}" title="Trasferisci">🔀</button>
+                <button class="btn-action btn-action-delete" data-action="delete" data-id="${id}" title="Elimina">✕</button>
+                ` : ''}
+            </div>`;
+        }
+    },
+];
+
+export const MIDDLE_COLUMN_IDS = COLUMN_DEFS.filter(c => !c.locked).map(c => c.id);
+
+// Ricostruisce { order, hidden } a partire dalla config salvata, aggiungendo
+// eventuali colonne nuove (introdotte dopo l'ultimo salvataggio) come nascoste
+// di default — così un aggiornamento dell'app non fa comparire colonne a sorpresa.
+export function reconcileColumnConfig(columnConfig) {
+    const isFresh = !columnConfig;
+    const storedOrder = Array.isArray(columnConfig?.order) ? columnConfig.order.filter(id => MIDDLE_COLUMN_IDS.includes(id)) : [];
+    const hidden = new Set(columnConfig?.hidden || []);
+    const order = [...storedOrder];
+    for (const id of MIDDLE_COLUMN_IDS) {
+        if (!order.includes(id)) {
+            order.push(id);
+            const def = COLUMN_DEFS.find(c => c.id === id);
+            if (isFresh ? def?.defaultHidden : true) hidden.add(id);
+        }
+    }
+    return { order, hidden: [...hidden] };
+}
+
+export function getVisibleColumnOrder(columnConfig) {
+    const { order, hidden } = reconcileColumnConfig(columnConfig);
+    const hiddenSet = new Set(hidden);
+    return order.filter(id => !hiddenSet.has(id));
+}
+
+export function renderTableHeader(columnConfig) {
+    const tr = document.querySelector('#portfolio-table thead tr');
+    if (!tr) return;
+    const cols = ['symbol', ...getVisibleColumnOrder(columnConfig), 'actions'];
+    tr.innerHTML = cols.map(id => {
+        const def = COLUMN_DEFS.find(c => c.id === id);
+        if (!def) return '';
+        return def.sortCol
+            ? `<th class="sort-header" data-col="${def.sortCol}">${def.label}<span class="sort-arrow"></span></th>`
+            : `<th>${def.label}</th>`;
+    }).join('');
+    updateSortArrows();
+}
+
 export function renderPage(container) {
     container.innerHTML = `
     <div class="controls-bar">
@@ -252,29 +435,17 @@ export function renderPage(container) {
     </div>
 
     <div class="card desktop-only" id="card-table">
-        <div class="card-title">💼 Posizioni</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>💼 Posizioni</span>
+            <button id="btn-column-config" class="btn-toggle" title="Configura colonne" style="font-size:16px;padding:2px 10px;">⚙️</button>
+        </div>
         <div class="table-scroll-wrapper" id="table-scroll-wrapper" style="position:relative;">
             <button class="table-scroll-btn table-scroll-left" id="tbl-scroll-left" title="Scorri sinistra">&#8249;</button>
             <button class="table-scroll-btn table-scroll-right" id="tbl-scroll-right" title="Scorri destra">&#8250;</button>
             <div class="table-wrapper" id="table-wrapper-inner">
                 <table id="portfolio-table">
                     <thead>
-                        <tr>
-                            <th class="sort-header" data-col="symbol">Symbol<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="shares">Shares<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="pmc">AC/Share<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="price">Last Price<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="dailyPnl">Daily P&L<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="cost">Total Cost<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="value">Market Value<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="pesoCosto">% Costo<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="pesoMercato">% Mercato<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="pnlGrossU">P&L Gross UNRL<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="pnlNetU">P&L Net UNRL<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="pnlGrossR">P&L Gross REAL<span class="sort-arrow"></span></th>
-                            <th class="sort-header" data-col="pnlNetR">P&L Net REAL<span class="sort-arrow"></span></th>
-                            <th>Trading Tools</th>
-                        </tr>
+                        <tr></tr>
                     </thead>
                     <tbody id="portfolio-tbody"></tbody>
                 </table>
@@ -633,13 +804,14 @@ const pnlAfterTaxEur = pnlEur - taxEur;
     return map;
 }
 
-export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {} }, handlers) {
+export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {}, columnConfig = null }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     const s = currency === 'EUR' ? '€' : '$';
+    const totalCols = 2 + getVisibleColumnOrder(columnConfig).length;
 
     if (!Object.keys(portfolio).length) {
-        tbody.innerHTML = `<tr><td colspan="14"><div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${totalCols}"><div class="empty-state"><div class="icon">📭</div>Nessun titolo — aggiungine uno sopra</div></td></tr>`;
         return;
     }
 
@@ -667,35 +839,37 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
         // Header gruppo
         const headerRow = document.createElement('tr');
         headerRow.className = 'tbody-group-header';
-        headerRow.innerHTML = `<td colspan="12">${groupLabel} <span style="font-weight:400;opacity:.7;">(${ids.length})</span></td>`;
+        headerRow.innerHTML = `<td colspan="${totalCols}">${groupLabel} <span style="font-weight:400;opacity:.7;">(${ids.length})</span></td>`;
         tbody.appendChild(headerRow);
 
         // Righe titoli
+       const visibleCols = getVisibleColumnOrder(columnConfig);
+        const rowCols = ['symbol', ...visibleCols, 'actions'];
+
         for (const id of ids) {
             const p   = portfolio[id];
             const pos = positionMap[id];
             const {
-    qta = 0,
-    pmc = 0,
-    realizedPnL = 0,
-    prLive = 0,
-    att = 0,
-    pnl = 0,
-    pnlP = 0,
-    pnlEur = 0,
-    pnlEurPuro = pnlEur,
-    tax = 0,
-    pnlAfterTax = 0,
-    taxEur = 0,
-    pnlAfterTaxEur = 0,
-    invEur = 0,
-    valuta: v = (p.valuta || 'EUR').toUpperCase()
-} = pos || {};
+                qta = 0,
+                pmc = 0,
+                realizedPnL = 0,
+                prLive = 0,
+                att = 0,
+                pnl = 0,
+                pnlP = 0,
+                pnlEur = 0,
+                pnlEurPuro = pnlEur,
+                tax = 0,
+                pnlAfterTax = 0,
+                taxEur = 0,
+                pnlAfterTaxEur = 0,
+                invEur = 0,
+                valuta: v = (p.valuta || 'EUR').toUpperCase()
+            } = pos || {};
             const prPrev = prevClose[id] ?? null;
             const cv     = x => Exchange.convert(x, v, currency);
             const varDay = prPrev ? ((prLive - prPrev) / prPrev) * 100 : null;
 
-            // Costo totale da mostrare
             const costoDisplay = currency === 'EUR'
                 ? `€ ${Calc.fmt(invEur)}`
                 : `${s} ${Calc.fmt(cv(pos.inv))}`;
@@ -738,120 +912,24 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 ? `<span class="badge-stato badge-partial-transfer" title="Parzialmente trasferito: ${Calc.fmt(qtaTrasferita, 4)} unità">🔀 Parz.</span>`
                 : '';
 
+            const ctx = {
+                id, p, pos, groupClass, currency, s, cv, v,
+                prLive, prPrev, varDay, qta, pmc, realizedPnL, att, pnl, pnlP,
+                pnlEur, pnlEurPuro, tax, pnlAfterTax, taxEur, pnlAfterTaxEur, invEur,
+                costoDisplay, rowId, extMarket, varHtml, assetBadge, statoBadge,
+                week52Lows, week52Highs, dividendi,
+                totMercatoEur: weightTotals.totMercatoEur || 0,
+                totCostoEur: weightTotals.totCostoEur || 0
+            };
+
             const tr = document.createElement('tr');
             if (groupClass) tr.className = groupClass;
-            tr.innerHTML = `
-                <td><div class="ticker-cell">
-                    ${logoImg(p.nome, 'ticker-logo')}
-                    <div style="display:flex;flex-direction:column;gap:1px;">
-                        <div style="display:flex;align-items:center;gap:4px;">
-                            <span class="ticker-name">${p.nome}</span>
-                           ${dividendoDot(id, dividendi)}
-                        </div>
-                        <span><span class="badge">${v}</span>${assetBadge}${statoBadge}</span>
-                    </div>
-                </div></td>
-                <td>${qta > 0 ? Calc.fmt(qta, 4) : '—'}</td>
-                <td>${pmc > 0 ? Calc.fmt(pmc) : '—'}</td>
-                <td>
-                    ${varHtml}
-                    ${week52Bar(id, prLive, week52Lows, week52Highs)}
-                </td>
-               <td>${(() => {
-    const hasPosition = qta > 0 && prPrev !== null;
-    const dailyPnL = hasPosition ? cv((prLive - prPrev) * qta) : null;
-
-    const priceRow = prPrev !== null
-        ? `<span class="${varDay >= 0 ? 'pos-gain' : 'neg-loss'} fs-xs">${Calc.fmtSign(varDay)}%</span>`
-        : '<span class="text-muted fs-xs">—</span>';
-
-    const pnlRow = dailyPnL !== null
-        ? `<span class="${dailyPnL >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${dailyPnL >= 0 ? '+' : ''}${s} ${Calc.fmt(dailyPnL)}</span>`
-        : '';
-
-    const extRow = extMarket ? (() => {
-        const extPnL = hasPosition ? cv((extMarket.price - prLive) * qta) : null;
-        const colorClass = extMarket.diff >= 0 ? 'text-success' : 'text-danger';
-        const pnlPart = extPnL !== null
-            ? ` <span style="color:var(--text-muted);">→ ${extPnL >= 0 ? '+' : ''}${s} ${Calc.fmt(extPnL)}</span>`
-            : '';
-        return `<span style="font-size:10px;color:var(--text-muted);">${extMarket.label} <b>${Calc.fmt(extMarket.price)}</b> <span class="${colorClass}">${Calc.fmtSign(extMarket.diff)}%</span>${pnlPart}</span>`;
-    })() : '';
-
-    if (!pnlRow && !extRow) return '—';
-
-    return `<div style="display:flex;flex-direction:column;gap:2px;">
-        ${pnlRow}
-        ${priceRow}
-        ${extRow}
-    </div>`;
-})()}</td>
-                <td>${invEur > 0 ? costoDisplay : '—'}</td>
-                <td>${att > 0 ? `<b>${s} ${Calc.fmt(cv(att))}</b>` : '—'}</td>
-                <td>${invEur > 0 && totCostoEur > 0 ? Calc.fmt((invEur / totCostoEur) * 100, 1) + '%' : '—'}</td>
-                <td>${(pos?.attEur || 0) > 0 && totMercatoEur > 0 ? Calc.fmt(((pos.attEur || 0) / totMercatoEur) * 100, 1) + '%' : '—'}</td>
-                <td class="${pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'}">
-                    ${att > 0
-    ? `${currency === 'EUR' ? (pnlEur < 0 ? '-' : '') : (cv(pnl) < 0 ? '-' : '')}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEur : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">di cui cambio: ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`
-    : '—'}
-                </td>
-                <td>
-                    ${att > 0
-    ? (() => {
-        const netShown = currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax);
-        const taxShown = currency === 'EUR' ? taxEur : cv(tax);
-        return `<span class="${netShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(netShown)}</span>
-                <br><span class="text-muted fs-xs">tasse: ${s} ${Calc.fmt(taxShown)}</span>`;
-      })()
-    : '—'}
-                </td>
-                <td class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
-                    ${realizedPnL !== 0
-                        ? `${s} ${Calc.fmt(currency === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, 'EUR', currency))}`
-                        : '—'}
-                </td>
-                <td>${(() => {
-    if (realizedPnL === 0) return '—';
-
-    // pos.realizedPnL è già in € (Calc.position() lo accumula così
-    // anche per gli asset non-EUR, al cambio storico di ogni vendita).
-    const realizedEur = realizedPnL;
-
-    const breakdown = Calc.realizedTaxBreakdown({
-        gainEur: realizedEur,
-        assetType: p.tipoAsset,
-        availableMinus: 0
-    });
-
-    const realNetEur = realizedEur > 0 ? breakdown.nettoTeorico : realizedEur;
-    const realTaxEur = realizedEur > 0 ? breakdown.taxTeorica : 0;
-
-    const realNetShown =
-        currency === 'EUR' ? realNetEur : Exchange.convert(realNetEur, 'EUR', currency);
-
-    const realTaxShown =
-        currency === 'EUR' ? realTaxEur : Exchange.convert(realTaxEur, 'EUR', currency);
-
-    const taxLbl =
-        p.tipoAsset === 'bond' ? '12,5%' :
-        p.tipoAsset === 'crypto' ? '33%' :
-        '26%';
-
-    return `<span class="${realNetShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(realNetShown)}</span>
-            <br><span class="text-muted fs-xs">tasse (${taxLbl}): ${s} ${Calc.fmt(realTaxShown)}</span>`;
-})()}</td>
-                <td>
-                    <div class="action-btns">
-                        <button class="btn-action btn-action-history" data-action="history" data-id="${id}" title="Storico">📜</button>
-                        ${groupClass !== 'row-transferred' ? `
-                        <button class="btn-action btn-action-buy"  data-action="buy"      data-id="${id}" title="Acquisto">＋</button>
-                        <button class="btn-action btn-action-sell" data-action="sell"     data-id="${id}" title="Vendita">－</button>
-                        <button class="btn-action btn-action-sim"  data-action="sim"      data-id="${id}" title="Simulazione">◎</button>
-                        <button class="btn-action"                 data-action="transfer" data-id="${id}" title="Trasferisci">🔀</button>
-                        <button class="btn-action btn-action-delete" data-action="delete" data-id="${id}" title="Elimina">✕</button>
-                        ` : ''}
-                    </div>
-                </td>`;
+            tr.innerHTML = rowCols.map(colId => {
+                const def = COLUMN_DEFS.find(c => c.id === colId);
+                if (!def) return '';
+                const cls = def.tdClass ? ` class="${def.tdClass(ctx)}"` : '';
+                return `<td${cls}>${def.cell(ctx)}</td>`;
+            }).join('');
             tbody.appendChild(tr);
         }
 
@@ -860,7 +938,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
             const toggleRow = document.createElement('tr');
             toggleRow.className = 'group-toggle-row';
             const isShown = renderTable[showKey];
-            toggleRow.innerHTML = `<td colspan="12">— ${isShown ? 'Nascondi' : 'Mostra'} ${groupLabel.toLowerCase()} —</td>`;
+            toggleRow.innerHTML = `<td colspan="${totalCols}">— ${isShown ? 'Nascondi' : 'Mostra'} ${groupLabel.toLowerCase()} —</td>`;
             toggleRow.addEventListener('click', () => {
                 renderTable[showKey] = !renderTable[showKey];
                 renderTable._refresh && renderTable._refresh();
@@ -874,7 +952,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     else if (closed.length) {
         const toggleRow = document.createElement('tr');
         toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="12">— Mostra posizioni chiuse (${closed.length}) —</td>`;
+        toggleRow.innerHTML = `<td colspan="${totalCols}">— Mostra posizioni chiuse (${closed.length}) —</td>`;
         toggleRow.addEventListener('click', () => {
             renderTable._showClosed = true;
             renderTable._refresh && renderTable._refresh();
@@ -885,7 +963,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     else if (empty.length) {
         const toggleRow = document.createElement('tr');
         toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="12">— Mostra watchlist (${empty.length}) —</td>`;
+        toggleRow.innerHTML = `<td colspan="${totalCols}">— Mostra watchlist (${empty.length}) —</td>`;
         toggleRow.addEventListener('click', () => {
             renderTable._showEmpty = true;
             renderTable._refresh && renderTable._refresh();
@@ -896,7 +974,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     else if (transferred.length) {
         const toggleRow = document.createElement('tr');
         toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="12">— Mostra titoli trasferiti (${transferred.length}) —</td>`;
+        toggleRow.innerHTML = `<td colspan="${totalCols}">— Mostra titoli trasferiti (${transferred.length}) —</td>`;
         toggleRow.addEventListener('click', () => {
             renderTable._showTransferred = true;
             renderTable._refresh && renderTable._refresh();

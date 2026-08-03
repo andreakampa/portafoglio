@@ -7,7 +7,8 @@ import { Search } from '../../api/search.js';
 import { Calc } from './calc.js';
 import {
     renderPage, renderTable, renderKPI, renderSkeleton,
-    renderMobileCards, buildPositionMap, resetRenderState
+    renderMobileCards, buildPositionMap, resetRenderState,
+    renderTableHeader, reconcileColumnConfig, COLUMN_DEFS
 } from './render.js';
 import { openTransactionModal, openHistoryModal, openSimModal, CartPanel, Cart, openTransferModal } from './ui.js';
 import { initCassettoFiscale, aggiornaBadgeFiscale } from '../../api/fiscale.js';
@@ -77,6 +78,7 @@ export class PortfolioPage {
         this.currency = 'EUR';
         this.weightScope = 'active'; // 'active' | 'cross'
         this.crossPrices = {}; // { portfolioId: { assetId: price } } — cache prezzi per portfolio non attivo
+        this.columnConfig = null; // { order: [...], hidden: [...] } — caricato da Firebase al mount
         this._autoTimer = null;
         this._portfolioSwitcherBound = false;
         this._docClickSwitcher = null;
@@ -105,9 +107,11 @@ export class PortfolioPage {
         }
 
         await Promise.all([Exchange.update(), this._loadData()]);
+        this.columnConfig = await DB.load('column_config');
         this._updateExchangeLabel();
         this._ensurePortfolioSwitcher();
         this._ensurePortfolioModal();
+        this._ensureColumnConfigModal();
 
         await Exchange.prefetchRatesForPortfolio(this.portfolio);
         this._syncActivePortfolio();
@@ -197,9 +201,11 @@ const state = {
   week52Highs,
   dividendi: this.dividendi,
   weightTotals,
+  columnConfig: this.columnConfig,
   handlers
 };
 
+renderTableHeader(this.columnConfig);
 renderTable._refresh = () => renderTable(state, handlers);
 renderKPI(state);
 renderTable(state, handlers);
@@ -634,6 +640,150 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         modal.style.display = 'none';
     }
 
+    _ensureColumnConfigModal() {
+        if (document.getElementById('column-config-modal')) return;
+
+        const modal = document.createElement('div');
+        modal.id = 'column-config-modal';
+        modal.innerHTML = `
+            <style>
+                #column-config-modal { position: fixed; inset: 0; z-index: 2000; display: none; }
+                #column-config-modal .ccm-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+                #column-config-modal .ccm-dialog {
+                    position: relative; max-width: 420px; margin: 8vh auto 0; background: var(--bg, #fff);
+                    border-radius: 10px; border: 0.5px solid var(--border, #ccc); overflow: hidden;
+                    display: flex; flex-direction: column; max-height: 80vh;
+                }
+                #column-config-modal .ccm-header {
+                    display: flex; align-items: center; justify-content: space-between;
+                    padding: 14px 16px; border-bottom: 0.5px solid var(--border, #ccc);
+                }
+                #column-config-modal .ccm-header h3 { margin: 0; font-size: 15px; }
+                #column-config-modal .ccm-close { background: none; border: none; cursor: pointer; font-size: 15px; }
+                #column-config-modal .ccm-body { padding: 10px 16px; overflow-y: auto; }
+                #column-config-modal .ccm-hint { font-size: 12px; color: var(--text-muted, #888); margin: 0 0 10px; }
+                #column-config-list { list-style: none; margin: 0; padding: 0; }
+                #column-config-list li {
+                    display: flex; align-items: center; gap: 8px; padding: 8px 6px;
+                    border: 0.5px solid var(--border, #ddd); border-radius: 6px; margin-bottom: 6px;
+                    background: var(--bg2, #f8f8f6); cursor: grab; font-size: 13px;
+                }
+                #column-config-list li.dragging { opacity: .4; }
+                #column-config-list li .ccm-handle { opacity: .5; }
+                #column-config-list li.ccm-hidden-item { opacity: .55; }
+                #column-config-modal .ccm-footer {
+                    padding: 10px 16px; border-top: 0.5px solid var(--border, #ccc);
+                    display: flex; justify-content: flex-end;
+                }
+                #column-config-modal .ccm-reset {
+                    background: none; border: 0.5px solid var(--border, #ccc); border-radius: 6px;
+                    padding: 6px 12px; cursor: pointer; font-size: 12px;
+                }
+            </style>
+            <div class="ccm-backdrop" data-close="1"></div>
+            <div class="ccm-dialog">
+                <div class="ccm-header">
+                    <h3>⚙️ Configura colonne</h3>
+                    <button class="ccm-close" data-close="1">✕</button>
+                </div>
+                <div class="ccm-body">
+                    <p class="ccm-hint">Trascina per riordinare · deseleziona per nascondere. Symbol e Trading Tools sono sempre presenti.</p>
+                    <ul id="column-config-list"></ul>
+                </div>
+                <div class="ccm-footer">
+                    <button class="ccm-reset" id="column-config-reset">Ripristina default</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.querySelectorAll('[data-close]').forEach(el =>
+            el.addEventListener('click', () => { modal.style.display = 'none'; })
+        );
+
+        document.getElementById('column-config-reset')?.addEventListener('click', async () => {
+            this.columnConfig = { order: [], hidden: [] };
+            await this._saveColumnConfig();
+            this._renderColumnConfigList();
+        });
+    }
+
+    _openColumnConfigModal() {
+        const modal = document.getElementById('column-config-modal');
+        if (!modal) return;
+        this._renderColumnConfigList();
+        modal.style.display = 'block';
+    }
+
+    _renderColumnConfigList() {
+        const list = document.getElementById('column-config-list');
+        if (!list) return;
+
+        const { order, hidden } = reconcileColumnConfig(this.columnConfig);
+        const hiddenSet = new Set(hidden);
+
+        list.innerHTML = order.map(id => {
+            const def = COLUMN_DEFS.find(c => c.id === id);
+            if (!def) return '';
+            const isHidden = hiddenSet.has(id);
+            return `
+                <li draggable="true" data-id="${id}" class="${isHidden ? 'ccm-hidden-item' : ''}">
+                    <span class="ccm-handle">⠿</span>
+                    <input type="checkbox" data-check="${id}" ${isHidden ? '' : 'checked'}>
+                    <span>${def.label}</span>
+                </li>`;
+        }).join('');
+
+        // Drag and drop nativo
+        let draggedId = null;
+        list.querySelectorAll('li').forEach(li => {
+            li.addEventListener('dragstart', () => {
+                draggedId = li.dataset.id;
+                li.classList.add('dragging');
+            });
+            li.addEventListener('dragend', () => li.classList.remove('dragging'));
+            li.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const target = e.currentTarget;
+                if (target.dataset.id === draggedId) return;
+                const rect = target.getBoundingClientRect();
+                const before = (e.clientY - rect.top) < rect.height / 2;
+                target.parentNode.insertBefore(
+                    list.querySelector(`li[data-id="${draggedId}"]`),
+                    before ? target : target.nextSibling
+                );
+            });
+            li.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                await this._persistColumnOrderFromDOM();
+            });
+            li.querySelector('[data-check]')?.addEventListener('change', async (e) => {
+                await this._persistColumnOrderFromDOM();
+            });
+        });
+    }
+
+    async _persistColumnOrderFromDOM() {
+        const list = document.getElementById('column-config-list');
+        if (!list) return;
+        const items = [...list.querySelectorAll('li')];
+        const order = items.map(li => li.dataset.id);
+        const hidden = items
+            .filter(li => !li.querySelector('[data-check]')?.checked)
+            .map(li => li.dataset.id);
+
+        items.forEach(li => li.classList.toggle('ccm-hidden-item', hidden.includes(li.dataset.id)));
+
+        this.columnConfig = { order, hidden };
+        await this._saveColumnConfig();
+    }
+
+    async _saveColumnConfig() {
+        await DB.save('column_config', this.columnConfig);
+        renderTableHeader(this.columnConfig);
+        await this._render();
+    }
+
     _bindStaticEvents() {
         document.getElementById('btn-refresh')?.addEventListener('click', async () => {
             await Exchange.update();
@@ -648,6 +798,8 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
 
         document.getElementById('btn-weight-active')?.addEventListener('click', () => this._setWeightScope('active'));
         document.getElementById('btn-weight-cross')?.addEventListener('click', () => this._setWeightScope('cross'));
+
+        document.getElementById('btn-column-config')?.addEventListener('click', () => this._openColumnConfigModal());
 
         let _suggestTimer = null;
         const inputTitolo = document.getElementById('input-titolo');
