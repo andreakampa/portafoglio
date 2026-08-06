@@ -576,9 +576,9 @@ export function renderPage(container) {
 
         /* Tabella compatta */
         #portfolio-table {
-            min-width: 900px;
             width: 100%;
             border-collapse: collapse;
+            table-layout: auto;
         }
         #portfolio-table th,
         #portfolio-table td {
@@ -599,6 +599,23 @@ export function renderPage(container) {
             font-size: 10px;
             margin-left: 3px;
             opacity: .8;
+        }
+
+        /* Colonna Symbol fissata a sinistra durante lo scroll orizzontale */
+        #portfolio-table th:first-child,
+        #portfolio-table td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: var(--bg, #fff);
+            box-shadow: 1px 0 0 var(--border, #b4b2a9);
+        }
+        #portfolio-table thead th:first-child {
+            z-index: 3;
+            background: var(--bg2, #f8f8f6);
+        }
+        .tbody-group-header td:first-child {
+            background: var(--bg2, #f8f8f6);
         }
 
         /* ── Separatori di gruppo ── */
