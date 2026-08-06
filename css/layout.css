@@ -28,7 +28,7 @@
 /* ── MAIN — full width con padding contenuto ───── */
 .main-content {
     width: 100%;
-    max-width: 1800px;
+    max-width: min(96vw, 2400px);
     margin: 0 auto;
     padding: 20px 24px;
 }
