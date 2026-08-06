@@ -648,35 +648,51 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
         modal.innerHTML = `
             <style>
                 #column-config-modal { position: fixed; inset: 0; z-index: 2000; display: none; }
-                #column-config-modal .ccm-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+                #column-config-modal .ccm-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
                 #column-config-modal .ccm-dialog {
-                    position: relative; max-width: 420px; margin: 8vh auto 0; background: var(--bg, #fff);
-                    border-radius: 10px; border: 0.5px solid var(--border, #ccc); overflow: hidden;
-                    display: flex; flex-direction: column; max-height: 80vh;
+                    position: relative; max-width: 560px; margin: 6vh auto 0; background: #ffffff;
+                    border-radius: 10px; border: 1px solid #d5d3ca; overflow: hidden;
+                    display: flex; flex-direction: column; max-height: 86vh;
                 }
                 #column-config-modal .ccm-header {
                     display: flex; align-items: center; justify-content: space-between;
-                    padding: 14px 16px; border-bottom: 0.5px solid var(--border, #ccc);
+                    padding: 14px 16px; border-bottom: 1px solid #e5e3da;
                 }
-                #column-config-modal .ccm-header h3 { margin: 0; font-size: 15px; }
-                #column-config-modal .ccm-close { background: none; border: none; cursor: pointer; font-size: 15px; }
-                #column-config-modal .ccm-body { padding: 10px 16px; overflow-y: auto; }
-                #column-config-modal .ccm-hint { font-size: 12px; color: var(--text-muted, #888); margin: 0 0 10px; }
-                #column-config-list { list-style: none; margin: 0; padding: 0; }
-                #column-config-list li {
-                    display: flex; align-items: center; gap: 8px; padding: 8px 6px;
-                    border: 0.5px solid var(--border, #ddd); border-radius: 6px; margin-bottom: 6px;
-                    background: var(--bg2, #f8f8f6); cursor: grab; font-size: 13px;
+                #column-config-modal .ccm-header h3 { margin: 0; font-size: 15px; color: #16151a; }
+                #column-config-modal .ccm-close { background: none; border: none; cursor: pointer; font-size: 15px; color: #16151a; }
+                #column-config-modal .ccm-body { padding: 14px 16px; overflow-y: auto; }
+                #column-config-modal .ccm-hint { font-size: 12px; color: #6a6960; margin: 0 0 12px; }
+                #column-config-modal .ccm-columns { display: flex; gap: 14px; align-items: flex-start; }
+                #column-config-modal .ccm-col { flex: 1 1 50%; min-width: 0; }
+                #column-config-modal .ccm-col-title {
+                    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+                    color: #8a8878; margin-bottom: 8px;
                 }
-                #column-config-list li.dragging { opacity: .4; }
-                #column-config-list li .ccm-handle { opacity: .5; }
-                #column-config-list li.ccm-hidden-item { opacity: .55; }
+                #column-config-modal ul { list-style: none; margin: 0; padding: 0; min-height: 30px; }
+                #column-config-modal li {
+                    display: flex; align-items: center; gap: 8px; padding: 8px 8px;
+                    border: 1px solid #e5e3da; border-radius: 6px; margin-bottom: 6px;
+                    background: #f7f6f1; font-size: 13px; color: #16151a;
+                }
+                #column-config-modal li.ccm-empty {
+                    color: #9a9888; font-style: italic; border-style: dashed; justify-content: center;
+                }
+                #column-config-visible li { cursor: grab; }
+                #column-config-visible li.dragging { opacity: .4; }
+                #column-config-modal .ccm-handle { opacity: .5; color: #16151a; flex-shrink: 0; }
+                #column-config-modal .ccm-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                #column-config-modal .ccm-btn {
+                    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; border: none;
+                    cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+                }
+                #column-config-modal .ccm-btn-remove { background: #f3d8d8; color: #a33a3a; }
+                #column-config-modal .ccm-btn-add { background: #d6ecdd; color: #1f7a45; }
                 #column-config-modal .ccm-footer {
-                    padding: 10px 16px; border-top: 0.5px solid var(--border, #ccc);
+                    padding: 10px 16px; border-top: 1px solid #e5e3da;
                     display: flex; justify-content: flex-end;
                 }
                 #column-config-modal .ccm-reset {
-                    background: none; border: 0.5px solid var(--border, #ccc); border-radius: 6px;
+                    background: none; border: 1px solid #d5d3ca; border-radius: 6px; color: #16151a;
                     padding: 6px 12px; cursor: pointer; font-size: 12px;
                 }
             </style>
@@ -687,8 +703,17 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
                     <button class="ccm-close" data-close="1">✕</button>
                 </div>
                 <div class="ccm-body">
-                    <p class="ccm-hint">Trascina per riordinare · deseleziona per nascondere. Symbol e Trading Tools sono sempre presenti.</p>
-                    <ul id="column-config-list"></ul>
+                    <p class="ccm-hint">Trascina a sinistra per riordinare. Usa i pulsanti − / + per rimuovere o aggiungere colonne.</p>
+                    <div class="ccm-columns">
+                        <div class="ccm-col">
+                            <div class="ccm-col-title">In tabella</div>
+                            <ul id="column-config-visible"></ul>
+                        </div>
+                        <div class="ccm-col">
+                            <div class="ccm-col-title">Disponibili</div>
+                            <ul id="column-config-hidden"></ul>
+                        </div>
+                    </div>
                 </div>
                 <div class="ccm-footer">
                     <button class="ccm-reset" id="column-config-reset">Ripristina default</button>
@@ -716,27 +741,44 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
     }
 
     _renderColumnConfigList() {
-        const list = document.getElementById('column-config-list');
-        if (!list) return;
+        const visibleList = document.getElementById('column-config-visible');
+        const hiddenList  = document.getElementById('column-config-hidden');
+        if (!visibleList || !hiddenList) return;
 
         const { order, hidden } = reconcileColumnConfig(this.columnConfig);
         const hiddenSet = new Set(hidden);
 
-        list.innerHTML = order.map(id => {
+        const visibleIds = order.filter(id => !hiddenSet.has(id));
+        const hiddenIds = order.filter(id => hiddenSet.has(id)).sort((a, b) => {
+            const la = COLUMN_DEFS.find(c => c.id === a)?.label || '';
+            const lb = COLUMN_DEFS.find(c => c.id === b)?.label || '';
+            return la.localeCompare(lb, 'it');
+        });
+
+        visibleList.innerHTML = visibleIds.map(id => {
             const def = COLUMN_DEFS.find(c => c.id === id);
             if (!def) return '';
-            const isHidden = hiddenSet.has(id);
             return `
-                <li draggable="true" data-id="${id}" class="${isHidden ? 'ccm-hidden-item' : ''}">
+                <li draggable="true" data-id="${id}">
                     <span class="ccm-handle">⠿</span>
-                    <input type="checkbox" data-check="${id}" ${isHidden ? '' : 'checked'}>
-                    <span>${def.label}</span>
+                    <span class="ccm-label">${def.label}</span>
+                    <button type="button" class="ccm-btn ccm-btn-remove" data-remove="${id}" title="Rimuovi">−</button>
                 </li>`;
-        }).join('');
+        }).join('') || '<li class="ccm-empty">Nessuna colonna</li>';
 
-        // Drag and drop nativo
+        hiddenList.innerHTML = hiddenIds.map(id => {
+            const def = COLUMN_DEFS.find(c => c.id === id);
+            if (!def) return '';
+            return `
+                <li data-id="${id}">
+                    <span class="ccm-label">${def.label}</span>
+                    <button type="button" class="ccm-btn ccm-btn-add" data-add="${id}" title="Aggiungi">+</button>
+                </li>`;
+        }).join('') || '<li class="ccm-empty">Tutte visibili</li>';
+
+        // Drag and drop: solo tra le colonne visibili (riordino)
         let draggedId = null;
-        list.querySelectorAll('li').forEach(li => {
+        visibleList.querySelectorAll('li[draggable]').forEach(li => {
             li.addEventListener('dragstart', () => {
                 draggedId = li.dataset.id;
                 li.classList.add('dragging');
@@ -746,35 +788,54 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
                 e.preventDefault();
                 const target = e.currentTarget;
                 if (target.dataset.id === draggedId) return;
+                const draggedEl = visibleList.querySelector(`li[data-id="${draggedId}"]`);
+                if (!draggedEl) return;
                 const rect = target.getBoundingClientRect();
                 const before = (e.clientY - rect.top) < rect.height / 2;
-                target.parentNode.insertBefore(
-                    list.querySelector(`li[data-id="${draggedId}"]`),
-                    before ? target : target.nextSibling
-                );
+                target.parentNode.insertBefore(draggedEl, before ? target : target.nextSibling);
             });
             li.addEventListener('drop', async (e) => {
                 e.preventDefault();
-                await this._persistColumnOrderFromDOM();
+                await this._persistColumnConfigFromDOM();
             });
-            li.querySelector('[data-check]')?.addEventListener('change', async (e) => {
-                await this._persistColumnOrderFromDOM();
+        });
+
+        // Rimuovi (sposta a destra)
+        visibleList.querySelectorAll('[data-remove]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.remove;
+                const { order, hidden } = reconcileColumnConfig(this.columnConfig);
+                const hiddenSet = new Set(hidden);
+                hiddenSet.add(id);
+                this.columnConfig = { order, hidden: [...hiddenSet] };
+                await this._saveColumnConfig();
+                this._renderColumnConfigList();
+            });
+        });
+
+        // Aggiungi (sposta a sinistra, in fondo)
+        hiddenList.querySelectorAll('[data-add]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.add;
+                const { order, hidden } = reconcileColumnConfig(this.columnConfig);
+                const hiddenSet = new Set(hidden);
+                hiddenSet.delete(id);
+                const newOrder = [...order.filter(x => x !== id), id]; // in coda alla lista visibile
+                this.columnConfig = { order: newOrder, hidden: [...hiddenSet] };
+                await this._saveColumnConfig();
+                this._renderColumnConfigList();
             });
         });
     }
 
-    async _persistColumnOrderFromDOM() {
-        const list = document.getElementById('column-config-list');
-        if (!list) return;
-        const items = [...list.querySelectorAll('li')];
-        const order = items.map(li => li.dataset.id);
-        const hidden = items
-            .filter(li => !li.querySelector('[data-check]')?.checked)
-            .map(li => li.dataset.id);
-
-        items.forEach(li => li.classList.toggle('ccm-hidden-item', hidden.includes(li.dataset.id)));
-
-        this.columnConfig = { order, hidden };
+    async _persistColumnConfigFromDOM() {
+        const visibleList = document.getElementById('column-config-visible');
+        if (!visibleList) return;
+        const visibleIds = [...visibleList.querySelectorAll('li[data-id]')].map(li => li.dataset.id);
+        const { hidden } = reconcileColumnConfig(this.columnConfig);
+        const hiddenSet = new Set(hidden);
+        const order = [...visibleIds, ...hiddenSet]; // visibili nel nuovo ordine + nascoste in coda
+        this.columnConfig = { order, hidden: [...hiddenSet] };
         await this._saveColumnConfig();
     }
 

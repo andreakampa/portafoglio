@@ -361,15 +361,18 @@ export const MIDDLE_COLUMN_IDS = COLUMN_DEFS.filter(c => !c.locked).map(c => c.i
 // eventuali colonne nuove (introdotte dopo l'ultimo salvataggio) come nascoste
 // di default — così un aggiornamento dell'app non fa comparire colonne a sorpresa.
 export function reconcileColumnConfig(columnConfig) {
-    const isFresh = !columnConfig;
     const storedOrder = Array.isArray(columnConfig?.order) ? columnConfig.order.filter(id => MIDDLE_COLUMN_IDS.includes(id)) : [];
     const hidden = new Set(columnConfig?.hidden || []);
     const order = [...storedOrder];
     for (const id of MIDDLE_COLUMN_IDS) {
         if (!order.includes(id)) {
             order.push(id);
+            // Una colonna assente dall'ordine salvato è "nuova" (non ancora vista
+            // dall'utente in questo config) — va nascosta SOLO se è definita come
+            // defaultHidden nel registro, indipendentemente dal fatto che esista
+            // già un config salvato o meno.
             const def = COLUMN_DEFS.find(c => c.id === id);
-            if (isFresh ? def?.defaultHidden : true) hidden.add(id);
+            if (def?.defaultHidden) hidden.add(id);
         }
     }
     return { order, hidden: [...hidden] };
