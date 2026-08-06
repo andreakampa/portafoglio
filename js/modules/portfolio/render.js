@@ -601,21 +601,19 @@ export function renderPage(container) {
             opacity: .8;
         }
 
-        /* Colonna Symbol fissata a sinistra durante lo scroll orizzontale */
+        /* Colonna Symbol fissata a sinistra: var(--card) è lo sfondo reale
+           della card che contiene la tabella, così si fonde col resto invece
+           di introdurre un colore estraneo. */
         #portfolio-table th:first-child,
         #portfolio-table td:first-child {
             position: sticky;
             left: 0;
             z-index: 2;
-            background: var(--bg, #fff);
-            box-shadow: 1px 0 0 var(--border, #b4b2a9);
+            background: var(--card);
+            box-shadow: 1px 0 0 var(--border);
         }
         #portfolio-table thead th:first-child {
             z-index: 3;
-            background: var(--bg2, #f8f8f6);
-        }
-        .tbody-group-header td:first-child {
-            background: var(--bg2, #f8f8f6);
         }
 
         /* ── Separatori di gruppo ── */
@@ -859,7 +857,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
         // Header gruppo
         const headerRow = document.createElement('tr');
         headerRow.className = 'tbody-group-header';
-        headerRow.innerHTML = `<td colspan="${totalCols}">${groupLabel} <span style="font-weight:400;opacity:.7;">(${ids.length})</span></td>`;
+        headerRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:12px;">${groupLabel} <span style="font-weight:400;opacity:.7;">(${ids.length})</span></span></td>`;
         tbody.appendChild(headerRow);
 
         // Righe titoli
@@ -958,7 +956,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
             const toggleRow = document.createElement('tr');
             toggleRow.className = 'group-toggle-row';
             const isShown = renderTable[showKey];
-            toggleRow.innerHTML = `<td colspan="${totalCols}">— ${isShown ? 'Nascondi' : 'Mostra'} ${groupLabel.toLowerCase()} —</td>`;
+            toggleRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:0;display:inline-block;">— ${isShown ? 'Nascondi' : 'Mostra'} ${groupLabel.toLowerCase()} —</span></td>`;
             toggleRow.addEventListener('click', () => {
                 renderTable[showKey] = !renderTable[showKey];
                 renderTable._refresh && renderTable._refresh();
@@ -972,7 +970,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     else if (closed.length) {
         const toggleRow = document.createElement('tr');
         toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="${totalCols}">— Mostra posizioni chiuse (${closed.length}) —</td>`;
+        toggleRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:0;display:inline-block;">— Mostra posizioni chiuse (${closed.length}) —</span></td>`;
         toggleRow.addEventListener('click', () => {
             renderTable._showClosed = true;
             renderTable._refresh && renderTable._refresh();
@@ -983,7 +981,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     else if (empty.length) {
         const toggleRow = document.createElement('tr');
         toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="${totalCols}">— Mostra watchlist (${empty.length}) —</td>`;
+        toggleRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:0;display:inline-block;">— Mostra watchlist (${empty.length}) —</span></td>`;
         toggleRow.addEventListener('click', () => {
             renderTable._showEmpty = true;
             renderTable._refresh && renderTable._refresh();
@@ -994,7 +992,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     else if (transferred.length) {
         const toggleRow = document.createElement('tr');
         toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="${totalCols}">— Mostra titoli trasferiti (${transferred.length}) —</td>`;
+        toggleRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:0;display:inline-block;">— Mostra titoli trasferiti (${transferred.length}) —</span></td>`;
         toggleRow.addEventListener('click', () => {
             renderTable._showTransferred = true;
             renderTable._refresh && renderTable._refresh();
