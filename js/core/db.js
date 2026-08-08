@@ -63,5 +63,52 @@ export const DB = {
             if (!user) return null;
             return await user.getIdToken();
         } catch (e) { return null; }
+    },
+
+    // Ascolta un path in tempo reale via Server-Sent Events (REST streaming
+    // di Firebase, nessun SDK aggiuntivo richiesto). onData(data) viene
+    // chiamata subito con lo stato iniziale e poi ad ogni cambiamento remoto.
+    // Ritorna una funzione di unsubscribe da chiamare per fermare l'ascolto.
+    watch(path, onData) {
+        const uid = getUid();
+        if (!uid) return () => {};
+
+        let es = null;
+        let closed = false;
+
+        const connect = async () => {
+            if (closed) return;
+            const token = await this._getToken();
+            if (!token || closed) return;
+
+            const url = `${getDbUrl()}users/${uid}/${path}.json?auth=${token}`;
+            es = new EventSource(url);
+
+            es.addEventListener('put', (e) => {
+                try {
+                    const { data } = JSON.parse(e.data);
+                    onData(data || null);
+                } catch (err) {}
+            });
+
+            es.addEventListener('patch', (e) => {
+                // Un "patch" aggiorna solo alcune chiavi: per semplicità,
+                // ricarichiamo l'intero path per restare consistenti.
+                this.load(path).then(onData);
+            });
+
+            es.onerror = () => {
+                // Il token può scadere (~1h): chiudi e riconnetti con token fresco.
+                if (es) es.close();
+                if (!closed) setTimeout(connect, 2000);
+            };
+        };
+
+        connect();
+
+        return () => {
+            closed = true;
+            if (es) es.close();
+        };
     }
 };

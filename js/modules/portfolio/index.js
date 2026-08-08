@@ -106,7 +106,8 @@ export class PortfolioPage {
             this.prevClose = cached.prevs;
         }
 
-        await Promise.all([Exchange.update(), this._loadData()]);
+         await Promise.all([Exchange.update(), this._loadData()]);
+        this._startStaleWatch();
         this.columnConfig = await DB.load('column_config');
         this._updateExchangeLabel();
         this._ensurePortfolioSwitcher();
@@ -143,8 +144,8 @@ await this._aggiornaDividendi();
             await generaPacTransazioni(id, this.portfolio);
             if ((p.transactions || []).length !== before) changed = true;
         }
-        if (changed) {
-            await DB.save('portfolio_state', this.portfolioState);
+         if (changed) {
+            await this._persistPortfolioState();
             Calc.clearCaches();
         }
     }
@@ -167,13 +168,15 @@ await this._aggiornaDividendi();
   await this._render();
 }
 
-   destroy() {
+    destroy() {
         clearInterval(this._autoTimer);
         this._portfolioSwitcherBound = false;
         if (this._docClickSwitcher) document.removeEventListener('click', this._docClickSwitcher);
         if (this._docClickSuggest) document.removeEventListener('click', this._docClickSuggest);
+        if (this._staleUnwatch) this._staleUnwatch();
         this._docClickSwitcher = null;
         this._docClickSuggest = null;
+        this._staleUnwatch = null;
     }
 
     async _render() {
@@ -242,13 +245,22 @@ renderMobileCards(state, handlers);
             }
         }
 
-        this._syncActivePortfolio();
+         this._syncActivePortfolio();
         this._ensurePortfolioSwitcher();
+        this._lastKnownStateJSON = JSON.stringify(this.portfolioState);
+    }
+
+    async _save() {
+    }
+
+    async _persistPortfolioState() {
+        await DB.save('portfolio_state', this.portfolioState);
+        this._lastKnownStateJSON = JSON.stringify(this.portfolioState);
     }
 
     async _save() {
         this._syncActivePortfolio();
-        await DB.save('portfolio_state', this.portfolioState);
+        await this._persistPortfolioState();
         window.__portfolioState__ = this.portfolioState;
         Calc.clearCaches();
         Dividendi.clear(this.activePortfolioId);
@@ -332,11 +344,67 @@ await this._aggiornaDividendi(true);
         if (el) el.innerHTML = `Cambio Real-Time: <span>1 EUR = ${Exchange.rate.toFixed(4)} USD</span>`;
     }
 
-    _updateTimestamp() {
+     _updateTimestamp() {
         const el = document.getElementById('last-update');
         if (!el) return;
         const d = new Date();
         el.textContent = `Agg. ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    _startStaleWatch() {
+        if (this._staleUnwatch) return;
+        this._staleUnwatch = DB.watch('portfolio_state', (data) => {
+            if (this._staleLocked || !data) return;
+            const incomingJSON = JSON.stringify(data);
+            if (incomingJSON === this._lastKnownStateJSON) return; // eco della nostra scrittura
+            this._triggerStaleLock();
+        });
+    }
+
+    _ensureStaleLockUI() {
+        if (document.getElementById('stale-lock-overlay')) return;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'stale-lock-overlay';
+        overlay.innerHTML = `
+            <style>
+                #stale-lock-overlay {
+                    position: fixed; inset: 0; z-index: 9999; display: none;
+                    background: rgba(10,10,20,0.35);
+                }
+                #stale-lock-banner {
+                    position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+                    background: #a33a3a; color: #fff; padding: 12px 16px;
+                    display: none; align-items: center; justify-content: center;
+                    flex-wrap: wrap; gap: 14px; font-size: 13px; font-weight: 600;
+                    box-shadow: 0 2px 10px rgba(0,0,0,.4);
+                }
+                #stale-lock-banner button {
+                    background: #fff; color: #a33a3a; border: none; border-radius: 6px;
+                    padding: 6px 14px; font-weight: 700; font-size: 12px; cursor: pointer;
+                    flex-shrink: 0;
+                }
+            </style>
+        `;
+        document.body.appendChild(overlay);
+
+        const banner = document.createElement('div');
+        banner.id = 'stale-lock-banner';
+        banner.innerHTML = `
+            <span>⚠️ Dati aggiornati da un altro dispositivo. Ricarica la pagina: le modifiche in corso qui non verranno salvate.</span>
+            <button id="stale-lock-reload">🔄 Ricarica pagina</button>
+        `;
+        document.body.appendChild(banner);
+
+        document.getElementById('stale-lock-reload').onclick = () => location.reload();
+    }
+
+    _triggerStaleLock() {
+        if (this._staleLocked) return;
+        this._staleLocked = true;
+        this._ensureStaleLockUI();
+        document.getElementById('stale-lock-overlay').style.display = 'block';
+        document.getElementById('stale-lock-banner').style.display = 'flex';
     }
 
         _getPortfolioLabel(pf) {
@@ -405,7 +473,7 @@ await this._aggiornaDividendi(true);
             if (!name || !name.trim()) return;
 
             active.name = name.trim();
-            await DB.save('portfolio_state', this.portfolioState);
+            await this._persistPortfolioState();
             this._renderPortfolioSwitcher();
             Toast.show('Portafoglio rinominato', 'ok');
         });
@@ -446,7 +514,7 @@ await this._aggiornaDividendi(true);
             this._syncActivePortfolio();
             Cart.switchPortfolio(this.activePortfolioId);
 
-            await DB.save('portfolio_state', this.portfolioState);
+            await this._persistPortfolioState();
             this._renderPortfolioSwitcher();
             await Exchange.prefetchRatesForPortfolio(this.portfolio);
 await this._aggiornaDividendi();
@@ -492,7 +560,7 @@ await this._aggiornaDividendi();
                 this._syncActivePortfolio();
                 Cart.switchPortfolio(pid);
 
-                await DB.save('portfolio_state', this.portfolioState);
+                await this._persistPortfolioState();
                 this._renderPortfolioSwitcher();
 
                 const menu = document.getElementById('portfolio-switcher-menu');
@@ -611,7 +679,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
   this._syncActivePortfolio();
   Cart.switchPortfolio(id);
   this.dividendi = {};
-  await DB.save('portfolio_state', this.portfolioState);
+  await this._persistPortfolioState();
   this._renderPortfolioSwitcher();
   this._closeCreatePortfolioModal();
   await this._render();
@@ -1183,7 +1251,7 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
     };
 
     this._syncActivePortfolio();
-    await DB.save('portfolio_state', this.portfolioState);
+    await this._persistPortfolioState();
     Toast.show(`Titolo aggiunto: ${active.assets[id].nome}`, 'ok');
     await this._refreshPrices(id);
     // Aggiorna dividendi solo per il nuovo ticker, senza invalidare tutta la cache

@@ -2,24 +2,17 @@ import { Calc } from '../calc.js';
 import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 import { calcolaCompensazioneProvvisoria } from '../../../api/fiscale.js';
+import { DB } from '../../../core/db.js';
 
-const CART_KEY_PREFIX = 'ptpro_cart_';
-const CART_KEY_LEGACY = 'ptpro_cart'; // formato pre-multi-portfolio, da migrare una tantum
+const CART_KEY_PREFIX = 'cart_';
 
 function cartKeyFor(portfolioId) {
-    return portfolioId ? `${CART_KEY_PREFIX}${portfolioId}` : CART_KEY_LEGACY;
+    return `${CART_KEY_PREFIX}${portfolioId || 'default'}`;
 }
 
-function loadCartItems(portfolioId) {
+async function saveCartItems(portfolioId, items) {
     try {
-        const raw = localStorage.getItem(cartKeyFor(portfolioId));
-        return raw ? JSON.parse(raw) : [];
-    } catch (e) { return []; }
-}
-
-function saveCartItems(portfolioId, items) {
-    try {
-        localStorage.setItem(cartKeyFor(portfolioId), JSON.stringify(items));
+        await DB.save(cartKeyFor(portfolioId), items);
     } catch (e) {}
 }
 
@@ -29,11 +22,24 @@ export const Cart = {
 
     // Da chiamare quando si cambia portfolio attivo (anche al mount iniziale).
     // Salva il carrello del portfolio precedente (se diverso) e carica quello nuovo.
+      _unwatch: null,
+    _applyingRemote: false,
+
     switchPortfolio(portfolioId) {
         if (portfolioId === this._portfolioId) return;
         this._portfolioId = portfolioId;
-        this.items = loadCartItems(portfolioId);
+        this.items = [];
         CartPanel.render();
+
+        if (this._unwatch) { this._unwatch(); this._unwatch = null; }
+
+        this._unwatch = DB.watch(cartKeyFor(portfolioId), (data) => {
+            if (this._portfolioId !== portfolioId) return; // risposta arrivata dopo un altro switch
+            this._applyingRemote = true;
+            this.items = Array.isArray(data) ? data : [];
+            CartPanel.render();
+            this._applyingRemote = false;
+        });
     },
 
     add(item) {
@@ -80,7 +86,7 @@ export const CartPanel = {
                 <span>🛒 Lista della Spesa</span>
                 <div style="display:flex;gap:6px;align-items:center;">
                     <button id="cart-clear" title="Svuota carrello" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-muted);padding:2px 6px;border-radius:4px;">✕ Svuota</button>
-                    <button id="cart-toggle-btn" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted);">▼</button>
+                    <button id="cart-close-btn" title="Chiudi" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted);">✕</button>
                 </div>
             </div>
             <div id="cart-body">
@@ -89,7 +95,7 @@ export const CartPanel = {
             </div>`;
         document.body.appendChild(panel);
 
-        document.getElementById('cart-toggle-btn').onclick = () => this.toggle();
+        document.getElementById('cart-close-btn').onclick = () => this.hide();
         document.getElementById('cart-clear').onclick = () => {
             if (Cart.items.length && confirm('Svuotare il carrello?')) {
                 Cart.clear();
@@ -98,7 +104,7 @@ export const CartPanel = {
 
         const fab = document.createElement('button');
         fab.id = 'cart-fab';
-        fab.innerHTML = '🛒 <span id="cart-badge">0</span>';
+        fab.innerHTML = '<span id="cart-fab-icon">🛒</span> <span id="cart-badge">0</span>';
         fab.onclick = () => this.toggle();
         document.body.appendChild(fab);
 
@@ -107,26 +113,24 @@ export const CartPanel = {
 
     show() {
         const panel = document.getElementById('cart-panel');
-        if (panel) {
-            panel.classList.add('visible');
-            this._visible = true;
-            const body = document.getElementById('cart-body');
-            if (body) body.style.display = 'block';
-            const btn = document.getElementById('cart-toggle-btn');
-            if (btn) btn.textContent = '▼';
-        }
+        if (!panel) return;
+        panel.classList.add('visible');
+        this._visible = true;
+    },
+
+    hide() {
+        const panel = document.getElementById('cart-panel');
+        if (!panel) return;
+        panel.classList.remove('visible');
+        this._visible = false;
     },
 
     toggle() {
-        const body = document.getElementById('cart-body');
-        const btn  = document.getElementById('cart-toggle-btn');
-        const panel = document.getElementById('cart-panel');
-        if (!body || !panel) return;
-        const isOpen = body.style.display !== 'none';
-        body.style.display = isOpen ? 'none' : 'block';
-        if (btn) btn.textContent = isOpen ? '▲' : '▼';
-        panel.classList.toggle('visible', true);
-        this._visible = true;
+        if (this._visible) {
+            this.hide();
+        } else {
+            this.show();
+        }
     },
 
     render() {
@@ -145,8 +149,6 @@ export const CartPanel = {
             if (footerEl) footerEl.innerHTML = '';
             return;
         }
-
-        if (panel) panel.classList.add('visible');
 
         // Ricalcolo dinamico della compensazione tra le vendite del carrello,
         // nell'ordine attuale (modificabile via drag&drop). Non altera nulla
