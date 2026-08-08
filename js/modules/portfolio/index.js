@@ -207,6 +207,7 @@ const state = {
 
 renderTableHeader(this.columnConfig);
 renderTable._refresh = () => renderTable(state, handlers);
+renderMobileCards._refresh = () => renderMobileCards(state, handlers);
 renderKPI(state);
 renderTable(state, handlers);
 renderMobileCards(state, handlers);

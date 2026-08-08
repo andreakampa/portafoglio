@@ -524,40 +524,16 @@ export function renderPage(container) {
             scrollbar-width: thin;
             scrollbar-color: var(--border, #b4b2a9) var(--bg2, #f1efe8);
         }
-        /* Bottoni freccia scorrimento */
-        .table-scroll-btn {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 10;
-            width: 28px;
-            height: 48px;
-            border: 0.5px solid var(--border);
-            border-radius: 6px;
-            background: var(--bg, #fff);
-            color: var(--text-muted);
-            font-size: 22px;
-            line-height: 1;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0.85;
-            transition: opacity .15s, background .15s;
-            padding: 0;
-        }
-        .table-scroll-btn:hover {
-            opacity: 1;
-            background: var(--bg2);
-        }
-        .table-scroll-left  { left: 0; }
-        .table-scroll-right { right: 0; }
 
         .mobile-sort-bar {
+            position: sticky;
+            top: 54px;
+            z-index: 40;
+            background: var(--bg);
             display: flex;
             gap: 8px;
             align-items: center;
-            padding: 0 4px 10px;
+            padding: 8px 4px 10px;
         }
         .mobile-sort-bar select {
             flex: 1;
@@ -680,7 +656,9 @@ export function renderPage(container) {
     </style>
     `;
 
-    // Frecce scorrimento tabella
+    // Frecce scorrimento tabella — fixed, posizione ricalcolata mentre
+    // si scrolla la pagina verticalmente, visibili solo quando la tabella
+    // è effettivamente nella parte visibile dello schermo.
     const wrapper = document.getElementById('table-wrapper-inner');
     const SCROLL_STEP = 220;
 
@@ -691,16 +669,36 @@ export function renderPage(container) {
         if (wrapper) wrapper.scrollBy({ left: SCROLL_STEP, behavior: 'smooth' });
     });
 
-    // Mostra/nascondi frecce in base alla posizione scroll
     if (wrapper) {
+        const leftBtn  = document.getElementById('tbl-scroll-left');
+        const rightBtn = document.getElementById('tbl-scroll-right');
+
         const updateBtns = () => {
-            const left  = document.getElementById('tbl-scroll-left');
-            const right = document.getElementById('tbl-scroll-right');
-            if (left)  left.style.display  = wrapper.scrollLeft > 10 ? 'flex' : 'none';
-            if (right) right.style.display = (wrapper.scrollLeft + wrapper.clientWidth < wrapper.scrollWidth - 10) ? 'flex' : 'none';
+            if (!leftBtn || !rightBtn) return;
+            const rect = wrapper.getBoundingClientRect();
+            const inViewport = rect.width > 0 && rect.bottom > 60 && rect.top < window.innerHeight - 20;
+
+            const canScrollLeft  = wrapper.scrollLeft > 10;
+            const canScrollRight = wrapper.scrollLeft + wrapper.clientWidth < wrapper.scrollWidth - 10;
+
+            leftBtn.style.display  = (inViewport && canScrollLeft)  ? 'flex' : 'none';
+            rightBtn.style.display = (inViewport && canScrollRight) ? 'flex' : 'none';
+
+            if (inViewport) {
+                const top = Math.min(Math.max(rect.top + rect.height / 2, 80), window.innerHeight - 80);
+                leftBtn.style.top  = `${top}px`;
+                rightBtn.style.top = `${top}px`;
+                leftBtn.style.left   = `${Math.max(rect.left + 4, 4)}px`;
+                rightBtn.style.right = `${Math.max(window.innerWidth - rect.right + 4, 4)}px`;
+            }
         };
+
         wrapper.addEventListener('scroll', updateBtns);
+        window.addEventListener('scroll', updateBtns, { passive: true });
+        window.addEventListener('resize', updateBtns);
         setTimeout(updateBtns, 300);
+
+        window._updateTableScrollBtns = updateBtns;
     }
     // Click sugli header per ordinare la tabella posizioni
     const theadRow = document.querySelector('#portfolio-table thead tr');
@@ -736,6 +734,7 @@ export function renderPage(container) {
         syncMobileSortUI();
         updateSortArrows();
         renderTable._refresh && renderTable._refresh();
+        renderMobileCards._refresh && renderMobileCards._refresh();
     });
 
     mobileSortDirBtn?.addEventListener('click', () => {
@@ -743,6 +742,7 @@ export function renderPage(container) {
         syncMobileSortUI();
         updateSortArrows();
         renderTable._refresh && renderTable._refresh();
+        renderMobileCards._refresh && renderMobileCards._refresh();
     });
 
     syncMobileSortUI();
@@ -854,11 +854,27 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     const renderGroup = (ids, groupClass, groupLabel, collapsible, showKey) => {
         if (!ids.length) return;
 
-        // Header gruppo
+        const isShown = collapsible ? !!renderTable[showKey] : true;
+
+        // Header gruppo — il toggle mostra/nascondi vive qui, accanto al nome,
+        // dentro lo stesso span sticky così resta sempre visibile durante lo scroll.
         const headerRow = document.createElement('tr');
         headerRow.className = 'tbody-group-header';
-        headerRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:12px;">${groupLabel} <span style="font-weight:400;opacity:.7;">(${ids.length})</span></span></td>`;
+        const toggleHtml = collapsible
+            ? ` <span class="group-toggle-inline" style="cursor:pointer;font-weight:400;text-transform:none;letter-spacing:normal;opacity:.8;pointer-events:auto;">${isShown ? '▲ nascondi' : '▼ mostra'}</span>`
+            : '';
+        headerRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:12px;">${groupLabel} <span style="font-weight:400;opacity:.7;">(${ids.length})</span>${toggleHtml}</span></td>`;
         tbody.appendChild(headerRow);
+
+        if (collapsible) {
+            headerRow.querySelector('.group-toggle-inline')?.addEventListener('click', () => {
+                renderTable[showKey] = !renderTable[showKey];
+                renderTable._refresh && renderTable._refresh();
+                renderMobileCards._refresh && renderMobileCards._refresh();
+            });
+        }
+
+        if (!isShown) return;
 
         // Righe titoli
        const visibleCols = getVisibleColumnOrder(columnConfig);
@@ -951,54 +967,10 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
             tbody.appendChild(tr);
         }
 
-        // Toggle collassa/espandi per chiusi e vuoti
-        if (collapsible) {
-            const toggleRow = document.createElement('tr');
-            toggleRow.className = 'group-toggle-row';
-            const isShown = renderTable[showKey];
-            toggleRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:0;display:inline-block;">— ${isShown ? 'Nascondi' : 'Mostra'} ${groupLabel.toLowerCase()} —</span></td>`;
-            toggleRow.addEventListener('click', () => {
-                renderTable[showKey] = !renderTable[showKey];
-                renderTable._refresh && renderTable._refresh();
-            });
-            tbody.appendChild(toggleRow);
-        }
-    };
-
-    renderGroup(active, '', '📈 Titoli attivi', false, null);
-    if (renderTable._showClosed) renderGroup(closed, 'row-closed', '🔒 Posizioni chiuse', true, '_showClosed');
-    else if (closed.length) {
-        const toggleRow = document.createElement('tr');
-        toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:0;display:inline-block;">— Mostra posizioni chiuse (${closed.length}) —</span></td>`;
-        toggleRow.addEventListener('click', () => {
-            renderTable._showClosed = true;
-            renderTable._refresh && renderTable._refresh();
-        });
-        tbody.appendChild(toggleRow);
-    }
-    if (renderTable._showEmpty) renderGroup(empty, 'row-empty', '👁 Watchlist', true, '_showEmpty');
-    else if (empty.length) {
-        const toggleRow = document.createElement('tr');
-        toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:0;display:inline-block;">— Mostra watchlist (${empty.length}) —</span></td>`;
-        toggleRow.addEventListener('click', () => {
-            renderTable._showEmpty = true;
-            renderTable._refresh && renderTable._refresh();
-        });
-        tbody.appendChild(toggleRow);
-    }
-    if (renderTable._showTransferred) renderGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti', true, '_showTransferred');
-    else if (transferred.length) {
-        const toggleRow = document.createElement('tr');
-        toggleRow.className = 'group-toggle-row';
-        toggleRow.innerHTML = `<td colspan="${totalCols}"><span style="position:sticky;left:0;display:inline-block;">— Mostra titoli trasferiti (${transferred.length}) —</span></td>`;
-        toggleRow.addEventListener('click', () => {
-            renderTable._showTransferred = true;
-            renderTable._refresh && renderTable._refresh();
-        });
-        tbody.appendChild(toggleRow);
-    }
+         renderGroup(active, '', '📈 Titoli attivi', false, null);
+    renderGroup(closed, 'row-closed', '🔒 Posizioni chiuse', true, '_showClosed');
+    renderGroup(empty, 'row-empty', '👁 Watchlist', true, '_showEmpty');
+    renderGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti', true, '_showTransferred');
     tbody.onclick = e => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
@@ -1013,14 +985,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
 };
 
     // Aggiorna frecce scroll dopo render
-    setTimeout(() => {
-        const wrapper = document.getElementById('table-wrapper-inner');
-        const left  = document.getElementById('tbl-scroll-left');
-        const right = document.getElementById('tbl-scroll-right');
-        if (!wrapper) return;
-        if (left)  left.style.display  = wrapper.scrollLeft > 10 ? 'flex' : 'none';
-        if (right) right.style.display = (wrapper.scrollLeft + wrapper.clientWidth < wrapper.scrollWidth - 10) ? 'flex' : 'none';
-    }, 100);
+    setTimeout(() => { window._updateTableScrollBtns && window._updateTableScrollBtns(); }, 100);
 }
 export function resetRenderState() {
     renderTable._showClosed      = true;
@@ -1204,13 +1169,25 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
         transferred = applySort(transferred, positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
     }
 
-    const renderMobileGroup = (ids, groupClass, groupLabel) => {
+    const renderMobileGroup = (ids, groupClass, groupLabel, collapsible, showKey) => {
         if (!ids.length) return;
 
+        const isShown = collapsible ? !!renderTable[showKey] : true;
+
         const labelEl = document.createElement('div');
-        labelEl.style.cssText = 'font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:12px 4px 6px;border-top:1px solid var(--border);margin-top:8px;';
-        labelEl.textContent = groupLabel;
+        labelEl.style.cssText = 'display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:12px 4px 6px;border-top:1px solid var(--border);margin-top:8px;' + (collapsible ? 'cursor:pointer;user-select:none;' : '');
+        labelEl.innerHTML = `<span>${groupLabel} <span style="font-weight:400;opacity:.7;">(${ids.length})</span></span>${collapsible ? `<span style="font-size:10px;">${isShown ? '▲ nascondi' : '▼ mostra'}</span>` : ''}`;
         container.appendChild(labelEl);
+
+        if (collapsible) {
+            labelEl.addEventListener('click', () => {
+                renderTable[showKey] = !renderTable[showKey];
+                renderMobileCards._refresh && renderMobileCards._refresh();
+                renderTable._refresh && renderTable._refresh();
+            });
+        }
+
+        if (!isShown) return;
 
         for (const id of ids) {
             const p = portfolio[id];
@@ -1389,8 +1366,9 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
         }
     };
 
-    renderMobileGroup(active, '', '📈 Titoli attivi');
-    renderMobileGroup(closed, 'row-closed', '🔒 Posizioni chiuse');
-    renderMobileGroup(empty, 'row-empty', '⬜ Senza operazioni');
-    renderMobileGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti');
+    renderMobileGroup(active, '', '📈 Titoli attivi', false, null);
+    renderMobileGroup(closed, 'row-closed', '🔒 Posizioni chiuse', true, '_showClosed');
+    renderMobileGroup(empty, 'row-empty', '👁 Watchlist', true, '_showEmpty');
+    renderMobileGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti', true, '_showTransferred');
+}
 }
