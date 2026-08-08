@@ -964,10 +964,11 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 const cls = def.tdClass ? ` class="${def.tdClass(ctx)}"` : '';
                 return `<td${cls}>${def.cell(ctx)}</td>`;
             }).join('');
-            tbody.appendChild(tr);
+           tbody.appendChild(tr);
         }
+    };
 
-         renderGroup(active, '', '📈 Titoli attivi', false, null);
+    renderGroup(active, '', '📈 Titoli attivi', false, null);
     renderGroup(closed, 'row-closed', '🔒 Posizioni chiuse', true, '_showClosed');
     renderGroup(empty, 'row-empty', '👁 Watchlist', true, '_showEmpty');
     renderGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti', true, '_showTransferred');
@@ -1370,5 +1371,4 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
     renderMobileGroup(closed, 'row-closed', '🔒 Posizioni chiuse', true, '_showClosed');
     renderMobileGroup(empty, 'row-empty', '👁 Watchlist', true, '_showEmpty');
     renderMobileGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti', true, '_showTransferred');
-}
 }
