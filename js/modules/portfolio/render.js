@@ -1283,11 +1283,6 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                                ${dividendoDot(id, dividendi)}
                             </div>
                             <span><span class="badge">${v}</span>${assetBadge}${groupClass === 'row-transferred' ? '<span class="badge-stato badge-transferred">Trasferito</span>' : ''}</span>
-                            ${(() => {
-                                const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
-                                if (!ext) return '';
-                                return `<span style="font-size:10px;color:var(--text-muted);">${ext.label} ${Calc.fmt(ext.price)} <span class="${ext.diff >= 0 ? 'text-success' : 'text-danger'}">${Calc.fmtSign(ext.diff)}%</span></span>`;
-                            })()}
                         </div>
                     </div>
                     <div class="mobile-card-right">
@@ -1296,74 +1291,84 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                     </div>
                     <span class="mobile-card-arrow">›</span>
                 </div>
-                <div class="mobile-card-summary">
-                    <div class="mobile-card-row">
-                        <span class="text-muted">Prezzo</span>
-                        <span><b>${Calc.fmt(prLive)}</b> &nbsp; Var: ${varHtml}</span>
+                <div class="mobile-card-body" id="body-${id}" style="display:none;">
+                    <div class="mobile-card-summary">
+                        <div class="mobile-card-row">
+                            <span class="text-muted">Prezzo</span>
+                            <span><b>${Calc.fmt(prLive)}</b> &nbsp; Var: ${varHtml}</span>
+                        </div>
+                        ${(() => {
+                            const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
+                            if (!ext) return '';
+                            return `<div class="mobile-card-row">
+                                <span class="text-muted">${ext.type === 'pre' ? 'Pre-market' : 'After-market'}</span>
+                                <span style="color:var(--text-muted);">${Calc.fmt(ext.price)} <span class="${ext.diff >= 0 ? 'text-success' : 'text-danger'}">${Calc.fmtSign(ext.diff)}%</span></span>
+                            </div>`;
+                        })()}
+                        <div class="mobile-card-row">
+                            <span class="text-muted">Q.tà / PMC</span>
+                            <span>${qta > 0 ? `${Calc.fmt(qta, 4)} / ${Calc.fmt(pmc)}` : '—'}</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="text-muted">Costo Totale</span>
+                            <span>${invEur > 0 ? costoDisplay : '—'}</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="text-muted">Controvalore</span>
+                            <span>${att > 0 ? `${s} ${Calc.fmt(cv(att))}` : '—'}</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="text-muted">% Costo / % Mercato</span>
+                            <span>${invEur > 0 && totCostoEur > 0 ? Calc.fmt((invEur / totCostoEur) * 100, 1) + '%' : '—'} / ${(pos?.attEur || 0) > 0 && totMercatoEur > 0 ? Calc.fmt(((pos.attEur || 0) / totMercatoEur) * 100, 1) + '%' : '—'}</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="text-muted">52 settimane</span>
+                            <span style="flex:1;">${week52Bar(id, prLive, week52Lows, week52Highs) || '—'}</span>
+                        </div>
                     </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">Q.tà / PMC</span>
-                        <span>${qta > 0 ? `${Calc.fmt(qta, 4)} / ${Calc.fmt(pmc)}` : '—'}</span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">Costo Totale</span>
-                        <span>${invEur > 0 ? costoDisplay : '—'}</span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">Controvalore</span>
-                        <span>${att > 0 ? `${s} ${Calc.fmt(cv(att))}` : '—'}</span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">% Costo / % Mercato</span>
-                        <span>${invEur > 0 && totCostoEur > 0 ? Calc.fmt((invEur / totCostoEur) * 100, 1) + '%' : '—'} / ${(pos?.attEur || 0) > 0 && totMercatoEur > 0 ? Calc.fmt(((pos.attEur || 0) / totMercatoEur) * 100, 1) + '%' : '—'}</span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">52 settimane</span>
-                        <span style="flex:1;">${week52Bar(id, prLive, week52Lows, week52Highs) || '—'}</span>
-                    </div>
-                </div>
-                <div class="mobile-card-detail" id="detail-${id}" style="display:none;">
-                    <div class="mobile-card-row">
-                        <span class="text-muted">P&L After Tax</span>
-                        <span class="${unrealizedNetShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">
-                            ${att > 0 ? `${s} ${Calc.fmt(unrealizedNetShown)}` : '—'}
-                        </span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">Tasse stimate</span>
-                        <span class="text-warning">
-                            ${att > 0 ? `${s} ${Calc.fmt(unrealizedTaxShown)}` : '—'}
-                        </span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">P&L Realizzato Lordo</span>
-                        <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
-                            ${realizedPnL !== 0 ? `${s} ${Calc.fmt(currency === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, 'EUR', currency))}` : '—'}
-                        </span>
-                    </div>
-                    <div class="mobile-card-row">
-                        <span class="text-muted">P&L Realizzato Netto</span>
-                        <span class="${realizedNetClass} fw-bold">
-                            ${realizedPnL !== 0 ? `${s} ${Calc.fmt(realizedNetShown)}` : '—'}
-                        </span>
-                    </div>
-                    <div class="mobile-card-actions">
-                        <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
-                        ${groupClass !== 'row-transferred' ? `
-                        <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
-                        <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
-                        <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
-                        <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
-                        ` : ''}
+                    <div class="mobile-card-detail">
+                        <div class="mobile-card-row">
+                            <span class="text-muted">P&L After Tax</span>
+                            <span class="${unrealizedNetShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">
+                                ${att > 0 ? `${s} ${Calc.fmt(unrealizedNetShown)}` : '—'}
+                            </span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="text-muted">Tasse stimate</span>
+                            <span class="text-warning">
+                                ${att > 0 ? `${s} ${Calc.fmt(unrealizedTaxShown)}` : '—'}
+                            </span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="text-muted">P&L Realizzato Lordo</span>
+                            <span class="${realizedPnL >= 0 ? 'pos-gain' : 'neg-loss'}">
+                                ${realizedPnL !== 0 ? `${s} ${Calc.fmt(currency === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, 'EUR', currency))}` : '—'}
+                            </span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="text-muted">P&L Realizzato Netto</span>
+                            <span class="${realizedNetClass} fw-bold">
+                                ${realizedPnL !== 0 ? `${s} ${Calc.fmt(realizedNetShown)}` : '—'}
+                            </span>
+                        </div>
+                        <div class="mobile-card-actions">
+                            <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
+                            ${groupClass !== 'row-transferred' ? `
+                            <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
+                            <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
+                            <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
+                            <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
             `;
 
             card.querySelector('.mobile-card-header').addEventListener('click', () => {
-                const detail = document.getElementById(`detail-${id}`);
+                const body = document.getElementById(`body-${id}`);
                 const arrow = card.querySelector('.mobile-card-arrow');
-                const isOpen = detail.style.display !== 'none';
-                detail.style.display = isOpen ? 'none' : 'block';
+                const isOpen = body.style.display !== 'none';
+                body.style.display = isOpen ? 'none' : 'block';
                 arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
             });
 
