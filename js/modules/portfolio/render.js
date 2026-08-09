@@ -409,6 +409,7 @@ export function renderPage(container) {
             <span class="text-muted fs-sm" style="margin-left:10px;">Peso su:</span>
             <button id="btn-weight-active" class="btn-toggle active">Portfolio</button>
             <button id="btn-weight-cross" class="btn-toggle">Tutti</button>
+            <button id="btn-storico" class="btn btn-dark btn-sm">📊 Movimenti</button>
             <button id="btn-refresh" class="btn btn-success btn-sm">🔄 Aggiorna prezzi</button>
             <span class="text-muted fs-xs" id="last-update"></span>
         </div>
@@ -483,6 +484,7 @@ export function renderPage(container) {
     <div id="modal-history"     class="overlay"></div>
     <div id="modal-transazione" class="overlay"></div>
     <div id="modal-simulazione" class="overlay"></div>
+    <div id="modal-storico"     class="overlay"></div>
 
     <style>
         /* ── Tabella full-width ── */

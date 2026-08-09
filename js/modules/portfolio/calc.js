@@ -453,6 +453,85 @@ export const Calc = {
         return events;
     },
 
+    // Righe complete (buy + sell) per la tabella "Movimenti > Compravendite".
+    // Stessa logica LIFO di history.js (consumeLotsLIFO), replicata qui per
+    // non introdurre una dipendenza tra i due moduli. Se in futuro vuoi
+    // consolidare, questa è la funzione candidata a diventare la fonte unica.
+    transactionRows(holding, taxRegime = 'amministrato') {
+        const isUSD = (holding.valuta || 'EUR').toUpperCase() === 'USD';
+        const txs = (holding.transactions || [])
+            .filter(tx => tx.type === 'buy' || tx.type === 'sell')
+            .slice()
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        let lots = []; // { qty, unitCostNative, unitCostEur }
+        const rows = [];
+
+        for (const tx of txs) {
+            const q = +tx.qty || 0;
+            if (q <= 0) continue;
+            const pr = +tx.price || 0;
+            const c  = +(tx.commission || 0);
+
+            const txRate = tx.exchangeRate
+                ? parseFloat(tx.exchangeRate)
+                : Exchange._memoryCache.get(tx.date)?.rate || Exchange.rate || 1;
+
+            if (tx.type === 'buy') {
+                const unitCostNative = pr + (c / q);
+                const unitCostEur = isUSD ? unitCostNative / txRate : unitCostNative;
+                lots.push({ qty: q, unitCostNative, unitCostEur });
+
+                const totalNative = q * pr + c;
+                rows.push({
+                    date: tx.date, type: 'buy', qty: q,
+                    priceNative: pr, totalNative,
+                    totalEur: isUSD ? totalNative / txRate : totalNative,
+                    currency: isUSD ? 'USD' : 'EUR',
+                    pnlPercent: null, pnlEurBroker: null, pnlEurFiscal: null
+                });
+                continue;
+            }
+
+            // sell — consuma i lotti in LIFO
+            let toConsume = q;
+            let costNative = 0, costEur = 0;
+            for (let i = lots.length - 1; i >= 0 && toConsume > 0.00001; i--) {
+                const lot = lots[i];
+                const used = Math.min(lot.qty, toConsume);
+                costNative += lot.unitCostNative * used;
+                costEur    += lot.unitCostEur * used;
+                lot.qty    -= used;
+                toConsume  -= used;
+                if (lot.qty < 0.00001) lots.splice(i, 1);
+            }
+
+            const totalNative = q * pr - c;
+            const pnlNative   = totalNative - costNative;
+            const pnlPercent  = costNative > 0 ? (pnlNative / costNative) * 100 : null;
+
+            let totalEur, pnlEurBroker, pnlEurFiscal;
+            if (isUSD) {
+                totalEur     = totalNative / txRate;
+                pnlEurBroker = pnlNative / txRate;
+                pnlEurFiscal = totalEur - costEur;
+            } else {
+                totalEur     = totalNative;
+                pnlEurBroker = pnlNative;
+                pnlEurFiscal = pnlNative;
+            }
+
+            rows.push({
+                date: tx.date, type: 'sell', qty: q,
+                priceNative: pr, totalNative, totalEur,
+                currency: isUSD ? 'USD' : 'EUR',
+                pnlPercent, pnlEurBroker, pnlEurFiscal
+            });
+        }
+
+        return rows;
+    },
+
     async position(holding, taxRegime = 'amministrato') {
         const sig = this._holdingSignature(holding) + '#' + taxRegime;
         if (this._positionCache.has(sig)) return this._positionCache.get(sig);

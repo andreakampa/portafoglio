@@ -17,6 +17,7 @@ import { generaPacTransazioni } from './ui/pac.js';
 
 import { Dividendi } from '../../api/dividendi.js';
 import { openDividendiModal } from './ui/dividendi.js';
+import { openStoricoModal } from './ui/storico.js';
 
 const DEFAULT_PORTFOLIO_NAME = 'Portafoglio principale';
 const DEFAULT_TAX_REGIME = 'amministrato';
@@ -927,6 +928,10 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             this.crossPrices = {}; // forza il refetch dei prezzi cross-portfolio al prossimo render
             await this._refreshPrices();
             Toast.show('Prezzi aggiornati', 'ok');
+        });
+
+        document.getElementById('btn-storico')?.addEventListener('click', () => {
+            openStoricoModal(this.portfolio, this.dividendi, this._getActivePortfolio()?.taxRegime || 'amministrato');
         });
 
         document.getElementById('btn-eur')?.addEventListener('click', () => this._setValuta('EUR'));
