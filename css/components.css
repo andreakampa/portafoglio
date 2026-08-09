@@ -575,19 +575,22 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
     justify-content: center;
     background: var(--card);
     color: var(--text-muted);
-    border: 1px solid var(--border);
+    border: 2px solid var(--accent);
     border-radius: 50%;
     font-size: 1.15em;
     cursor: pointer;
-    box-shadow: var(--shadow);
-    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.15));
-    transition: filter var(--transition), transform var(--transition), background var(--transition);
+    box-shadow: 0 3px 14px rgba(0,0,0,0.35);
+    transition: filter var(--transition), transform var(--transition), background var(--transition), border-color var(--transition);
     padding: 0;
 }
-#cart-fab:hover { background: var(--secondary); transform: translateY(-1px); }
+#cart-fab:hover {
+    background: var(--secondary);
+    transform: translateY(-1px) scale(1.05);
+}
 #cart-fab.has-items {
     border-color: var(--success);
     color: var(--success);
+    box-shadow: 0 3px 14px rgba(0,0,0,0.35), 0 0 0 3px rgba(0, 0, 0, 0.08);
 }
 
 #cart-fab-icon { line-height: 1; }
