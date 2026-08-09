@@ -247,15 +247,18 @@ renderMobileCards(state, handlers);
 
          this._syncActivePortfolio();
         this._ensurePortfolioSwitcher();
-        this._lastKnownStateJSON = JSON.stringify(this.portfolioState);
+        this._lastKnownPortfoliosJSON = JSON.stringify(this.portfolioState.portfolios);
     }
 
     async _save() {
     }
 
-    async _persistPortfolioState() {
+     async _persistPortfolioState() {
+        // Impostiamo la baseline PRIMA di salvare, non dopo: l'evento SSE
+        // di conferma della nostra stessa scrittura può arrivare prima che
+        // la fetch del salvataggio risponda, quindi va già "atteso".
+        this._lastKnownPortfoliosJSON = JSON.stringify(this.portfolioState.portfolios);
         await DB.save('portfolio_state', this.portfolioState);
-        this._lastKnownStateJSON = JSON.stringify(this.portfolioState);
     }
 
     async _save() {
@@ -355,8 +358,11 @@ await this._aggiornaDividendi(true);
         if (this._staleUnwatch) return;
         this._staleUnwatch = DB.watch('portfolio_state', (data) => {
             if (this._staleLocked || !data) return;
-            const incomingJSON = JSON.stringify(data);
-            if (incomingJSON === this._lastKnownStateJSON) return; // eco della nostra scrittura
+            // Confrontiamo solo i dati veri (portfolios), non activePortfolioId:
+            // cambiare portafoglio visualizzato su un dispositivo non deve
+            // bloccare gli altri, dato che non è una modifica ai dati.
+            const incomingPortfoliosJSON = JSON.stringify(data.portfolios || {});
+            if (incomingPortfoliosJSON === this._lastKnownPortfoliosJSON) return; // eco della nostra scrittura o solo cambio vista
             this._triggerStaleLock();
         });
     }
