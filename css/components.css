@@ -108,7 +108,11 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
     max-height: 92vh; overflow-y: auto;
     box-shadow: var(--shadow-lg); animation: modalIn 0.17s ease;
 }
-.modal.modal-wide { max-width: 780px; }
+.modal.modal-wide {
+    width: 94%;
+    max-width: min(92vw, 1100px);
+    max-height: 90vh;
+}
 @keyframes modalIn { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .modal-header {
     padding: 18px 22px 0;
@@ -397,12 +401,216 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
 /* Carrello Spesa - Basso Destra Fissa */
 .cart-panel {
     position: fixed;
-    bottom
+    bottom: 90px;
+    right: 20px;
+    width: 360px;
+    max-width: 92vw;
+    max-height: 70vh;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: 1500;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(12px);
+    transition: opacity .18s ease, transform .18s ease, visibility .18s;
+}
+.cart-panel.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
 
+.cart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+    font-size: 0.88em;
+    color: var(--text);
+    flex-shrink: 0;
+}
 
+#cart-body {
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
 
+#cart-items {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
 
+.cart-empty {
+    text-align: center;
+    padding: 30px 10px;
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
 
+.cart-item {
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 9px 10px;
+    font-size: 0.8em;
+}
+.cart-item[draggable="true"] { cursor: grab; }
+.cart-item.dragging { opacity: 0.4; }
+.cart-item.drag-over { border-color: var(--accent); }
 
+.cart-item-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.cart-item-drag {
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+.cart-item-badge {
+    font-size: 0.68em;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+.cart-item-badge.buy  { background: var(--success-dim); color: var(--success); }
+.cart-item-badge.sell { background: var(--purple-dim, rgba(155,89,255,0.15)); color: var(--purple); }
+.cart-item-name {
+    flex: 1;
+    font-weight: 700;
+    color: var(--text);
+}
+.cart-item-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85em;
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+.cart-item-remove:hover { background: var(--danger-dim); color: var(--danger); }
 
+.cart-item-detail {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    margin-bottom: 4px;
+}
+.cart-item-total {
+    font-size: 0.88em;
+    margin-bottom: 2px;
+}
+.cart-item-total.buy-color { color: var(--success); }
+.cart-eur-hint {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    margin-left: 6px;
+}
+.cart-item-pmc {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+.cart-item-pmc.sell-net b { color: var(--text); }
+.cart-item-comp {
+    margin-top: 4px;
+}
 
+.cart-regime-note {
+    font-size: 0.78em;
+    color: var(--text-muted);
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    margin-bottom: 8px;
+}
+
+#cart-footer {
+    border-top: 1px solid var(--border);
+    padding: 10px 14px;
+    flex-shrink: 0;
+}
+.cart-totals {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85em;
+}
+.cart-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.cart-grand-total {
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding-top: 6px;
+    font-size: 1.05em;
+}
+
+/* ── FAB carrello ──────────────────────────────── */
+#cart-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1400;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 30px;
+    padding: 10px 16px;
+    font-size: 0.9em;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--shadow-lg);
+    /* Migliora il contrasto dell'icona 🛒 su sfondo colorato */
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+    transition: filter var(--transition), transform var(--transition);
+}
+#cart-fab:hover { filter: brightness(1.1); transform: translateY(-1px); }
+#cart-fab.has-items { background: var(--success); }
+
+#cart-badge {
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    min-width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78em;
+    font-weight: 700;
+    padding: 0 5px;
+}
+
+@media (max-width: 768px) {
+    .cart-panel {
+        left: 12px;
+        right: 12px;
+        bottom: 78px;
+        width: auto;
+        max-width: none;
+        max-height: 65vh;
+    }
+    #cart-fab {
+        bottom: 14px;
+        right: 14px;
+    }
+}

@@ -44,8 +44,22 @@
 .tx-table td { padding: 8px 5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .tx-table tr:last-child td { border-bottom: none; }
 .tx-table td:last-child { white-space: nowrap; min-width: 64px; }
-.modal-wide { max-width: 960px !important; }
+.modal-wide {
+    max-width: min(94vw, 960px) !important;
+}
 .modal-wide .table-wrapper { overflow-x: auto; }
+
+@media (min-width: 1400px) {
+    .modal-wide {
+        max-width: min(90vw, 1200px) !important;
+    }
+}
+
+@media (min-width: 1800px) {
+    .modal-wide {
+        max-width: min(85vw, 1450px) !important;
+    }
+}
 
 /* ── TABELLA PORTAFOGLIO — full width ──────────── */
 #card-table {
@@ -457,6 +471,15 @@
 }
 .fiscale-nota b { color: var(--text-muted); }
 
+/* ── SCROLL LOCK (modali) ──────────────────────── */
+body.modal-open {
+    overflow: hidden;
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+}
+
 /* ── RESPONSIVE MOBILE ─────────────────────────── */
 .desktop-only { display: block; }
 .mobile-only  { display: none; }
@@ -468,8 +491,6 @@
     .main-content { padding: 10px 12px; }
     .navbar { padding: 0 10px; }
     .navbar-brand { margin-right: 10px; font-size: 0.88em; }
-
-    body.modal-open { overflow: hidden; }
 
     .kpi-group { padding: 12px 14px; overflow-x: auto; }
     .kpi-row   { flex-wrap: nowrap; min-width: max-content; }

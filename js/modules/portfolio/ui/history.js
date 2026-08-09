@@ -207,7 +207,9 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
                 return '🔀 Trasf.';
             })()}</td>
             <td>${Calc.fmt(q, 4)}</td>
-            <td>${s} ${Calc.fmt(rowConv(pr))}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(pr)})</span>` : ''}</td>
+           <td>${isUSD
+                ? `${nativeS} ${Calc.fmt(pr)} <span style="font-size:10px;color:var(--text-muted)">(${s} ${Calc.fmt(rowConv(pr))})</span>`
+                : `${s} ${Calc.fmt(rowConv(pr))}`}</td>
             <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}</td>
             <td>${s} ${Calc.fmt(rowConv(totale))}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(totale)})</span>` : ''}</td>
             ${isUSD ? `<td style="font-size:11px;color:var(--text-muted);">${tx.exchangeRate ? Calc.fmt(parseFloat(tx.exchangeRate), 4) : (Exchange._memoryCache.get(tx.date)?.rate ? Calc.fmt(Exchange._memoryCache.get(tx.date).rate, 4) : '—')}</td>` : ''}
