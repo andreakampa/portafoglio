@@ -39,9 +39,9 @@
 }
 
 /* ── TX TABLE (storico) ────────────────────────── */
-.tx-table { width: 100%; border-collapse: collapse; font-size: 0.78em; }
-.tx-table th { font-size: 0.66em; padding: 6px 5px; white-space: nowrap; }
-.tx-table td { padding: 8px 5px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tx-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.tx-table th { font-size: 0.74em; padding: 7px 6px; white-space: nowrap; }
+.tx-table td { padding: 9px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .tx-table tr:last-child td { border-bottom: none; }
 .tx-table td:last-child { white-space: nowrap; min-width: 64px; }
 .modal-wide {
@@ -65,6 +65,16 @@
     .modal-wide {
         max-width: min(80vw, 1800px) !important;
     }
+}
+
+@media (min-width: 1800px) {
+    .modal-wide .tx-table { font-size: 1em; }
+    .modal-wide .tx-table th { font-size: 0.82em; }
+}
+
+@media (min-width: 2200px) {
+    .modal-wide .tx-table { font-size: 1.08em; }
+    .modal-wide .tx-table th { font-size: 0.88em; }
 }
 
 /* ── TABELLA PORTAFOGLIO — full width ──────────── */
