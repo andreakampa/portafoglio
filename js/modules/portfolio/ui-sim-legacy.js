@@ -386,20 +386,20 @@ const calcSimBuy = () => {
                 ${result.pnl > 0
                     ? `<div>Tasse (${result.taxLabel}): <b class="neg-loss">− € ${Calc.fmt(result.tax)}</b></div>`
                     : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
-                <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                <div>
                     Incasso netto (ti arriva in conto): <b class="${result.netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.netReceiptEur)}</b>
                 </div>
 
-                <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:12px;">Profitto rispetto al costo</div>
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">Profitto rispetto al costo</div>
                 <div>P&L lordo operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
                 ${result.pnl > 0 && result.minusUsate > 0
                     ? `<div class="text-muted fs-xs">Minus compensate: − € ${Calc.fmt(result.minusUsate)} (di € ${Calc.fmt(result.minusDisponibili)} disponibili) → imponibile € ${Calc.fmt(result.imponibile)}</div>`
                     : ''}
-                <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                <div>
                     P&L netto operazione (guadagno reale): <b class="${result.pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnlNetto)}</b>
                 </div>
 
-                <div style="margin-top:10px;">Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
+                <div style="margin-top:10px; border-top:1px solid var(--border); padding-top:10px;">Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
             </div>`;
 
         lastSellResult = {
@@ -462,20 +462,20 @@ const calcSimSell = () => {
             ${result.pnl > 0
                 ? `<div>Tasse (${result.taxLabel}): <b class="neg-loss">− € ${Calc.fmt(result.tax)}</b></div>`
                 : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
-            <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+            <div>
                 Incasso netto (ti arriva in conto): <b class="${result.netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.netReceiptEur)}</b>
             </div>
 
-            <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:12px;">Profitto rispetto al costo</div>
+            <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">Profitto rispetto al costo</div>
             <div>P&L lordo operazione: <b class="${result.pnl >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnl)}</b></div>
             ${result.pnl > 0 && result.minusUsate > 0
                 ? `<div class="text-muted fs-xs">Minus compensate: − € ${Calc.fmt(result.minusUsate)} (di € ${Calc.fmt(result.minusDisponibili)} disponibili) → imponibile € ${Calc.fmt(result.imponibile)}</div>`
                 : ''}
-            <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+            <div>
                 P&L netto operazione (guadagno reale): <b class="${result.pnlNetto >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(result.pnlNetto)}</b>
             </div>
 
-            <div style="margin-top:10px;">Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
+            <div style="margin-top:10px; border-top:1px solid var(--border); padding-top:10px;">Q.tà rimanente: <b>${Calc.fmt(result.remQty, 4)}</b></div>
         </div>`;
 
     lastSellResult = {
