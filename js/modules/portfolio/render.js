@@ -191,6 +191,43 @@ function week52Bar(id, prLive, week52Lows, week52Highs) {
         </div>`;
 }
 
+// Sparkline intraday minimale: verde/rossa in base a chiusura precedente
+function sparklineSvg(data, refValue, width = 56, height = 22) {
+    if (!Array.isArray(data) || data.length < 2) return '';
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = (max - min) || 1;
+    const stepX = width / (data.length - 1);
+    const points = data.map((v, i) => {
+        const x = i * stepX;
+        const y = height - ((v - min) / range) * height;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    const last = data[data.length - 1];
+    const up = refValue != null ? last >= refValue : last >= data[0];
+    const color = up ? 'var(--success)' : 'var(--danger)';
+    return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="display:block;flex-shrink:0;">
+        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
+}
+
+// Colonne selezionabili dal filtro mobile: quando attivo, il valore compare
+// sulla card al posto dello sparkline, e guida anche l'ordinamento.
+const SORT_COLUMN_META = {
+    shares:      { label: 'Shares',         format: v => Calc.fmt(v, 4) },
+    pmc:         { label: 'AC/Share',       format: v => Calc.fmt(v) },
+    price:       { label: 'Last Price',     format: v => Calc.fmt(v) },
+    dailyPnl:    { label: 'Daily P&L',      format: (v, s) => `${v >= 0 ? '+' : ''}${s} ${Calc.fmt(v)}` },
+    cost:        { label: 'Total Cost',     format: (v, s) => `${s} ${Calc.fmt(v)}` },
+    value:       { label: 'Market Value',   format: (v, s) => `${s} ${Calc.fmt(v)}` },
+    pesoCosto:   { label: '% Costo',        format: v => Calc.fmt(v * 100, 1) + '%' },
+    pesoMercato: { label: '% Mercato',      format: v => Calc.fmt(v * 100, 1) + '%' },
+    pnlGrossU:   { label: 'P&L Gross UNRL', format: (v, s) => `${v >= 0 ? '+' : ''}${s} ${Calc.fmt(v)}` },
+    pnlNetU:     { label: 'P&L Net UNRL',   format: (v, s) => `${v >= 0 ? '+' : ''}${s} ${Calc.fmt(v)}` },
+    pnlGrossR:   { label: 'P&L Gross REAL', format: (v, s) => `${v >= 0 ? '+' : ''}${s} ${Calc.fmt(v)}` },
+    pnlNetR:     { label: 'P&L Net REAL',   format: (v, s) => `${v >= 0 ? '+' : ''}${s} ${Calc.fmt(v)}` },
+};
+
 function dividendoDot(id, dividendi) {
     const divsAsset = dividendi?.[id] || [];
     const hasPaid = divsAsset.some(d => d.pagato);
@@ -1149,7 +1186,7 @@ dash.onclick = e => {
 };
 }
 
-export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {} }, handlers) {
+export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {}, intraday = {} }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -1253,6 +1290,17 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
             if (groupClass === 'row-empty') card.style.opacity = '0.4';
             if (groupClass === 'row-transferred') card.style.opacity = '0.6';
 
+            const sortColKey = positionSortState.col;
+            const sortMeta = sortColKey ? SORT_COLUMN_META[sortColKey] : null;
+            let sortDisplay = null;
+            if (sortMeta) {
+                const rawVal = getSortValue(id, sortColKey, portfolio, positionMap, prevClose, currency, weightTotals);
+                sortDisplay = `${sortMeta.label}: ${Number.isFinite(rawVal) ? sortMeta.format(rawVal, s) : '—'}`;
+            }
+            const sparklineHtml = !sortMeta ? sparklineSvg(intraday[id], prPrev) : '';
+            const priceColorClass = varDay === null ? '' : (varDay >= 0 ? 'pos-gain' : 'neg-loss');
+            const extForHeader = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
+
             card.innerHTML = `
                 <div class="mobile-card-header" data-id="${id}">
                     <div class="mobile-card-left">
@@ -1265,14 +1313,23 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                             <span><span class="badge">${v}</span>${assetBadge}${groupClass === 'row-transferred' ? '<span class="badge-stato badge-transferred">Trasferito</span>' : ''}</span>
                         </div>
                     </div>
+                    ${sparklineHtml}
                     <div class="mobile-card-right">
-                        <span class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${att > 0 ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))}` : '—'}</span>
-                        <span class="fs-xs ${pnl >= 0 ? 'pos-gain' : 'neg-loss'}">${att > 0 ? `(${Calc.fmtSign(pnlP)}%)` : ''}</span>
+                        <span class="${priceColorClass}" style="font-size:1.05em;font-weight:700;">${Calc.fmt(prLive)}</span>
+                        ${sortMeta
+                            ? `<span class="fs-xs text-muted">${sortDisplay}</span>`
+                            : `<span class="fs-xs ${priceColorClass}">${varDay !== null ? Calc.fmtSign(varDay) + '%' : '—'}</span>
+                               ${extForHeader ? `<span class="fs-xs text-muted">${extForHeader.label} ${Calc.fmt(extForHeader.price)} <span class="${extForHeader.diff >= 0 ? 'text-success' : 'text-danger'}">${Calc.fmtSign(extForHeader.diff)}%</span></span>` : ''}`
+                        }
                     </div>
                     <span class="mobile-card-arrow">›</span>
                 </div>
                 <div class="mobile-card-body" id="body-${id}" style="display:none;">
                     <div class="mobile-card-summary">
+                        <div class="mobile-card-row">
+                            <span class="text-muted">P&L Non Realizzato</span>
+                            <span class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${att > 0 ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))} (${Calc.fmtSign(pnlP)}%)` : '—'}</span>
+                        </div>
                         <div class="mobile-card-row">
                             <span class="text-muted">Prezzo</span>
                             <span><b>${Calc.fmt(prLive)}</b> &nbsp; Var: ${varHtml}</span>

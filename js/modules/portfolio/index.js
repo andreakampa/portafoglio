@@ -76,6 +76,7 @@ export class PortfolioPage {
         this.week52Lows = {};
         this.week52Highs = {};
         this.dividendi = {};
+        this.intraday = {};
         this.currency = 'EUR';
         this.weightScope = 'active'; // 'active' | 'cross'
         this.crossPrices = {}; // { portfolioId: { assetId: price } } — cache prezzi per portfolio non attivo
@@ -204,6 +205,7 @@ const state = {
   week52Lows,
   week52Highs,
   dividendi: this.dividendi,
+  intraday: this.intraday,
   weightTotals,
   columnConfig: this.columnConfig,
   handlers
@@ -319,13 +321,14 @@ await this._aggiornaDividendi(true);
     return;
   }
 
-  const { prices, prevs, preMarkets, postMarkets, week52Lows, week52Highs } = await Yahoo.fetchAll(tickerMap);
+  const { prices, prevs, preMarkets, postMarkets, week52Lows, week52Highs, intraday } = await Yahoo.fetchAll(tickerMap);
   Object.assign(this.prices, prices);
   Object.assign(this.prevClose, prevs);
   Object.assign(this.preMarkets, preMarkets || {});
   Object.assign(this.postMarkets, postMarkets || {});
   Object.assign(this.week52Lows, week52Lows || {});
   Object.assign(this.week52Highs, week52Highs || {});
+  Object.assign(this.intraday, intraday || {});
   Cache.savePrices(this.prices, this.prevClose);
 
   if (btn) {

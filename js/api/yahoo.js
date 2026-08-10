@@ -46,6 +46,9 @@ export const Yahoo = {
                 if (postCandles.length) postMarket = postCandles.at(-1).c;
             }
 
+            // Serie intraday per lo sparkline (pre + regular + post della giornata)
+            const intraday = closes.filter(c => c !== null && c !== undefined);
+
             return {
                 price: meta.regularMarketPrice,
                 prevClose: prev,
@@ -53,6 +56,7 @@ export const Yahoo = {
                 postMarket,
                 week52Low:  meta.fiftyTwoWeekLow  ?? null,
                 week52High: meta.fiftyTwoWeekHigh ?? null,
+                intraday,
             };
         } catch (e) { /* try next proxy */ }
     }
@@ -67,7 +71,7 @@ export const Yahoo = {
             )
         );
         const prices = {}, prevs = {};
-        const preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {};
+        const preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, intraday = {};
         results.forEach(({ status, value }) => {
             if (status === 'fulfilled' && value?.r) {
                 prices[value.id]      = value.r.price;
@@ -76,9 +80,10 @@ export const Yahoo = {
                 postMarkets[value.id] = value.r.postMarket;
                 week52Lows[value.id]  = value.r.week52Low;
                 week52Highs[value.id] = value.r.week52High;
+                intraday[value.id]    = value.r.intraday;
             }
         });
-        return { prices, prevs, preMarkets, postMarkets, week52Lows, week52Highs };
+        return { prices, prevs, preMarkets, postMarkets, week52Lows, week52Highs, intraday };
     },
 
     async fetchSparkline(ticker) {
