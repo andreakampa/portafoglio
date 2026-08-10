@@ -366,12 +366,32 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
             box.innerHTML = `<span style="color:var(--danger);">⚠️ Quantità superiore al disponibile (${Calc.fmt(qta, 4)})</span>`;
             return;
         }
+
+        const netReceiptEur = proceedsEur - tax;
+        const grossReceiptNative = q * pr - cNative;
+        const taxNative = assetIsUSD ? tax * cachedRate : tax;
+        const netReceiptNative = grossReceiptNative - taxNative;
+
         box.innerHTML = `
-            Incasso lordo: <b>${s} ${Calc.fmt(q * pr - cNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)<br>
-            P&L lordo: <b class="${pnlLordoNative >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordoNative)}</b>${eurHint}<br>
-            ${pnlLordoEur > 0 ? `Tasse teoriche (${taxLabel}, su € ${Calc.fmt(pnlLordoEur)}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b><br>` : ''}
-            P&L netto teorico: <b class="${pnlNettoEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNettoEur)}</b><br>
-            Q.tà rimanente: <b>${Calc.fmt(qta - q, 4)}</b>
-            ${minusHtml}`;
+            <div style="display:grid; gap:4px;">
+
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted);">Cassa</div>
+                <div>Incasso lordo: <b>${s} ${Calc.fmt(grossReceiptNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)${eurHint}</div>
+                ${pnlLordoEur > 0
+                    ? `<div>Tasse teoriche (${taxLabel}, su € ${Calc.fmt(pnlLordoEur)}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b>${assetIsUSD ? ` <span class="text-muted fs-xs">(≈ $ ${Calc.fmt(taxNative)})</span>` : ''}</div>`
+                    : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
+                <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                    Incasso netto (ti arriva in conto): <b class="${netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(netReceiptEur)}</b>${assetIsUSD ? ` <span class="text-muted fs-xs">(≈ $ ${Calc.fmt(netReceiptNative)})</span>` : ''}
+                </div>
+
+                <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:12px;">Profitto rispetto al costo</div>
+                <div>P&L lordo: <b class="${pnlLordoNative >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordoNative)}</b></div>
+                <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                    P&L netto teorico: <b class="${pnlNettoEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNettoEur)}</b>
+                </div>
+
+                <div style="margin-top:10px;">Q.tà rimanente: <b>${Calc.fmt(qta - q, 4)}</b></div>
+                ${minusHtml}
+            </div>`;
     }
 }
