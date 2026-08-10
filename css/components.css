@@ -110,8 +110,14 @@ tbody tr:hover td { background: rgba(74,158,255,0.035); }
 }
 .modal.modal-wide {
     width: 94%;
-    max-width: min(92vw, 1100px);
+    max-width: min(94vw, 1200px) !important;
     max-height: 90vh;
+}
+@media (min-width: 1800px) {
+    .modal.modal-wide { max-width: min(88vw, 1500px) !important; }
+}
+@media (min-width: 2200px) {
+    .modal.modal-wide { max-width: min(80vw, 1800px) !important; }
 }
 @keyframes modalIn { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .modal-header {

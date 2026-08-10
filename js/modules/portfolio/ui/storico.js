@@ -6,7 +6,9 @@ let storicoState = {
     range: null,          // giorni, null = Tutto
     customFrom: null,
     customTo: null,
-    fxMode: 'broker'      // 'broker' | 'fiscale'
+    fxMode: 'broker',      // 'broker' | 'fiscale'
+    ticker: null,          // null = tutti
+    txType: null           // null = tutti | 'buy' | 'sell' (solo compravendite)
 };
 
 const RANGES = [
@@ -67,6 +69,20 @@ function buildDividendiRows(portfolio, dividendi) {
     return rows;
 }
 
+function uniqueSortedTickers(list) {
+    return [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'it'));
+}
+
+function getCompravenditeTickers(portfolio) {
+    return uniqueSortedTickers(Object.values(portfolio).map(p => p.nome));
+}
+
+function getDividendiTickers(portfolio, dividendi) {
+    return uniqueSortedTickers(
+        Object.keys(dividendi || {}).map(id => portfolio[id]?.nome)
+    );
+}
+
 export function openStoricoModal(portfolio, dividendi, taxRegime = 'amministrato') {
     const overlay = document.getElementById('modal-storico');
     if (!overlay) return;
@@ -89,6 +105,7 @@ export function openStoricoModal(portfolio, dividendi, taxRegime = 'amministrato
                     <input type="date" id="storico-to">
                     <button id="storico-apply-range" class="btn btn-dark btn-sm">Applica</button>
                 </div>
+                <div id="storico-extra-filters" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px;"></div>
                 <div id="storico-fx-toggle-wrap" style="display:flex; justify-content:flex-end; margin-bottom:8px;"></div>
                 <div class="table-wrapper">
                     <table class="tx-table tx-table-compact" id="storico-table"></table>
@@ -137,6 +154,50 @@ function renderFilters(portfolio, dividendi, taxRegime) {
     };
 }
 
+function renderExtraFilters(portfolio, dividendi, taxRegime) {
+    const el = document.getElementById('storico-extra-filters');
+
+    const tickers = storicoState.tab === 'compravendite'
+        ? getCompravenditeTickers(portfolio)
+        : getDividendiTickers(portfolio, dividendi);
+
+    // Se il titolo selezionato non esiste in questa vista, resetta.
+    if (storicoState.ticker && !tickers.includes(storicoState.ticker)) {
+        storicoState.ticker = null;
+    }
+
+    const tickerSelectHtml = `
+        <div style="display:flex; align-items:center; gap:6px;">
+            <span class="text-muted fs-sm">Titolo:</span>
+            <select id="storico-ticker-select">
+                <option value="">Tutti i titoli</option>
+                ${tickers.map(t => `<option value="${t}" ${storicoState.ticker === t ? 'selected' : ''}>${t}</option>`).join('')}
+            </select>
+        </div>`;
+
+    const typeFilterHtml = storicoState.tab === 'compravendite' ? `
+        <div style="display:flex; align-items:center; gap:6px;">
+            <span class="text-muted fs-sm">Tipo:</span>
+            <button class="btn-toggle storico-type-btn ${!storicoState.txType ? 'active' : ''}" data-type="">Tutti</button>
+            <button class="btn-toggle storico-type-btn ${storicoState.txType === 'buy' ? 'active' : ''}" data-type="buy">Buy</button>
+            <button class="btn-toggle storico-type-btn ${storicoState.txType === 'sell' ? 'active' : ''}" data-type="sell">Sell</button>
+        </div>` : '';
+
+    el.innerHTML = tickerSelectHtml + typeFilterHtml;
+
+    document.getElementById('storico-ticker-select').onchange = (e) => {
+        storicoState.ticker = e.target.value || null;
+        renderStorico(portfolio, dividendi, taxRegime);
+    };
+
+    el.querySelectorAll('.storico-type-btn').forEach(btn => {
+        btn.onclick = () => {
+            storicoState.txType = btn.dataset.type || null;
+            renderStorico(portfolio, dividendi, taxRegime);
+        };
+    });
+}
+
 function renderStorico(portfolio, dividendi, taxRegime) {
     document.getElementById('storico-tab-cv').classList.toggle('active', storicoState.tab === 'compravendite');
     document.getElementById('storico-tab-div').classList.toggle('active', storicoState.tab === 'dividendi');
@@ -144,6 +205,7 @@ function renderStorico(portfolio, dividendi, taxRegime) {
     document.getElementById('storico-tab-div').onclick = () => { storicoState.tab = 'dividendi'; renderStorico(portfolio, dividendi, taxRegime); };
 
     renderFilters(portfolio, dividendi, taxRegime);
+    renderExtraFilters(portfolio, dividendi, taxRegime);
 
     const fxWrap = document.getElementById('storico-fx-toggle-wrap');
     const table  = document.getElementById('storico-table');
@@ -157,7 +219,10 @@ function renderStorico(portfolio, dividendi, taxRegime) {
             renderStorico(portfolio, dividendi, taxRegime);
         };
 
-        const rows = buildCompravenditeRows(portfolio, taxRegime).filter(r => inRange(r.date));
+        let rows = buildCompravenditeRows(portfolio, taxRegime).filter(r => inRange(r.date));
+        if (storicoState.ticker) rows = rows.filter(r => r.symbol === storicoState.ticker);
+        if (storicoState.txType) rows = rows.filter(r => r.type === storicoState.txType);
+
         table.innerHTML = `
             <thead><tr>
                 <th>Data</th><th>Tipo</th><th>Simbolo</th><th>Importo Totale</th>
@@ -176,11 +241,13 @@ function renderStorico(portfolio, dividendi, taxRegime) {
                         <td>${r.pnlPercent !== null ? `<span class="${r.pnlPercent >= 0 ? 'pos-gain' : 'neg-loss'}">${Calc.fmtSign(r.pnlPercent)}%</span>` : '—'}</td>
                         <td>${pnlEur !== null && pnlEur !== undefined ? `<span class="${pnlEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlEur)}</span>` : '—'}</td>
                     </tr>`;
-                }).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">Nessuna compravendita nel periodo selezionato</td></tr>`}
+                }).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">Nessuna compravendita nel periodo/filtro selezionato</td></tr>`}
             </tbody>`;
     } else {
         fxWrap.innerHTML = '';
-        const rows = buildDividendiRows(portfolio, dividendi).filter(r => inRange(r.date));
+        let rows = buildDividendiRows(portfolio, dividendi).filter(r => inRange(r.date));
+        if (storicoState.ticker) rows = rows.filter(r => r.symbol === storicoState.ticker);
+
         table.innerHTML = `
             <thead><tr>
                 <th>Data</th><th>Simbolo</th><th>Dividendo €</th><th>Quantità</th><th>Importo Totale €</th>
@@ -196,7 +263,7 @@ function renderStorico(portfolio, dividendi, taxRegime) {
                         <td>${Calc.fmt(r.qty, 4)}</td>
                         <td>€ ${Calc.fmt(r.totalEur)}</td>
                     </tr>
-                `).join('') : `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Nessun dividendo nel periodo selezionato</td></tr>`}
+                `).join('') : `<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-muted);">Nessun dividendo nel periodo/filtro selezionato</td></tr>`}
             </tbody>`;
     }
 }
