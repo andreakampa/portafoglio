@@ -380,7 +380,15 @@ await this._aggiornaDividendi(true);
             // Confrontiamo solo i dati veri (portfolios), non activePortfolioId:
             // cambiare portafoglio visualizzato su un dispositivo non deve
             // bloccare gli altri, dato che non è una modifica ai dati.
-            const incomingPortfoliosJSON = stableStringify(data.portfolios || {});
+            // Normalizziamo prima del confronto: Firebase RTDB elimina array/oggetti
+            // vuoti dai dati salvati, quindi un nuovo asset con campi tipo lots:[]
+            // torna dall'eco SENZA quella chiave, mentre lo stato locale ce l'ha ancora.
+            // normalizeState ripristina i default e rende il confronto affidabile.
+            const normalizedIncoming = normalizeState({
+                activePortfolioId: this.activePortfolioId,
+                portfolios: data.portfolios || {}
+            }).portfolios;
+            const incomingPortfoliosJSON = stableStringify(normalizedIncoming);
             if (incomingPortfoliosJSON === this._lastKnownPortfoliosJSON) return; // eco della nostra scrittura o solo cambio vista
             this._triggerStaleLock();
         });
