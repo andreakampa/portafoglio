@@ -1172,8 +1172,8 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
                 async () => { await this._save(); }, this._getActivePortfolio()),
             onSimulation: id => openSimModal(id, this.portfolio, this.prices, this._getActivePortfolio()?.taxRegime || 'amministrato', this._getActivePortfolio()),
             onDelete: id => this.elimina(id),
-            onDividendi: id => openDividendiModal(id, this.portfolio, this.dividendi),
-            onDividendiDashboard: () => openDividendiModal('__ALL__', this.portfolio, this.dividendi),
+                       onDividendi: id => openDividendiModal(id, this.portfolio, this.dividendi, 'Tutti', this._getActivePortfolio(), () => this._save()),
+            onDividendiDashboard: () => openDividendiModal('__ALL__', this.portfolio, this.dividendi, 'Tutti', this._getActivePortfolio(), () => this._save()),
             onTransfer: id => openTransferModal(
     id,
     this.portfolio,

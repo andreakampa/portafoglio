@@ -1,7 +1,10 @@
 import { Calc } from '../calc.js';
 import { lockScroll, unlockScroll } from './helpers.js';
 
-export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato = 'Tutti') {
+export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato = 'Tutti', portfolioFull = null, onSave = null) {
+    if (portfolioFull && !portfolioFull.fiscal) portfolioFull.fiscal = { manualLosses: [] };
+    if (portfolioFull && !portfolioFull.fiscal.dividendActuals) portfolioFull.fiscal.dividendActuals = {};
+    const dividendActuals = portfolioFull?.fiscal?.dividendActuals || {};
     const isGlobal = id === '__ALL__';
     const p = isGlobal ? null : portfolio[id];
 
@@ -61,8 +64,17 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
 
     const s = isGlobal ? '€' : (p?.valuta === 'USD' ? '$' : '€');
 
-    const ricevuti = divs.filter(d => d.pagato);
+        const ricevuti = divs.filter(d => d.pagato);
     const maturati = divs.filter(d => d.maturato);
+
+    const chiaveDiv = d => `${d.assetId}#${d.exDate}`;
+    const conAnomalia = ricevuti.filter(d => {
+        if (!d.usaAmministrato) return false;
+        const override = dividendActuals[chiaveDiv(d)];
+        const nettoReale = override?.nettoRealeEur;
+        if (nettoReale == null || !d.nettoAttesoEur) return false;
+        return Math.abs(nettoReale - d.nettoAttesoEur) > d.nettoAttesoEur * 0.03;
+    });
 
     const totaleEur = ricevuti.reduce((sum, d) => sum + Number(d.importoEur || 0), 0);
     const totaleNativo = isGlobal ? 0 : ricevuti.reduce((sum, d) => sum + Number(d.importoNativo || 0), 0);
@@ -91,7 +103,7 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
                     <div class="text-muted" style="text-align:center;padding:24px;">
                         ${isGlobal ? 'Nessun dividendo pagato registrato nel portafoglio per questo filtro' : 'Nessun dividendo registrato su questo titolo'}
                     </div>` : `
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+                                <div style="display:grid;grid-template-columns:repeat(${conAnomalia.length ? 4 : 3},1fr);gap:10px;margin-bottom:16px;">
                     <div class="preview-box" style="text-align:center;">
                         <div class="text-muted fs-xs">Dividendi maturati</div>
                         <div class="fw-600">${maturati.length}</div>
@@ -102,10 +114,16 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
                         <div class="fw-600 pos-gain">€ ${Calc.fmt(totaleEur)}</div>
                         ${!isGlobal && p?.valuta === 'USD' ? `<div class="text-muted fs-xs">≈ ${s} ${Calc.fmt(totaleNativo)}</div>` : ''}
                     </div>
-                    <div class="preview-box" style="text-align:center;">
+                                        <div class="preview-box" style="text-align:center;">
                         <div class="text-muted fs-xs">Ultimo pagamento</div>
                         <div class="fw-600">${ultimoPagato}</div>
                     </div>
+                    ${conAnomalia.length ? `
+                    <div class="preview-box" style="text-align:center;border:1px solid var(--danger);">
+                        <div class="text-muted fs-xs">⚠️ Scostamenti anomali</div>
+                        <div class="fw-600" style="color:var(--danger);">${conAnomalia.length}</div>
+                        <div class="text-muted fs-xs">oltre 3% dal netto atteso</div>
+                    </div>` : ''}
                 </div>
 
                                 ${ricevuti.some(d => d.usaAmministrato) ? `
@@ -113,6 +131,11 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
                     * Stima: lordo × 0,74 — ritenuta USA 15% compensata nel 26% italiano.
                     Confronta con l'estratto conto reale: se l'importo effettivo è più basso,
                     probabilmente manca il credito d'imposta sulla ritenuta USA.
+                </div>` : ''}
+                                ${ricevuti.some(d => d.usaAmministrato) ? `
+                <div class="text-muted fs-xs" style="margin:-8px 0 12px;">
+                    * Netto atteso = lordo × 0,74 (ritenuta USA 15% compensata nel 26% italiano).
+                    Clicca ✎ per inserire il netto realmente accreditato: se lo scostamento supera il 3% probabilmente manca il credito d'imposta sulla ritenuta USA.
                 </div>` : ''}
                 ${filtroHtml}
 
@@ -129,16 +152,24 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
                                 <th>Importo Totale</th>
                                 <th>Importo (€)</th>
                                 <th>Netto atteso*</th>
+                                <th>Netto reale</th>
+                            </tr>
                             </tr>
                         </thead>
-                        <tbody>
+                                                <tbody>
                             ${divs.map(d => {
                                 const rowSymbol = isGlobal
                                     ? (d.valutaTitolo === 'USD' ? '$' : '€')
                                     : s;
 
+                                const key = chiaveDiv(d);
+                                const override = dividendActuals[key];
+                                const nettoReale = override?.nettoRealeEur;
+                                const haAnomalia = d.usaAmministrato && nettoReale != null && d.nettoAttesoEur
+                                    && Math.abs(nettoReale - d.nettoAttesoEur) > d.nettoAttesoEur * 0.03;
+
                                 return `
-                                <tr style="${!isGlobal && !d.pagato ? 'opacity:0.78;' : ''}">
+                                <tr style="${!isGlobal && !d.pagato ? 'opacity:0.78;' : ''}${haAnomalia ? 'background:rgba(163,58,58,0.08);' : ''}">
                                     ${isGlobal ? `<td><b>${d.nome}</b><div class="text-muted fs-xs">${d.ticker}</div></td>` : ''}
                                     <td>${d.exDate || '—'}</td>
                                     <td>${d.payDate || '—'}</td>
@@ -151,9 +182,18 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
                                     }</td>` : ''}
                                     <td>${rowSymbol} ${Calc.fmt(d.dividendoPerAzione, 4)}</td>
                                     <td>${Calc.fmt(d.qta, 4)}</td>
-                                                                        <td><b>${rowSymbol} ${Calc.fmt(d.importoNativo)}</b></td>
+                                    <td><b>${rowSymbol} ${Calc.fmt(d.importoNativo)}</b></td>
                                     <td>${d.importoEur != null ? `€ ${Calc.fmt(d.importoEur)}` : '—'}</td>
                                     <td>${d.usaAmministrato ? `€ ${Calc.fmt(d.nettoAttesoEur)}` : '—'}</td>
+                                    <td>
+                                        ${d.pagato && portfolioFull ? `
+                                            <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
+                                                <span style="${haAnomalia ? 'color:var(--danger);font-weight:700;' : ''}">${nettoReale != null ? `€ ${Calc.fmt(nettoReale)}` : '—'}</span>
+                                                <button type="button" class="div-edit-btn" data-div-edit="${key}" data-div-current="${nettoReale ?? ''}" title="Inserisci netto realmente accreditato" style="border:none;background:none;cursor:pointer;font-size:13px;opacity:0.7;">✎</button>
+                                            </div>
+                                            ${haAnomalia ? `<div class="text-muted fs-xs" style="color:var(--danger);text-align:right;">scostamento ${Calc.fmt(((nettoReale - d.nettoAttesoEur) / d.nettoAttesoEur) * 100, 1)}%</div>` : ''}
+                                        ` : '—'}
+                                    </td>
                                 </tr>`;
                             }).join('')}
                         </tbody>
@@ -166,7 +206,39 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
     wrap.querySelector('#div-close').onclick = close;
     wrap.querySelector('#div-close2').onclick = close;
 
-    wrap.querySelector('#dividendi-anno-filter')?.addEventListener('change', e => {
-        openDividendiModal(id, portfolio, dividendi, e.target.value);
+        wrap.querySelector('#dividendi-anno-filter')?.addEventListener('change', e => {
+        openDividendiModal(id, portfolio, dividendi, e.target.value, portfolioFull, onSave);
+    });
+
+    wrap.querySelectorAll('[data-div-edit]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!portfolioFull) return;
+            const key = btn.dataset.divEdit;
+            const current = btn.dataset.divCurrent;
+
+            const input = prompt(
+                'Netto realmente accreditato per questo dividendo (€).\nLascia vuoto per rimuovere il valore inserito.',
+                current || ''
+            );
+            if (input === null) return;
+
+            if (!portfolioFull.fiscal) portfolioFull.fiscal = { manualLosses: [] };
+            if (!portfolioFull.fiscal.dividendActuals) portfolioFull.fiscal.dividendActuals = {};
+
+            const trimmed = input.trim();
+            if (trimmed === '') {
+                delete portfolioFull.fiscal.dividendActuals[key];
+            } else {
+                const val = parseFloat(trimmed.replace(',', '.'));
+                if (isNaN(val) || val < 0) {
+                    alert('Importo non valido.');
+                    return;
+                }
+                portfolioFull.fiscal.dividendActuals[key] = { nettoRealeEur: val };
+            }
+
+            if (typeof onSave === 'function') await onSave();
+            openDividendiModal(id, portfolio, dividendi, annoSelezionato, portfolioFull, onSave);
+        });
     });
 }
