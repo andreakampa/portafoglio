@@ -143,7 +143,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
                 let tradePnL = null;
         let tradePnLEur = null;
         let tradePnLBroker = null;
-        let isLotSale = false; // true se la vendita corrisponde a lotto/i interi (non frazionata sul PMC medio)
+                let lotSaleType = null; // 'exact' = chiude lotto/i interi, 'partial' = consuma solo parte di un lotto
 
         if (tx.type === 'transfer' && tx.destPortfolioId) {
             // Uscita dal sorgente: consuma i lotti in LIFO, P&L = 0 (trasferito a costo)
@@ -157,9 +157,9 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
             const unitCostNative = pr + (c / q);
             const unitCostEur = isUSD ? unitCostNative / txRate : unitCostNative;
             openLots.push({ qty: q, unitCostNative, unitCostEur, date: tx.date });
-                } else {
+                        } else {
             const { costNative: costoBaseNative, costEur: costoBaseEur, exactLotMatch } = consumeLotsLIFO(openLots, q);
-            isLotSale = exactLotMatch;
+            lotSaleType = exactLotMatch ? 'exact' : 'partial';
             tradePnL = Calc.round((pr * q - c) - costoBaseNative);
             if (isUSD) {
                 const ricavoEur = (pr * q - c) / txRate;
@@ -203,9 +203,15 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
     return '';
 })()}</td>
                         <td class="${tx.type === 'transfer' ? 'tx-transfer' : tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${(() => {
-                if (tx.type !== 'transfer') return tx.type === 'buy'
-                    ? '🔀 Acq.'
-                    : `🔴 Vend.${isLotSale ? ' <span title="Vendita corrispondente a lotto/i interi — non frazionata sul PMC medio" style="cursor:help;display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">📦 lotto</span>' : ''}`;
+                               if (tx.type !== 'transfer') {
+                    if (tx.type === 'buy') return '🔀 Acq.';
+                    const badge = lotSaleType === 'exact'
+                        ? ' <span title="Vendita corrispondente a lotto/i interi — non frazionata" style="cursor:help;display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">📦 lotto</span>'
+                        : lotSaleType === 'partial'
+                            ? ' <span title="Vendita di una parte delle azioni di un singolo lotto — usa il PMC di quel lotto, non una media generale" style="cursor:help;display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--warning-dim, rgba(230,162,60,0.15));color:var(--warning);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">🧩 lotto parziale</span>'
+                            : '';
+                    return `🔴 Vend.${badge}`;
+                }
                 if (tx.sourcePortfolioId) {
                     const srcName = window.__portfolioState__?.portfolios?.[tx.sourcePortfolioId]?.name;
                     return srcName ? `🔀 da ${srcName}` : '🔀 Trasf.';
