@@ -37,6 +37,28 @@ function stableStringify(obj) {
     return '{' + pairs.join(',') + '}';
 }
 
+// Rimuove ricorsivamente array vuoti, oggetti vuoti e null: Firebase RTDB
+// elimina questi valori quando salva, quindi confrontare i dati "grezzi"
+// locali (che li mantengono) con l'eco da Firebase (che non li ha più)
+// genera falsi positivi nello stale-lock. Applicando questa pulizia a
+// ENTRAMBI i lati prima del confronto, l'asimmetria sparisce.
+function stripEmpty(value) {
+    if (Array.isArray(value)) {
+        const arr = value.map(stripEmpty).filter(v => v !== undefined);
+        return arr.length ? arr : undefined;
+    }
+    if (value !== null && typeof value === 'object') {
+        const out = {};
+        for (const k of Object.keys(value)) {
+            const v = stripEmpty(value[k]);
+            if (v !== undefined) out[k] = v;
+        }
+        return Object.keys(out).length ? out : undefined;
+    }
+    if (value === null) return undefined;
+    return value;
+}
+
 function makePortfolioId() {
     return 'P' + Date.now();
 }
@@ -265,7 +287,7 @@ renderMobileCards(state, handlers);
 
          this._syncActivePortfolio();
         this._ensurePortfolioSwitcher();
-        this._lastKnownPortfoliosJSON = stableStringify(this.portfolioState.portfolios);
+                this._lastKnownPortfoliosJSON = stableStringify(stripEmpty(this.portfolioState.portfolios) || {});
     }
 
     async _save() {
@@ -275,7 +297,7 @@ renderMobileCards(state, handlers);
         // Impostiamo la baseline PRIMA di salvare, non dopo: l'evento SSE
         // di conferma della nostra stessa scrittura può arrivare prima che
         // la fetch del salvataggio risponda, quindi va già "atteso".
-        this._lastKnownPortfoliosJSON = stableStringify(this.portfolioState.portfolios);
+        this._lastKnownPortfoliosJSON = stableStringify(stripEmpty(this.portfolioState.portfolios) || {});
         await DB.save('portfolio_state', this.portfolioState);
     }
 
@@ -384,11 +406,7 @@ await this._aggiornaDividendi(true);
             // vuoti dai dati salvati, quindi un nuovo asset con campi tipo lots:[]
             // torna dall'eco SENZA quella chiave, mentre lo stato locale ce l'ha ancora.
             // normalizeState ripristina i default e rende il confronto affidabile.
-            const normalizedIncoming = normalizeState({
-                activePortfolioId: this.activePortfolioId,
-                portfolios: data.portfolios || {}
-            }).portfolios;
-            const incomingPortfoliosJSON = stableStringify(normalizedIncoming);
+                        const incomingPortfoliosJSON = stableStringify(stripEmpty(data.portfolios || {}) || {});
             if (incomingPortfoliosJSON === this._lastKnownPortfoliosJSON) return; // eco della nostra scrittura o solo cambio vista
             this._triggerStaleLock();
         });
