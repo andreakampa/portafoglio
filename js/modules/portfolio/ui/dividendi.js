@@ -108,6 +108,12 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
                     </div>
                 </div>
 
+                                ${ricevuti.some(d => d.usaAmministrato) ? `
+                <div class="text-muted fs-xs" style="margin:-8px 0 12px;">
+                    * Stima: lordo × 0,74 — ritenuta USA 15% compensata nel 26% italiano.
+                    Confronta con l'estratto conto reale: se l'importo effettivo è più basso,
+                    probabilmente manca il credito d'imposta sulla ritenuta USA.
+                </div>` : ''}
                 ${filtroHtml}
 
                 <div class="table-wrapper" style="max-height:320px;overflow-y:auto;">
@@ -122,6 +128,7 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
                                 <th>Quantità</th>
                                 <th>Importo Totale</th>
                                 <th>Importo (€)</th>
+                                <th>Netto atteso*</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -144,8 +151,9 @@ export function openDividendiModal(id, portfolio, dividendi, annoPreselezionato 
                                     }</td>` : ''}
                                     <td>${rowSymbol} ${Calc.fmt(d.dividendoPerAzione, 4)}</td>
                                     <td>${Calc.fmt(d.qta, 4)}</td>
-                                    <td><b>${rowSymbol} ${Calc.fmt(d.importoNativo)}</b></td>
+                                                                        <td><b>${rowSymbol} ${Calc.fmt(d.importoNativo)}</b></td>
                                     <td>${d.importoEur != null ? `€ ${Calc.fmt(d.importoEur)}` : '—'}</td>
+                                    <td>${d.usaAmministrato ? `€ ${Calc.fmt(d.nettoAttesoEur)}` : '—'}</td>
                                 </tr>`;
                             }).join('')}
                         </tbody>

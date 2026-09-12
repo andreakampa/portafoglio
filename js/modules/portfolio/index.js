@@ -202,7 +202,8 @@ await this._aggiornaDividendi();
     }
   }
 
-  this.dividendi = await Dividendi.aggiornaPortfolio(this.portfolio);
+    const taxRegime = this._getActivePortfolio()?.taxRegime || 'amministrato';
+  this.dividendi = await Dividendi.aggiornaPortfolio(this.portfolio, taxRegime);
   Dividendi.salva(this.dividendi, portfolioId);
   await this._render();
 }
@@ -1310,8 +1311,8 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
     Toast.show(`Titolo aggiunto: ${active.assets[id].nome}`, 'ok');
     await this._refreshPrices(id);
     // Aggiorna dividendi solo per il nuovo ticker, senza invalidare tutta la cache
-    const divsTicker = await Dividendi.fetchDividendi(item.ticker || item.nome);
-    const nuovi = await Dividendi.calcolaDividendiRicevuti(this.portfolio[id], divsTicker);
+        const divsTicker = await Dividendi.fetchDividendi(item.ticker || item.nome);
+    const nuovi = await Dividendi.calcolaDividendiRicevuti(this.portfolio[id], divsTicker, this._getActivePortfolio()?.taxRegime || 'amministrato');
     if (nuovi.length > 0) this.dividendi[id] = nuovi;
     Dividendi.salva(this.dividendi, this.activePortfolioId);
     await this._render();

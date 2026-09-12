@@ -60,9 +60,16 @@ export const Dividendi = {
     }
   },
 
-  async calcolaDividendiRicevuti(asset, dividendiTicker) {
+    async calcolaDividendiRicevuti(asset, dividendiTicker, taxRegime = 'amministrato') {
     const txs = [...(asset.transactions || [])].sort((a, b) => a.date.localeCompare(b.date));
     if (!txs.length || !dividendiTicker.length) return [];
+
+    // Ritenuta USA (15% da trattato) compensata nel 26% di imposta sostitutiva
+    // italiana: per un'azione USA in regime amministrato il netto realmente
+    // accreditato dovrebbe essere lordo × 0,74. In regime dichiarativo l'intermediario
+    // non applica alcuna ritenuta a monte (ci pensa il contribuente in dichiarazione),
+    // quindi qui il "netto atteso" coincide col lordo.
+    const usaAmministrato = taxRegime === 'amministrato' && (asset.valuta || 'EUR').toUpperCase() === 'USD';
 
     const risultati = [];
     const oggi = todayIso();
@@ -93,6 +100,8 @@ export const Dividendi = {
         ? importoNativo / rate
         : importoNativo;
 
+            const nettoAttesoEur = usaAmministrato ? importoEur * 0.74 : importoEur;
+
       risultati.push({
         exDate,
         payDate: payDateEstimated,
@@ -103,6 +112,8 @@ export const Dividendi = {
         qta: qtaAllExDate,
         importoNativo,
         importoEur,
+        nettoAttesoEur,
+        usaAmministrato,
         valuta: asset.valuta || 'EUR'
       });
     }
@@ -110,7 +121,7 @@ export const Dividendi = {
     return risultati;
   },
 
-  async aggiornaPortfolio(portfolio) {
+    async aggiornaPortfolio(portfolio, taxRegime = 'amministrato') {
     const risultati = {};
 
     const assets = Object.entries(portfolio || {})
@@ -124,8 +135,8 @@ export const Dividendi = {
 
     await Promise.all(
       assets.map(async ({ id, ticker, asset }) => {
-        const divsTicker = await this.fetchDividendi(ticker);
-        const ricevuti = await this.calcolaDividendiRicevuti(asset, divsTicker);
+                const divsTicker = await this.fetchDividendi(ticker);
+        const ricevuti = await this.calcolaDividendiRicevuti(asset, divsTicker, taxRegime);
         if (ricevuti.length > 0) risultati[id] = ricevuti;
       })
     );
