@@ -22,6 +22,21 @@ import { openStoricoModal } from './ui/storico.js';
 const DEFAULT_PORTFOLIO_NAME = 'Portafoglio principale';
 const DEFAULT_TAX_REGIME = 'amministrato';
 
+// Stringify deterministico: ordina le chiavi ricorsivamente, per confrontare
+// stato locale (ordine di inserimento) con stato da Firebase (ordine alfabetico)
+// senza falsi positivi nello stale-lock.
+function stableStringify(obj) {
+    if (obj === null || typeof obj !== 'object') {
+        return JSON.stringify(obj);
+    }
+    if (Array.isArray(obj)) {
+        return '[' + obj.map(stableStringify).join(',') + ']';
+    }
+    const keys = Object.keys(obj).sort();
+    const pairs = keys.map(k => JSON.stringify(k) + ':' + stableStringify(obj[k]));
+    return '{' + pairs.join(',') + '}';
+}
+
 function makePortfolioId() {
     return 'P' + Date.now();
 }
@@ -250,7 +265,7 @@ renderMobileCards(state, handlers);
 
          this._syncActivePortfolio();
         this._ensurePortfolioSwitcher();
-        this._lastKnownPortfoliosJSON = JSON.stringify(this.portfolioState.portfolios);
+        this._lastKnownPortfoliosJSON = stableStringify(this.portfolioState.portfolios);
     }
 
     async _save() {
@@ -260,7 +275,7 @@ renderMobileCards(state, handlers);
         // Impostiamo la baseline PRIMA di salvare, non dopo: l'evento SSE
         // di conferma della nostra stessa scrittura può arrivare prima che
         // la fetch del salvataggio risponda, quindi va già "atteso".
-        this._lastKnownPortfoliosJSON = JSON.stringify(this.portfolioState.portfolios);
+        this._lastKnownPortfoliosJSON = stableStringify(this.portfolioState.portfolios);
         await DB.save('portfolio_state', this.portfolioState);
     }
 
@@ -365,7 +380,7 @@ await this._aggiornaDividendi(true);
             // Confrontiamo solo i dati veri (portfolios), non activePortfolioId:
             // cambiare portafoglio visualizzato su un dispositivo non deve
             // bloccare gli altri, dato che non è una modifica ai dati.
-            const incomingPortfoliosJSON = JSON.stringify(data.portfolios || {});
+            const incomingPortfoliosJSON = stableStringify(data.portfolios || {});
             if (incomingPortfoliosJSON === this._lastKnownPortfoliosJSON) return; // eco della nostra scrittura o solo cambio vista
             this._triggerStaleLock();
         });
