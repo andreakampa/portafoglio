@@ -12,6 +12,7 @@ let historySortState = { dir: 'desc' };
 function consumeLotsLIFO(lots, qtyToConsume) {
     let remaining = qtyToConsume;
     let costNative = 0, costEur = 0;
+    let exactLotMatch = true; // true se la vendita chiude esattamente uno o più lotti interi (nessun lotto lasciato a metà)
     for (let i = lots.length - 1; i >= 0 && remaining > 0.00001; i--) {
         const lot = lots[i];
         const used = Math.min(lot.qty, remaining);
@@ -19,9 +20,14 @@ function consumeLotsLIFO(lots, qtyToConsume) {
         costEur += lot.unitCostEur * used;
         lot.qty -= used;
         remaining -= used;
-        if (lot.qty < 0.00001) lots.splice(i, 1);
+        if (lot.qty < 0.00001) {
+            lots.splice(i, 1);
+        } else {
+            // Lotto consumato solo parzialmente: la quantità venduta non corrisponde a lotti interi
+            exactLotMatch = false;
+        }
     }
-    return { costNative, costEur };
+    return { costNative, costEur, exactLotMatch };
 }
 
 export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxRegime = 'amministrato') {
@@ -134,9 +140,10 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
             ? parseFloat(tx.exchangeRate)
             : Exchange._memoryCache.get(tx.date)?.rate || rate;
 
-        let tradePnL = null;
+                let tradePnL = null;
         let tradePnLEur = null;
         let tradePnLBroker = null;
+        let isLotSale = false; // true se la vendita corrisponde a lotto/i interi (non frazionata sul PMC medio)
 
         if (tx.type === 'transfer' && tx.destPortfolioId) {
             // Uscita dal sorgente: consuma i lotti in LIFO, P&L = 0 (trasferito a costo)
@@ -150,8 +157,9 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
             const unitCostNative = pr + (c / q);
             const unitCostEur = isUSD ? unitCostNative / txRate : unitCostNative;
             openLots.push({ qty: q, unitCostNative, unitCostEur, date: tx.date });
-        } else {
-            const { costNative: costoBaseNative, costEur: costoBaseEur } = consumeLotsLIFO(openLots, q);
+                } else {
+            const { costNative: costoBaseNative, costEur: costoBaseEur, exactLotMatch } = consumeLotsLIFO(openLots, q);
+            isLotSale = exactLotMatch;
             tradePnL = Calc.round((pr * q - c) - costoBaseNative);
             if (isUSD) {
                 const ricavoEur = (pr * q - c) / txRate;
@@ -194,8 +202,10 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
     if (!hasManual && isRecent) return ' <span title="Tasso BCE non disponibile per questa data — considera di inserire il tasso manualmente" style="cursor:help;color:var(--warning);">⚠️</span>';
     return '';
 })()}</td>
-            <td class="${tx.type === 'transfer' ? 'tx-transfer' : tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${(() => {
-                if (tx.type !== 'transfer') return tx.type === 'buy' ? '🔀 Acq.' : '🔴 Vend.';
+                        <td class="${tx.type === 'transfer' ? 'tx-transfer' : tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${(() => {
+                if (tx.type !== 'transfer') return tx.type === 'buy'
+                    ? '🔀 Acq.'
+                    : `🔴 Vend.${isLotSale ? ' <span title="Vendita corrispondente a lotto/i interi — non frazionata sul PMC medio" style="cursor:help;display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">📦 lotto</span>' : ''}`;
                 if (tx.sourcePortfolioId) {
                     const srcName = window.__portfolioState__?.portfolios?.[tx.sourcePortfolioId]?.name;
                     return srcName ? `🔀 da ${srcName}` : '🔀 Trasf.';
