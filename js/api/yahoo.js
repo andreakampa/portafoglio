@@ -52,6 +52,8 @@ export const Yahoo = {
             return {
                 price: meta.regularMarketPrice,
                 prevClose: prev,
+                open: meta.regularMarketOpen ?? null,
+                marketState: meta.marketState ?? null,
                 preMarket,
                 postMarket,
                 week52Low:  meta.fiftyTwoWeekLow  ?? null,
@@ -72,18 +74,21 @@ export const Yahoo = {
         );
         const prices = {}, prevs = {};
         const preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, intraday = {};
+        const opens = {}, marketStates = {};
         results.forEach(({ status, value }) => {
             if (status === 'fulfilled' && value?.r) {
-                prices[value.id]      = value.r.price;
-                prevs[value.id]       = value.r.prevClose;
-                preMarkets[value.id]  = value.r.preMarket;
-                postMarkets[value.id] = value.r.postMarket;
-                week52Lows[value.id]  = value.r.week52Low;
-                week52Highs[value.id] = value.r.week52High;
-                intraday[value.id]    = value.r.intraday;
+                prices[value.id]       = value.r.price;
+                prevs[value.id]        = value.r.prevClose;
+                opens[value.id]        = value.r.open;
+                marketStates[value.id] = value.r.marketState;
+                preMarkets[value.id]   = value.r.preMarket;
+                postMarkets[value.id]  = value.r.postMarket;
+                week52Lows[value.id]   = value.r.week52Low;
+                week52Highs[value.id]  = value.r.week52High;
+                intraday[value.id]     = value.r.intraday;
             }
         });
-        return { prices, prevs, preMarkets, postMarkets, week52Lows, week52Highs, intraday };
+        return { prices, prevs, opens, marketStates, preMarkets, postMarkets, week52Lows, week52Highs, intraday };
     },
 
     async fetchSparkline(ticker) {

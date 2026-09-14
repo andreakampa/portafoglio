@@ -110,6 +110,8 @@ export class PortfolioPage {
         this.prevClose = {};
         this.preMarkets = {};
         this.postMarkets = {};
+        this.opens = {};
+        this.marketStates = {};
         this.week52Lows = {};
         this.week52Highs = {};
         this.dividendi = {};
@@ -222,7 +224,7 @@ await this._aggiornaDividendi();
     async _render() {
         this._syncActivePortfolio();
 
-        const { portfolio, prices, prevClose, currency, preMarkets, postMarkets, week52Lows, week52Highs } = this;
+        const { portfolio, prices, prevClose, currency, preMarkets, postMarkets, opens, marketStates, week52Lows, week52Highs } = this;
         const positionMap = await buildPositionMap(portfolio, prices);
         const fiscalState = this._getActivePortfolio()?.fiscal || null;
         const handlers = this._handlers();
@@ -240,6 +242,8 @@ const state = {
   fiscalState,
   preMarkets,
   postMarkets,
+  opens,
+  marketStates,
   week52Lows,
   week52Highs,
   dividendi: this.dividendi,
@@ -359,11 +363,13 @@ await this._aggiornaDividendi(true);
     return;
   }
 
-  const { prices, prevs, preMarkets, postMarkets, week52Lows, week52Highs, intraday } = await Yahoo.fetchAll(tickerMap);
+  const { prices, prevs, preMarkets, postMarkets, opens, marketStates, week52Lows, week52Highs, intraday } = await Yahoo.fetchAll(tickerMap);
   Object.assign(this.prices, prices);
   Object.assign(this.prevClose, prevs);
   Object.assign(this.preMarkets, preMarkets || {});
   Object.assign(this.postMarkets, postMarkets || {});
+  Object.assign(this.opens, opens || {});
+  Object.assign(this.marketStates, marketStates || {});
   Object.assign(this.week52Lows, week52Lows || {});
   Object.assign(this.week52Highs, week52Highs || {});
   Object.assign(this.intraday, intraday || {});

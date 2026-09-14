@@ -149,22 +149,15 @@ function groupedSortedIds(portfolio, positionMap) {
     return { active, closed, empty, transferred };
 }
 
-function getExtendedMarketInfo(id, valuta, preMarkets, postMarkets, prLive) {
+function getExtendedMarketInfo(id, valuta, preMarkets, postMarkets, prLive, marketStates = {}) {
     if (valuta !== 'USD') return null;
-    const now = new Date();
-    const utcHour = now.getUTCHours();
-    const utcMin  = now.getUTCMinutes();
-    const utcTime = utcHour * 60 + utcMin;
+    const state = marketStates[id];
 
-    // Orari in UTC: premarket 9:00-14:30 (IT 11:00-16:30), aftermarket 21:00-01:00 (IT 23:00-03:00)
-    const isPreMarket  = utcTime >= 540  && utcTime < 870;
-    const isPostMarket = utcTime >= 1260 || utcTime < 60;
-
-    if (isPreMarket && preMarkets[id] != null) {
+    if (state === 'PRE' && preMarkets[id] != null) {
         const diff = ((preMarkets[id] - prLive) / prLive) * 100;
         return { label: '🌅', price: preMarkets[id], diff, type: 'pre' };
     }
-    if (isPostMarket && postMarkets[id] != null) {
+    if ((state === 'POST' || state === 'POSTPOST') && postMarkets[id] != null) {
         const diff = ((postMarkets[id] - prLive) / prLive) * 100;
         return { label: '🌙', price: postMarkets[id], diff, type: 'post' };
     }
@@ -276,6 +269,15 @@ export const COLUMN_DEFS = [
     },
     { id: 'price', label: 'Last Price', sortCol: 'price',
         cell(ctx) { return `${ctx.varHtml}${week52Bar(ctx.id, ctx.prLive, ctx.week52Lows, ctx.week52Highs)}`; }
+    },
+    { id: 'open', label: 'Open', sortCol: null,
+        cell(ctx) {
+            const marketOpened = ['REGULAR', 'POST', 'POSTPOST'].includes(ctx.marketState);
+            return (marketOpened && ctx.open != null) ? Calc.fmt(ctx.open) : '—';
+        }
+    },
+    { id: 'prevCloseCol', label: 'Prev Close', sortCol: null,
+        cell(ctx) { return ctx.prPrev != null ? Calc.fmt(ctx.prPrev) : '—'; }
     },
     { id: 'dailyPnl', label: 'Daily P&L', sortCol: 'dailyPnl',
         cell(ctx) {
@@ -861,7 +863,7 @@ const pnlAfterTaxEur = pnlEur - taxEur;
     return map;
 }
 
-export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {}, columnConfig = null }, handlers) {
+export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, opens = {}, marketStates = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {}, columnConfig = null }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -958,7 +960,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 });
             }
 
-            const extMarket = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
+            const extMarket = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive, marketStates);
             const varHtml = `
                 <div style="display:flex;flex-direction:column;gap:2px;">
                     <b>${Calc.fmt(prLive)}</b>
@@ -991,6 +993,8 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 pnlEur, pnlEurPuro, tax, pnlAfterTax, taxEur, pnlAfterTaxEur, invEur,
                 costoDisplay, rowId, extMarket, varHtml, assetBadge, statoBadge,
                 week52Lows, week52Highs, dividendi,
+                open: opens[id] ?? null,
+                marketState: marketStates[id] ?? null,
                 totMercatoEur: weightTotals.totMercatoEur || 0,
                 totCostoEur: weightTotals.totCostoEur || 0
             };
@@ -1186,7 +1190,7 @@ dash.onclick = e => {
 };
 }
 
-export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {}, intraday = {} }, handlers) {
+export function renderMobileCards({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, marketStates = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {}, intraday = {} }, handlers) {
     const container = document.getElementById('mobile-cards');
     if (!container) return;
     const s = currency === 'EUR' ? '€' : '$';
@@ -1299,7 +1303,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
             }
             const sparklineHtml = !sortMeta ? sparklineSvg(intraday[id], prPrev) : '';
             const priceColorClass = varDay === null ? '' : (varDay >= 0 ? 'pos-gain' : 'neg-loss');
-            const extForHeader = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
+            const extForHeader = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive, marketStates);
 
             card.innerHTML = `
                 <div class="mobile-card-header" data-id="${id}">
@@ -1335,7 +1339,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                             <span><b>${Calc.fmt(prLive)}</b> &nbsp; Var: ${varHtml}</span>
                         </div>
                         ${(() => {
-                            const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive);
+                            const ext = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive, marketStates);
                             if (!ext) return '';
                             return `<div class="mobile-card-row">
                                 <span class="text-muted">${ext.type === 'pre' ? 'Pre-market' : 'After-market'}</span>
