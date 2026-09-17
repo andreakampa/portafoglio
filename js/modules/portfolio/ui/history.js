@@ -103,7 +103,8 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
     const s = currency === 'EUR' ? '€' : '$';   // simbolo secondo il toggle del sito
     const nativeS = isUSD ? '$' : '€';          // simbolo nativo della posizione (per gli hint)
     const rate = Exchange.rate || 1;
-    const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+        const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const totalMargine = txsSorted.reduce((sum, tx) => sum + (tx.type === 'buy' ? (tx.marginAmount || 0) : 0), 0);
 
     // PMC: se il sito è su EUR e la posizione è USD, mostriamo il PMC fiscale (cambio storico) come primario
     const pmcDisplay = (currency === 'EUR' && isUSD && pmcEur > 0) ? pmcEur : pmc;
@@ -119,7 +120,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
         `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp;
          PMC: <b>${s} ${Calc.fmt(pmcDisplay)}</b>${pmcHint} &nbsp;|&nbsp;
          P&L Realizzato: <b class="${realizedDisplay >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedDisplay)}</b>${realizedHint} &nbsp;|&nbsp;
-         Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>`;
+                  Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>${totalMargine > 0 ? ` &nbsp;|&nbsp; Margine tot.: <b>${nativeS} ${Calc.fmt(totalMargine)}</b>` : ''}`;
 
     const arrowEl = document.getElementById('hist-date-arrow');
     if (arrowEl) arrowEl.textContent = historySortState.dir === 'asc' ? ' ▲' : ' ▼';
@@ -226,7 +227,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
            <td>${isUSD
                 ? `${nativeS} ${Calc.fmt(pr)} <span style="font-size:10px;color:var(--text-muted)">(${s} ${Calc.fmt(rowConv(pr))})</span>`
                 : `${s} ${Calc.fmt(rowConv(pr))}`}</td>
-            <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}</td>
+                        <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}${tx.marginAmount ? `<br><span title="Finanziato a margine" style="font-size:10px;color:var(--text-muted);">🏦 ${nativeS} ${Calc.fmt(tx.marginAmount)}</span>` : ''}</td>
             <td>${s} ${Calc.fmt(rowConv(totale))}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(totale)})</span>` : ''}</td>
             ${isUSD ? `<td style="font-size:11px;color:var(--text-muted);">${tx.exchangeRate ? Calc.fmt(parseFloat(tx.exchangeRate), 4) : (Exchange._memoryCache.get(tx.date)?.rate ? Calc.fmt(Exchange._memoryCache.get(tx.date).rate, 4) : '—')}</td>` : ''}
             <td>${s} ${Calc.fmt(currency === 'EUR' && isUSD ? rPmcEur : rPmc)}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(rPmc)})</span>` : ''}</td>
@@ -346,7 +347,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                         <span class="modal-label">Prezzo</span>
                         <input type="number" id="edit-tx-prezzo" step="any" value="${origTx.price}" ${isTransferred ? 'readonly style="opacity:0.5;cursor:not-allowed;"' : ''}>
                     </div>
-                    <div>
+                                        <div>
                         <span class="modal-label">Commissione</span>
                         <div style="display:flex; gap:6px;">
                             <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}" style="flex:1;" ${isTransferred ? 'readonly style="opacity:0.5;cursor:not-allowed;"' : ''}>
@@ -355,6 +356,10 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                                 <option value="USD" ${origTx.commissionCurrency === 'USD' ? 'selected' : ''}>$ USD</option>
                             </select>
                         </div>
+                    </div>
+                    <div>
+                        <span class="modal-label">Margine <span class="text-muted fs-xs">(solo acquisti — 0 se cash)</span></span>
+                        <input type="number" id="edit-tx-margin" step="any" value="${origTx.marginAmount || 0}" min="0">
                     </div>
                     ${isTransferred ? `<div style="padding:8px 10px;background:var(--bg2);border-radius:6px;font-size:12px;color:var(--text-muted);border:1px solid var(--border);">🔀 Transazione trasferita — prezzo e commissione non modificabili</div>` : ''}
                     ${isUSD ? `
@@ -472,7 +477,8 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
         const newType = document.getElementById('edit-tx-tipo').value;
         const newQty  = parseFloat(document.getElementById('edit-tx-qta').value);
         const newPr   = parseFloat(document.getElementById('edit-tx-prezzo').value);
-        const newComm = parseFloat(document.getElementById('edit-tx-comm').value) || 0;
+                const newComm = parseFloat(document.getElementById('edit-tx-comm').value) || 0;
+        const newMargin = parseFloat(document.getElementById('edit-tx-margin')?.value) || 0;
 
         if (!newDate || isNaN(newQty) || newQty <= 0 || isNaN(newPr) || newPr <= 0) {
             Toast.show('Compila tutti i campi correttamente', 'err');
@@ -524,8 +530,9 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                     sourcePortfolioId: origTx.sourcePortfolioId,
                     transferId: origTx.transferId
                 } : {}),
-                ...(editCommCurrency !== 'EUR' ? { commissionCurrency: editCommCurrency } : {}),
-                ...(isManual && fxVal > 0 ? { exchangeRate: fxVal } : {})
+                                ...(editCommCurrency !== 'EUR' ? { commissionCurrency: editCommCurrency } : {}),
+                ...(isManual && fxVal > 0 ? { exchangeRate: fxVal } : {}),
+                ...(newType === 'buy' && newMargin > 0 ? { marginAmount: newMargin } : {})
             };
         }
 

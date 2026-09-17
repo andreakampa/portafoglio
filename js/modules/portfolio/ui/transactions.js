@@ -35,7 +35,7 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                         <span class="modal-label">Prezzo Eseguito</span>
                         <input type="number" id="tx-prezzo" step="any" value="${prLive}">
                     </div>
-                    <div>
+                                        <div>
                         <span class="modal-label">Commissione</span>
                         <div style="display:flex; gap:6px;">
                             <input type="number" id="tx-comm" step="any" placeholder="0.00" style="flex:1;">
@@ -45,6 +45,11 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                             </select>
                         </div>
                     </div>
+                    ${isBuy ? `
+                    <div>
+                        <span class="modal-label">Margine <span class="text-muted fs-xs">(0 = tutto cash)</span></span>
+                        <input type="number" id="tx-margin" step="any" placeholder="0.00" min="0">
+                    </div>` : ''}
                     ${p.valuta === 'USD' ? `
                     <div>
                         <span class="modal-label">Tasso EUR/USD <span class="text-muted fs-xs">(auto-compilato, modificabile)</span></span>
@@ -237,10 +242,11 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
     }
 
     const preview = () => txPreview(id, type, portfolio, prices, activePortfolio);
-    document.getElementById('tx-qta').oninput    = preview;
+        document.getElementById('tx-qta').oninput    = preview;
         document.getElementById('tx-prezzo').oninput = preview;
         document.getElementById('tx-comm').oninput   = preview;
         document.getElementById('tx-comm-currency')?.addEventListener('change', preview);
+        document.getElementById('tx-margin')?.addEventListener('input', preview);
 
     document.getElementById('tx-confirm').onclick = async () => {
         const q  = parseFloat(document.getElementById('tx-qta').value);
@@ -271,16 +277,19 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
             }
         }
 
-        if (!portfolio[id].transactions) portfolio[id].transactions = [];
+                if (!portfolio[id].transactions) portfolio[id].transactions = [];
         const fxInp = document.getElementById('tx-fx');
         const fxSave = fxInp ? parseFloat(fxInp.value) : NaN;
         const commCurrency = document.getElementById('tx-comm-currency')?.value || 'EUR';
+        const marginInp = document.getElementById('tx-margin');
+        const marginAmount = Math.min(parseFloat(marginInp?.value) || 0, q * pr + c);
         portfolio[id].transactions.push({
             date: dt, type, qty: q, price: pr, commission: c,
             ...(commCurrency !== 'EUR' ? { commissionCurrency: commCurrency } : {}),
             ...(fxSave > 0 ? { exchangeRate: fxSave } : {}),
             ...(type === 'sell' ? { saleMode } : {}),
-            ...(lotAllocation ? { lotAllocation } : {})
+            ...(lotAllocation ? { lotAllocation } : {}),
+            ...(type === 'buy' && marginAmount > 0 ? { marginAmount } : {})
         });
         closeModal();
         await onSave();
@@ -320,14 +329,19 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
 
     box.style.display = 'block';
 
-    if (type === 'buy') {
+        if (type === 'buy') {
         const newCost = (qta * pmc) + (q * pr) + cNative;
         const newQta  = qta + q;
         const newPmc  = newQta > 0 ? newCost / newQta : 0;
+        const marginInputPreview = document.getElementById('tx-margin');
+        const marginAmountPreview = Math.min(parseFloat(marginInputPreview?.value) || 0, q * pr + cNative);
+        const marginHint = marginAmountPreview > 0
+            ? `<br>Di cui a margine: <b class="text-warning">${s} ${Calc.fmt(marginAmountPreview)}</b>`
+            : '';
         box.innerHTML = `
             Costo operazione: <b>${s} ${Calc.fmt(q * pr + cNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)<br>
             Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
-            Nuova Q.tà: <b>${Calc.fmt(newQta, 4)}</b>`;
+            Nuova Q.tà: <b>${Calc.fmt(newQta, 4)}</b>${marginHint}`;
     } else {
         const pnlLordoNative = (pr - pmc) * q - cNative;
         const costoBaseEur   = (pmcEur || pmc) * q;
