@@ -1036,7 +1036,7 @@ export function resetRenderState() {
     renderTable._showEmpty       = true;
     renderTable._showTransferred = true;
 }
-export function renderKPI({ portfolio, positionMap, currency, fiscalState, dividendi = {}, handlers = {} }) {
+export function renderKPI({ portfolio, positionMap, currency, fiscalState, dividendi = {}, marginInterest = [], handlers = {} }) {
     const s = currency === 'EUR' ? '€' : '$';
 
     let totInv = 0;
@@ -1107,7 +1107,13 @@ const totaleDividendi = currency === 'EUR'
     ? totaleDividendiEur
     : Exchange.convert(totaleDividendiEur, 'EUR', currency);
 
-    
+    const rate = Exchange.rate || 1;
+    const totaleInteressiEur = (marginInterest || []).reduce(
+        (sum, m) => sum + (m.currency === 'USD' ? m.amount / rate : m.amount), 0
+    );
+    const totaleInteressi = currency === 'EUR'
+        ? totaleInteressiEur
+        : Exchange.convert(totaleInteressiEur, 'EUR', currency);
 
     const dash = document.getElementById('dashboard');
 if (!dash) return;
@@ -1125,11 +1131,18 @@ dash.innerHTML = `
                 <div class="kpi-title">Controvalore</div>
                 <div class="kpi-value">${s} ${Calc.fmt(totAtt)}</div>
             </div>
-            <div class="kpi-sep"></div>
+                        <div class="kpi-sep"></div>
             <div class="kpi-item">
                 <div class="kpi-title">Commissioni Pagate</div>
                 <div class="kpi-value text-warning">${s} ${Calc.fmt(totComm)}</div>
             </div>
+            ${totaleInteressiEur > 0 ? `
+            <div class="kpi-sep"></div>
+            <div class="kpi-item">
+                <div class="kpi-title">Interessi Margine</div>
+                <div class="kpi-value text-warning">${s} ${Calc.fmt(totaleInteressi)}</div>
+                <div class="kpi-sub">totale addebitato</div>
+            </div>` : ''}
             <div class="kpi-sep"></div>
             <div class="kpi-item" data-action="dividendi-dashboard" style="cursor:pointer;">
                 <div class="kpi-title">Dividendi</div>

@@ -246,10 +246,11 @@ const state = {
   marketStates,
   week52Lows,
   week52Highs,
-  dividendi: this.dividendi,
+    dividendi: this.dividendi,
   intraday: this.intraday,
   weightTotals,
   columnConfig: this.columnConfig,
+  marginInterest: this._getActivePortfolio()?.marginInterest || [],
   handlers
 };
 
@@ -981,8 +982,8 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             Toast.show('Prezzi aggiornati', 'ok');
         });
 
-        document.getElementById('btn-storico')?.addEventListener('click', () => {
-            openStoricoModal(this.portfolio, this.dividendi, this._getActivePortfolio()?.taxRegime || 'amministrato');
+                document.getElementById('btn-storico')?.addEventListener('click', () => {
+            openStoricoModal(this.portfolio, this.dividendi, this._getActivePortfolio()?.taxRegime || 'amministrato', this._getActivePortfolio(), () => this._save());
         });
 
         document.getElementById('btn-eur')?.addEventListener('click', () => this._setValuta('EUR'));

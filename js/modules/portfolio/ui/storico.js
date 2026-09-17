@@ -1,14 +1,18 @@
 import { Calc } from '../calc.js';
+import { Exchange } from '../../../api/exchange.js';
+import { Toast } from '../../../core/toast.js';
 import { lockScroll, unlockScroll } from './helpers.js';
 
 let storicoState = {
-    tab: 'compravendite', // 'compravendite' | 'dividendi'
+    tab: 'compravendite', // 'compravendite' | 'dividendi' | 'interessi'
     range: null,          // giorni, null = Tutto
     customFrom: null,
     customTo: null,
     fxMode: 'broker',      // 'broker' | 'fiscale'
     ticker: null,          // null = tutti
-    txType: null           // null = tutti | 'buy' | 'sell' (solo compravendite)
+    txType: null,          // null = tutti | 'buy' | 'sell' (solo compravendite)
+    activePortfolio: null, // portafoglio attivo, per la tab Interessi
+    onSave: null           // callback di salvataggio, per la tab Interessi
 };
 
 const RANGES = [
@@ -69,6 +73,19 @@ function buildDividendiRows(portfolio, dividendi) {
     return rows;
 }
 
+const MESI_IT = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+function formatPeriod(period) {
+    const [y, m] = (period || '').split('-');
+    const idx = parseInt(m, 10) - 1;
+    return MESI_IT[idx] ? `${MESI_IT[idx]} ${y}` : period;
+}
+
+function buildInterestRows(activePortfolio) {
+    const rows = (activePortfolio?.marginInterest || []).slice();
+    rows.sort((a, b) => b.period.localeCompare(a.period) || a.currency.localeCompare(b.currency));
+    return rows;
+}
+
 function uniqueSortedTickers(list) {
     return [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'it'));
 }
@@ -83,9 +100,12 @@ function getDividendiTickers(portfolio, dividendi) {
     );
 }
 
-export function openStoricoModal(portfolio, dividendi, taxRegime = 'amministrato') {
+export function openStoricoModal(portfolio, dividendi, taxRegime = 'amministrato', activePortfolio = null, onSave = null) {
     const overlay = document.getElementById('modal-storico');
     if (!overlay) return;
+
+    storicoState.activePortfolio = activePortfolio;
+    storicoState.onSave = onSave;
 
     overlay.innerHTML = `
         <div class="modal modal-wide">
@@ -94,9 +114,10 @@ export function openStoricoModal(portfolio, dividendi, taxRegime = 'amministrato
                 <button class="btn-x" id="storico-close">✕</button>
             </div>
             <div class="modal-body">
-                <div style="display:flex; gap:8px; margin-bottom:14px;">
+                                <div style="display:flex; gap:8px; margin-bottom:14px;">
                     <button id="storico-tab-cv" class="btn-toggle">Compravendite</button>
                     <button id="storico-tab-div" class="btn-toggle">Dividendi</button>
+                    <button id="storico-tab-int" class="btn-toggle">Interessi</button>
                 </div>
                 <div id="storico-filters" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
                 <div id="storico-custom-range" style="display:none; gap:8px; align-items:center; margin-bottom:12px;">
@@ -198,17 +219,94 @@ function renderExtraFilters(portfolio, dividendi, taxRegime) {
     });
 }
 
+function renderInterestTab(table) {
+    const activePortfolio = storicoState.activePortfolio;
+    if (!activePortfolio) {
+        table.innerHTML = `<tbody><tr><td style="text-align:center;padding:20px;color:var(--text-muted);">Portafoglio non disponibile</td></tr></tbody>`;
+        return;
+    }
+
+    const rows = buildInterestRows(activePortfolio);
+    const rate = Exchange.rate || 1;
+    const totaleEur = rows.reduce((sum, r) => sum + (r.currency === 'USD' ? r.amount / rate : r.amount), 0);
+
+    table.innerHTML = `
+        <thead><tr>
+            <th>Periodo</th><th>Valuta</th><th>Importo</th><th></th>
+        </tr></thead>
+        <tbody>
+            <tr>
+                <td><input type="month" id="mi-period" style="width:130px;"></td>
+                <td>
+                    <select id="mi-currency">
+                        <option value="EUR">EUR</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </td>
+                <td><input type="number" id="mi-amount" step="0.01" min="0" placeholder="0.00" style="width:100px;"></td>
+                <td><button id="mi-add" class="btn btn-success btn-sm">+ Aggiungi</button></td>
+            </tr>
+            ${rows.length ? rows.map(r => `
+                <tr>
+                    <td>${formatPeriod(r.period)}</td>
+                    <td>${r.currency}</td>
+                    <td>${r.currency === 'USD' ? '$' : '€'} ${Calc.fmt(r.amount)}</td>
+                    <td><button class="btn-del-mi" data-id="${r.id}" title="Elimina">✕</button></td>
+                </tr>
+            `).join('') : `<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--text-muted);">Nessun interesse registrato</td></tr>`}
+            <tr>
+                <td colspan="2" style="text-align:right;font-weight:600;">Totale (≈ EUR)</td>
+                <td colspan="2" style="font-weight:600;">€ ${Calc.fmt(totaleEur)}</td>
+            </tr>
+        </tbody>`;
+
+    document.getElementById('mi-add').onclick = async () => {
+        const period = document.getElementById('mi-period').value;
+        const currency = document.getElementById('mi-currency').value;
+        const amount = parseFloat(document.getElementById('mi-amount').value);
+        if (!period || isNaN(amount) || amount <= 0) {
+            Toast.show('Inserisci periodo e importo validi', 'err');
+            return;
+        }
+        if (!activePortfolio.marginInterest) activePortfolio.marginInterest = [];
+        activePortfolio.marginInterest.push({ id: 'MI' + Date.now(), period, currency, amount });
+        await storicoState.onSave?.();
+        renderInterestTab(table);
+        Toast.show('Interesse registrato', 'ok');
+    };
+
+    table.querySelectorAll('.btn-del-mi').forEach(btn => {
+        btn.onclick = async () => {
+            const idx = (activePortfolio.marginInterest || []).findIndex(r => r.id === btn.dataset.id);
+            if (idx > -1) activePortfolio.marginInterest.splice(idx, 1);
+            await storicoState.onSave?.();
+            renderInterestTab(table);
+            Toast.show('Interesse rimosso', 'ok');
+        };
+    });
+}
+
 function renderStorico(portfolio, dividendi, taxRegime) {
     document.getElementById('storico-tab-cv').classList.toggle('active', storicoState.tab === 'compravendite');
     document.getElementById('storico-tab-div').classList.toggle('active', storicoState.tab === 'dividendi');
+    document.getElementById('storico-tab-int').classList.toggle('active', storicoState.tab === 'interessi');
     document.getElementById('storico-tab-cv').onclick = () => { storicoState.tab = 'compravendite'; renderStorico(portfolio, dividendi, taxRegime); };
     document.getElementById('storico-tab-div').onclick = () => { storicoState.tab = 'dividendi'; renderStorico(portfolio, dividendi, taxRegime); };
-
-    renderFilters(portfolio, dividendi, taxRegime);
-    renderExtraFilters(portfolio, dividendi, taxRegime);
+    document.getElementById('storico-tab-int').onclick = () => { storicoState.tab = 'interessi'; renderStorico(portfolio, dividendi, taxRegime); };
 
     const fxWrap = document.getElementById('storico-fx-toggle-wrap');
     const table  = document.getElementById('storico-table');
+
+    if (storicoState.tab === 'interessi') {
+        document.getElementById('storico-filters').innerHTML = '';
+        document.getElementById('storico-extra-filters').innerHTML = '';
+        fxWrap.innerHTML = '';
+        renderInterestTab(table);
+        return;
+    }
+
+    renderFilters(portfolio, dividendi, taxRegime);
+    renderExtraFilters(portfolio, dividendi, taxRegime);
 
     if (storicoState.tab === 'compravendite') {
         fxWrap.innerHTML = `<button id="storico-fx-toggle" class="btn-toggle">
