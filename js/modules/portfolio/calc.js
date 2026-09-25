@@ -1,6 +1,12 @@
 import { Exchange } from '../../api/exchange.js';
 import { getAvailableMinusForPreview } from '../../api/fiscale.js';
 
+// Tipi di transazione che aprono/chiudono una posizione SHORT — vanno sempre
+// esclusi dalla logica long esistente (buy/sell/transfer), altrimenti
+// verrebbero scambiati per una vendita di lotti long che non esistono.
+const SHORT_TX_TYPES = ['short_sell', 'buy_to_cover'];
+const excludeShortTx = tx => !SHORT_TX_TYPES.includes(tx.type);
+
 export const Calc = {
 
     buildDashboardTaxMetrics(portfolio, fiscalState = null) {
@@ -29,7 +35,7 @@ export const Calc = {
         }
 
         for (const p of Object.values(portfolio || {})) {
-            const txs = [...(p.transactions || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+            const txs = [...(p.transactions || [])].filter(excludeShortTx).sort((a, b) => new Date(a.date) - new Date(b.date));
 
             let qty = 0;
             let totalCostEur = 0;
@@ -217,11 +223,113 @@ export const Calc = {
         this._positionSyncCache.clear();
     },
 
+    // ── SHORT SELLING ────────────────────────────────────────────────────
+    // Calcolo indipendente dalla logica long: LIFO sui lotti short_sell,
+    // consumati da buy_to_cover. Nessuna distinzione dichiarativo/amministrato
+    // qui: si usa sempre LIFO per la copertura.
+    _shortPositionSync(holding) {
+        const txs = (holding.transactions || [])
+            .filter(tx => SHORT_TX_TYPES.includes(tx.type))
+            .slice()
+            .sort((a, b) => a.date.localeCompare(b.date));
+        const v = (holding.valuta || 'EUR').toUpperCase();
+
+        const getRateSync = (tx) => {
+            if (tx.exchangeRate) return parseFloat(tx.exchangeRate);
+            const cached = Exchange._memoryCache.get(tx.date);
+            if (cached?.rate > 0) return cached.rate;
+            return Exchange.rate || 1;
+        };
+
+        let shortLots = []; // { qty, unitProceedsNative, unitProceedsEur } — incasso per unità all'apertura
+        let realizedPnL = 0;
+        let totalComm = 0;
+
+        for (const tx of txs) {
+            const q = +tx.qty || 0;
+            if (q <= 0) continue;
+            const pr = +tx.price || 0;
+            const commRaw = +(tx.commission || 0);
+            const commCurr = (tx.commissionCurrency || 'EUR').toUpperCase();
+            const txRate = getRateSync(tx);
+            const c = commCurr === 'USD' && v !== 'USD' ? commRaw / txRate
+                    : commCurr === 'EUR' && v === 'USD' ? commRaw * txRate
+                    : commRaw;
+            totalComm += commRaw;
+
+            if (tx.type === 'short_sell') {
+                const unitProceedsNative = pr - (c / q);
+                const unitProceedsEur = v === 'USD' ? unitProceedsNative / txRate : unitProceedsNative;
+                shortLots.push({ qty: q, unitProceedsNative, unitProceedsEur });
+            } else {
+                // buy_to_cover — consuma i lotti short in LIFO (più recente prima)
+                let toConsume = q;
+                let proceedsNative = 0, proceedsEur = 0;
+                for (let i = shortLots.length - 1; i >= 0 && toConsume > 0.00001; i--) {
+                    const lot = shortLots[i];
+                    const used = Math.min(lot.qty, toConsume);
+                    proceedsNative += lot.unitProceedsNative * used;
+                    proceedsEur    += lot.unitProceedsEur * used;
+                    lot.qty -= used;
+                    toConsume -= used;
+                    if (lot.qty < 0.00001) shortLots.splice(i, 1);
+                }
+                const costNative = pr * q + c; // costo di riacquisto + commissione
+                if (v === 'EUR') {
+                    realizedPnL += proceedsNative - costNative;
+                } else {
+                    const costEur = costNative / txRate;
+                    realizedPnL += proceedsEur - costEur;
+                }
+            }
+        }
+
+        const qtaShort = shortLots.reduce((s, l) => s + l.qty, 0);
+        let totalProceedsNative = 0, totalProceedsEur = 0;
+        for (const lot of shortLots) {
+            totalProceedsNative += lot.unitProceedsNative * lot.qty;
+            totalProceedsEur    += lot.unitProceedsEur * lot.qty;
+        }
+        const pmcShort    = qtaShort > 0.00001 ? totalProceedsNative / qtaShort : 0;
+        const pmcShortEur = qtaShort > 0.00001 ? totalProceedsEur / qtaShort : 0;
+
+        return { qtaShort, pmcShort, pmcShortEur, totalProceedsEur, totalProceedsNative, realizedPnL: Calc.round(realizedPnL), totalComm };
+    },
+
+    // Fonde il risultato della posizione long (basePos) con l'eventuale short
+    // aperto sullo stesso titolo. Per costruzione i due non coesistono mai:
+    // se c'è uno short aperto, qta/pmc/totalCostEur vengono sostituiti con
+    // i valori short E SEGNO NEGATIVO — questo fa sì che att/inv calcolati
+    // altrove (render.js) risultino negativi in modo coerente, e che i KPI
+    // di portafoglio (che sommano semplicemente inv/att di tutti i titoli)
+    // includano lo short senza bisogno di logica dedicata.
+    _mergeWithShort(basePos, holding) {
+        const shortPos = Calc._shortPositionSync(holding);
+        const totalRealizedPnL = Calc.round((basePos.realizedPnL || 0) + shortPos.realizedPnL);
+        const totalCommAll = (basePos.totalComm || 0) + shortPos.totalComm;
+
+        if (shortPos.qtaShort > 0.00001 && (basePos.qta || 0) < 0.00001) {
+            return {
+                ...basePos,
+                qta: -shortPos.qtaShort,
+                pmc: shortPos.pmcShort,
+                pmcEur: shortPos.pmcShortEur,
+                totalCostEur: -shortPos.totalProceedsEur,
+                totalCostNative: -shortPos.totalProceedsNative,
+                realizedPnL: totalRealizedPnL,
+                totalComm: totalCommAll,
+                isShort: true
+            };
+        }
+
+        return { ...basePos, realizedPnL: totalRealizedPnL, totalComm: totalCommAll, isShort: false };
+    },
+
     // Calcola la posizione per i portafogli in regime dichiarativo:
     // costo a lotti specifici se indicato sulla transazione, altrimenti LIFO
     // (presunzione di legge per il dichiarativo) — mai costo medio ponderato.
     _positionDichiarativo(holding, getRate) {
-        const txs = (holding.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+        const txs = (holding.transactions || []).filter(excludeShortTx).slice().sort((a, b) => a.date.localeCompare(b.date));
         const v = (holding.valuta || 'EUR').toUpperCase();
 
         let lots = [];
@@ -537,7 +645,7 @@ export const Calc = {
         if (this._positionCache.has(sig)) return this._positionCache.get(sig);
 
         const promise = (async () => {
-            const txs = (holding.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+            const txs = (holding.transactions || []).filter(excludeShortTx).slice().sort((a, b) => a.date.localeCompare(b.date));
             const v   = (holding.valuta || 'EUR').toUpperCase();
 
             let qta = 0, pmcCost = 0;
@@ -560,7 +668,7 @@ export const Calc = {
             };
 
             if (taxRegime === 'dichiarativo') {
-                return Calc._positionDichiarativo(holding, getRate);
+                return Calc._mergeWithShort(Calc._positionDichiarativo(holding, getRate), holding);
             }
 
             const dateCounters = {};
@@ -670,7 +778,7 @@ export const Calc = {
 
             const pmc    = qta > 0 ? pmcCost : 0;
             const pmcEur = qta > 0 ? (v === 'EUR' ? pmc : totalCostEur / qta) : 0;
-            return { qta, pmc, pmcEur, totalCostEur, totalCostNative, realizedPnL: Calc.round(realizedPnL), totalComm };
+            return Calc._mergeWithShort({ qta, pmc, pmcEur, totalCostEur, totalCostNative, realizedPnL: Calc.round(realizedPnL), totalComm }, holding);
         })();
 
         this._positionCache.set(sig, promise);
@@ -757,12 +865,12 @@ getLots(holding, taxRegime = 'amministrato') {
                 if (cached?.rate > 0) return cached.rate;
                 return Exchange.rate || 1;
             };
-            const result = Calc._positionDichiarativo(holding, getRateSyncDich);
+            const result = Calc._mergeWithShort(Calc._positionDichiarativo(holding, getRateSyncDich), holding);
             this._positionSyncCache.set(sig, result);
             return result;
         }
 
-        const txs = (holding.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+        const txs = (holding.transactions || []).filter(excludeShortTx).slice().sort((a, b) => a.date.localeCompare(b.date));
         const v   = (holding.valuta || 'EUR').toUpperCase();
 
         let qta = 0, pmcCost = 0;
@@ -877,7 +985,7 @@ getLots(holding, taxRegime = 'amministrato') {
 
         const pmc    = qta > 0 ? pmcCost : 0;
         const pmcEur = qta > 0 ? (v === 'EUR' ? pmc : totalCostEur / qta) : 0;
-        const result = { qta, pmc, pmcEur, totalCostEur, realizedPnL: Calc.round(realizedPnL), totalComm };
+        const result = Calc._mergeWithShort({ qta, pmc, pmcEur, totalCostEur, realizedPnL: Calc.round(realizedPnL), totalComm }, holding);
         this._positionSyncCache.set(sig, result);
         return result;
     },
