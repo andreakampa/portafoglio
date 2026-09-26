@@ -758,7 +758,7 @@ function openTransferEditModal(id, origTx, portfolio, onSave, currency, taxRegim
         // Aggiorna anche nel destinazione
         if (linkedPortfolio) {
             const linkedAsset = linkedPortfolio.assets?.[id];
-            if (linkedAsset) {
+            if (linkedAsset) {a
                 const linkIdx = linkedAsset.transactions.findIndex(
                     t => t.transferId === origTx.transferId && t.type === 'transfer'
                 );

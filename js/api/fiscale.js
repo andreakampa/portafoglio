@@ -330,11 +330,88 @@ export function calcolaCompensazioneProvvisoria(portfolio, cartSells, taxRegime 
             continue;
         }
 
-        // pnl ≈ 0
+                // pnl ≈ 0
         risultati.push({ cartId: item.cartId, compensatoEur: 0, residuoTassabileEur: 0, motivoEsclusione: null });
     }
 
     return risultati;
+}
+
+// ── RIEPILOGO ANNUALE TASSE DOVUTE ──────────────────────────────────────────
+// Riusa calcolaCompensazione (già compensa FIFO minus/plus per categoria e
+// rispetta i 4 anni) e vi applica l'aliquota per tipo asset, raggruppando
+// il risultato per anno solare. Le minus dell'anno vengono elencate insieme
+// alle plus (non generano tassa, ma servono a mostrare il quadro completo).
+export function calcolaRiepilogoAnnualeTasse(portfolio, taxRegime = 'amministrato') {
+    const { dettaglioPlus } = calcolaCompensazione(portfolio, taxRegime);
+    const righeMinus = calcolaMinusvalenze(portfolio, taxRegime);
+
+    const perAnno = {};
+    const ensureAnno = (anno) => {
+        if (!perAnno[anno]) {
+            perAnno[anno] = {
+                anno,
+                vendite: [],
+                totalePlusEur: 0,
+                totaleMinusEur: 0,
+                totaleCompensatoEur: 0,
+                totaleImponibileEur: 0,
+                totaleTassaEur: 0
+            };
+        }
+        return perAnno[anno];
+    };
+
+    for (const p of dettaglioPlus) {
+        const bucket = ensureAnno(p.anno);
+        const imponibile = p.motivoEsclusione === 'fondo' ? p.plusEur : p.residuoTassabileEur;
+        const tassaDovuta = Calc.taxOnGain(imponibile, p.tipoAsset);
+
+        bucket.vendite.push({
+            data: p.date, titolo: p.titolo, tipoAsset: p.tipoAsset,
+            esito: 'plus', importoEur: p.plusEur,
+            compensatoEur: p.compensatoEur, imponibileEur: imponibile,
+            tassaEur: tassaDovuta, escluso: p.motivoEsclusione
+        });
+        bucket.totalePlusEur += p.plusEur;
+        bucket.totaleCompensatoEur += p.compensatoEur;
+        bucket.totaleImponibileEur += imponibile;
+        bucket.totaleTassaEur += tassaDovuta;
+    }
+
+    for (const m of righeMinus) {
+        const bucket = ensureAnno(m.anno);
+        bucket.vendite.push({
+            data: m.data, titolo: m.titolo, tipoAsset: m.tipoAsset,
+            esito: 'minus', importoEur: -m.minus,
+            compensatoEur: 0, imponibileEur: 0, tassaEur: 0, escluso: null
+        });
+        bucket.totaleMinusEur += m.minus;
+    }
+
+    for (const anno in perAnno) {
+        perAnno[anno].vendite.sort((a, b) => b.data.localeCompare(a.data));
+    }
+
+    return Object.values(perAnno).sort((a, b) => b.anno - a.anno);
+}
+
+// Tassa dovuta stimata per l'anno corrente — usata dalla KPI in dashboard.
+export function getTasseDovuteAnnoCorrente(portfolio, taxRegime = 'amministrato') {
+    const riepilogo = calcolaRiepilogoAnnualeTasse(portfolio, taxRegime);
+    const annoCorrente = new Date().getFullYear();
+    const bucket = riepilogo.find(r => r.anno === annoCorrente);
+    return bucket ? bucket.totaleTassaEur : 0;
+}
+
+// Versione "autonoma" per la dashboard: legge da sola il portafoglio attivo
+// e il suo regime fiscale tramite _getPortfolio, così render.js non deve
+// procurarsi l'oggetto portfolio completo solo per questo numero.
+export function getTasseDovuteAnnoCorrenteDashboard() {
+    const pf = typeof _getPortfolio === 'function' ? _getPortfolio() : null;
+    if (!pf) return 0;
+    const { taxRegime } = getActivePortfolioData();
+    return getTasseDovuteAnnoCorrente(pf, taxRegime);
 }
 
 export function raggruppaPerAnno(righe) {
@@ -369,6 +446,7 @@ export function getAvailableMinusForPreview(fiscalState, assetType = 'stock') {
 let _portfolio = null;
 let _getPortfolio = null;
 let _savePortfolio = null;
+let fiscaleActiveTab = 'tasse'; // 'tasse' | 'minus' — tasse dovute mostrato per primo
 
 
 function getActivePortfolioData() {
@@ -521,12 +599,16 @@ _savePortfolio = savePortfolio;
     document.body.appendChild(overlay);
 
 
-    const drawer = document.createElement('div');
+        const drawer = document.createElement('div');
     drawer.id = 'drawer-fiscale';
     drawer.innerHTML = `
         <div class="drawer-header">
             <h3>📂 Cassetto fiscale</h3>
             <button class="drawer-close" id="drawer-fiscale-close">✕</button>
+        </div>
+        <div class="fiscale-tabs" style="display:flex;gap:6px;padding:10px 20px 0;border-bottom:1px solid var(--border);">
+            <button class="fiscale-tab-btn" data-tab="tasse" id="fiscale-tab-tasse" style="background:none;border:none;font-size:13px;padding:8px 10px;cursor:pointer;border-bottom:2px solid transparent;">💶 Tasse dovute</button>
+            <button class="fiscale-tab-btn" data-tab="minus" id="fiscale-tab-minus" style="background:none;border:none;font-size:13px;padding:8px 10px;cursor:pointer;border-bottom:2px solid transparent;">📉 Minusvalenze</button>
         </div>
         <div class="drawer-body" id="drawer-fiscale-body">
             <div class="fiscale-empty">Caricamento...</div>
@@ -535,6 +617,21 @@ _savePortfolio = savePortfolio;
 
 
     document.getElementById('drawer-fiscale-close')?.addEventListener('click', chiudiFiscale);
+
+    drawer.querySelectorAll('.fiscale-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            fiscaleActiveTab = btn.dataset.tab;
+            renderDrawerFiscale(_portfolio || (_getPortfolio ? _getPortfolio() : null));
+        });
+    });
+}
+
+// Apre il cassetto fiscale direttamente su un tab specifico — usata dalla
+// KPI "Tasse su Plusvalenze" in dashboard.
+export function apriCassettoFiscale(tab = null) {
+    if (tab) fiscaleActiveTab = tab;
+    const pf = typeof _getPortfolio === 'function' ? _getPortfolio() : null;
+    apriFiscale(pf);
 }
 
 
@@ -689,7 +786,25 @@ function attachCompensationOverrideHandlers() {
     });
 }
 
+function updateFiscaleTabButtons() {
+    document.querySelectorAll('.fiscale-tab-btn').forEach(btn => {
+        const isActive = btn.dataset.tab === fiscaleActiveTab;
+        btn.style.color = isActive ? 'var(--text-primary)' : 'var(--text-muted)';
+        btn.style.borderBottomColor = isActive ? 'var(--accent)' : 'transparent';
+        btn.style.fontWeight = isActive ? '600' : '400';
+    });
+}
+
 function renderDrawerFiscale(portfolio) {
+    updateFiscaleTabButtons();
+    if (fiscaleActiveTab === 'tasse') {
+        renderTasseDoveteTab(portfolio);
+        return;
+    }
+    renderMinusvalenzeTab(portfolio);
+}
+
+function renderMinusvalenzeTab(portfolio) {
     const body = document.getElementById('drawer-fiscale-body');
     if (!body) return;
 
@@ -859,6 +974,82 @@ function renderDrawerFiscale(portfolio) {
     }
 }
 
+function renderTasseDoveteTab(portfolio) {
+    const body = document.getElementById('drawer-fiscale-body');
+    if (!body) return;
+
+    const data = portfolio && portfolio.assets ? portfolio : { assets: portfolio || {} };
+    const { taxRegime } = getActivePortfolioData();
+    const riepilogo = calcolaRiepilogoAnnualeTasse(data, taxRegime);
+
+    if (!riepilogo.length) {
+        body.innerHTML = `
+            <div class="fiscale-empty">
+                <div style="font-size:2em;margin-bottom:8px;">🎉</div>
+                Nessuna vendita registrata.
+            </div>`;
+        return;
+    }
+
+    let html = '';
+    for (const anno of riepilogo) {
+        const annoId = `fiscale-tasse-anno-${anno.anno}`;
+        html += `
+        <div class="fiscale-anno" id="${annoId}">
+            <div class="fiscale-anno-header" data-toggle-anno-tasse="${annoId}">
+                <div class="fiscale-anno-label">Anno ${anno.anno}</div>
+                <div class="fiscale-anno-importo text-warning">
+                    ${anno.totaleTassaEur > 0.009 ? `Tassa dovuta: € ${Calc.fmt(anno.totaleTassaEur)}` : '— nessuna tassa dovuta'}
+                </div>
+            </div>
+            <div class="fiscale-detail" id="${annoId}-detail">
+                <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding:10px 14px;background:var(--secondary);font-size:0.8em;border-bottom:1px solid var(--border);">
+                    <div><div style="color:var(--text-muted);font-size:0.7em;margin-bottom:2px;">Plus lorde</div><div class="pos-gain" style="font-weight:700;">€ ${Calc.fmt(anno.totalePlusEur)}</div></div>
+                    <div><div style="color:var(--text-muted);font-size:0.7em;margin-bottom:2px;">Minus generate</div><div class="neg-loss" style="font-weight:700;">− € ${Calc.fmt(anno.totaleMinusEur)}</div></div>
+                    <div><div style="color:var(--text-muted);font-size:0.7em;margin-bottom:2px;">Compensato</div><div style="font-weight:700;">€ ${Calc.fmt(anno.totaleCompensatoEur)}</div></div>
+                    <div><div style="color:var(--text-muted);font-size:0.7em;margin-bottom:2px;">Imponibile netto</div><div style="font-weight:700;">€ ${Calc.fmt(anno.totaleImponibileEur)}</div></div>
+                    <div><div style="color:var(--text-muted);font-size:0.7em;margin-bottom:2px;">Tassa dovuta</div><div class="text-warning" style="font-weight:700;">€ ${Calc.fmt(anno.totaleTassaEur)}</div></div>
+                </div>
+                ${anno.vendite.map(v => venditaTassaRigaHtml(v)).join('')}
+            </div>
+        </div>`;
+    }
+
+    html += `
+        <div class="fiscale-nota">
+            Tassa dovuta = imponibile netto (dopo compensazione con eventuali minus disponibili, FIFO entro 4 anni) × aliquota
+            per tipo asset (26% azioni/ETF, 12,5% bond, 33% crypto). Le plus da fondi/OICR non sono compensabili con minus,
+            ma restano tassate per intero.
+        </div>`;
+
+    body.innerHTML = html;
+    body.querySelectorAll('[data-toggle-anno-tasse]').forEach(el => {
+        el.addEventListener('click', () => toggleAnnoFiscale(el.dataset.toggleAnnoTasse));
+    });
+
+    const primo = riepilogo[0];
+    if (primo) {
+        const el = document.getElementById(`fiscale-tasse-anno-${primo.anno}-detail`);
+        if (el) el.classList.add('open');
+    }
+}
+
+function venditaTassaRigaHtml(v) {
+    const isPlus = v.esito === 'plus';
+    const escluso = v.escluso === 'fondo';
+    return `
+        <div class="fiscale-detail-row">
+            <div class="fiscale-detail-titolo">
+                <span>${v.titolo}</span>
+                <span class="fiscale-detail-cat">${isPlus ? '📈 Plus' : '📉 Minus'}</span>
+            </div>
+            <div class="fiscale-detail-data">${v.data}</div>
+            <div class="fiscale-detail-importo ${isPlus ? 'pos-gain' : 'neg-loss'}">
+                ${isPlus ? '' : '− '}€ ${Calc.fmt(Math.abs(v.importoEur))}
+                ${isPlus ? `<br><span style="font-size:0.75em;color:var(--text-muted);font-weight:400;">${escluso ? 'fondo, non compensabile — ' : (v.compensatoEur > 0.009 ? `− € ${Calc.fmt(v.compensatoEur)} compensate — ` : '')}tassa: € ${Calc.fmt(v.tassaEur)}</span>` : ''}
+            </div>
+        </div>`;
+}
 
 function rigaDettaglio(r) {
     const isManual = r.id === 'manual';

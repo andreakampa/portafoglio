@@ -25,6 +25,13 @@ const RANGES = [
     { label: 'Tutto', days: null }
 ];
 
+// Aliquote per il calcolo della tassa presunta sulla singola vendita.
+// Stessa logica usata altrove nel sito (calc.js taxOnGain, history.js).
+const TAX_RATES_BY_ASSET = { bond: 0.125, crypto: 0.33 };
+function taxRateForAsset(tipoAsset) {
+    return TAX_RATES_BY_ASSET[tipoAsset] ?? 0.26;
+}
+
 function daysAgo(dateStr) {
     const d = new Date(`${dateStr}T12:00:00`);
     return Math.round((new Date() - d) / 86400000);
@@ -45,7 +52,7 @@ function buildCompravenditeRows(portfolio, taxRegime) {
     for (const id in portfolio) {
         const p = portfolio[id];
         for (const r of Calc.transactionRows(p, taxRegime)) {
-            rows.push({ ...r, symbol: p.nome, id });
+            rows.push({ ...r, symbol: p.nome, id, tipoAsset: p.tipoAsset || 'stock' });
         }
     }
     rows.sort((a, b) => b.date.localeCompare(a.date));
@@ -317,30 +324,54 @@ function renderStorico(portfolio, dividendi, taxRegime) {
             renderStorico(portfolio, dividendi, taxRegime);
         };
 
-        let rows = buildCompravenditeRows(portfolio, taxRegime).filter(r => inRange(r.date));
+                let rows = buildCompravenditeRows(portfolio, taxRegime).filter(r => inRange(r.date));
         if (storicoState.ticker) rows = rows.filter(r => r.symbol === storicoState.ticker);
         if (storicoState.txType) rows = rows.filter(r => r.type === storicoState.txType);
 
+        // Tassa presunta e esito (plus/minus): sempre calcolati sul P&L fiscale
+        // (cambio storico), indipendentemente dal toggle broker/fiscale usato
+        // per la colonna "Profitto €" — la tassazione italiana usa sempre il fiscale.
+        const totaleTassaPresunta = rows
+            .filter(r => r.type === 'sell' && r.pnlEurFiscal > 0)
+            .reduce((s, r) => s + r.pnlEurFiscal * taxRateForAsset(r.tipoAsset), 0);
+        const totaleMinusGenerate = rows
+            .filter(r => r.type === 'sell' && r.pnlEurFiscal < 0)
+            .reduce((s, r) => s + Math.abs(r.pnlEurFiscal), 0);
+
         table.innerHTML = `
             <thead><tr>
-                <th>Data</th><th>Tipo</th><th>Simbolo</th><th>Importo Totale</th>
-                <th>Profitto %</th><th>Profitto €</th>
+                <th>Data</th><th>Tipo</th><th>Simbolo</th><th>Quantità</th><th>Importo Totale</th>
+                <th>Profitto %</th><th>Profitto €</th><th>Esito</th><th>Tassa Presunta</th>
             </tr></thead>
             <tbody>
                 ${rows.length ? rows.map(r => {
                     const pnlEur = storicoState.fxMode === 'broker' ? r.pnlEurBroker : r.pnlEurFiscal;
+                    const isSell  = r.type === 'sell' && r.pnlEurFiscal !== null && r.pnlEurFiscal !== undefined;
+                    const isPlus  = isSell && r.pnlEurFiscal > 0;
+                    const isMinus = isSell && r.pnlEurFiscal < 0;
+                    const tassaPresunta = isPlus ? r.pnlEurFiscal * taxRateForAsset(r.tipoAsset) : null;
                     return `<tr>
                         <td>${r.date}</td>
                         <td class="${r.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${r.type === 'buy' ? '🟢 Buy' : '🔴 Sell'}</td>
                         <td>${r.symbol}</td>
+                        <td>${Calc.fmt(r.qty, 4)}</td>
                         <td>${r.currency === 'USD'
                             ? `$ ${Calc.fmt(r.totalNative)} <span style="font-size:10px;color:var(--text-muted)">(€ ${Calc.fmt(r.totalEur)})</span>`
                             : `€ ${Calc.fmt(r.totalEur)}`}</td>
                         <td>${r.pnlPercent !== null ? `<span class="${r.pnlPercent >= 0 ? 'pos-gain' : 'neg-loss'}">${Calc.fmtSign(r.pnlPercent)}%</span>` : '—'}</td>
                         <td>${pnlEur !== null && pnlEur !== undefined ? `<span class="${pnlEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlEur)}</span>` : '—'}</td>
+                        <td>${isPlus ? '<span class="pos-gain">📈 Plus</span>' : isMinus ? '<span class="neg-loss">📉 Minus</span>' : '—'}</td>
+                        <td>${tassaPresunta !== null ? `<span class="text-warning">€ ${Calc.fmt(tassaPresunta)}</span>` : '—'}</td>
                     </tr>`;
-                }).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">Nessuna compravendita nel periodo/filtro selezionato</td></tr>`}
-            </tbody>`;
+                }).join('') : `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted);">Nessuna compravendita nel periodo/filtro selezionato</td></tr>`}
+            </tbody>
+            ${rows.length ? `<tfoot>
+                <tr style="border-top:2px solid var(--border);font-weight:600;">
+                    <td colspan="7" style="text-align:right;">Totale minus generate (periodo) &nbsp;/&nbsp; Totale tassa presunta lorda (senza compensazione)</td>
+                    <td class="neg-loss">− € ${Calc.fmt(totaleMinusGenerate)}</td>
+                    <td class="text-warning">€ ${Calc.fmt(totaleTassaPresunta)}</td>
+                </tr>
+            </tfoot>` : ''}`;
     } else {
         fxWrap.innerHTML = '';
         let rows = buildDividendiRows(portfolio, dividendi).filter(r => inRange(r.date));

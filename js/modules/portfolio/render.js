@@ -1,6 +1,7 @@
 import { Calc } from './calc.js';
 import { Exchange } from '../../api/exchange.js';
 import { Search } from '../../api/search.js';
+import { getTasseDovuteAnnoCorrenteDashboard, apriCassettoFiscale } from '../../api/fiscale.js';
 
 // ── Sort state tabella posizioni ────────────────────────────────────────
 let positionSortState = { col: null, dir: 'asc' };
@@ -1150,9 +1151,14 @@ const totaleDividendi = currency === 'EUR'
     const totaleInteressiEur = (marginInterest || []).reduce(
         (sum, m) => sum + (m.currency === 'USD' ? m.amount / rate : m.amount), 0
     );
-    const totaleInteressi = currency === 'EUR'
+       const totaleInteressi = currency === 'EUR'
         ? totaleInteressiEur
         : Exchange.convert(totaleInteressiEur, 'EUR', currency);
+
+    const totaleTasseDovuteEur = getTasseDovuteAnnoCorrenteDashboard();
+    const totaleTasseDovute = currency === 'EUR'
+        ? totaleTasseDovuteEur
+        : Exchange.convert(totaleTasseDovuteEur, 'EUR', currency);
 
     const dash = document.getElementById('dashboard');
 if (!dash) return;
@@ -1182,11 +1188,17 @@ dash.innerHTML = `
                 <div class="kpi-value text-warning">${s} ${Calc.fmt(totaleInteressi)}</div>
                 <div class="kpi-sub">totale addebitato</div>
             </div>` : ''}
-            <div class="kpi-sep"></div>
+                        <div class="kpi-sep"></div>
             <div class="kpi-item" data-action="dividendi-dashboard" style="cursor:pointer;">
                 <div class="kpi-title">Dividendi</div>
                 <div class="kpi-value pos-gain">${s} ${Calc.fmt(totaleDividendi)}</div>
                 <div class="kpi-sub">totale ricevuto finora</div>
+            </div>
+            <div class="kpi-sep"></div>
+            <div class="kpi-item" data-action="tasse-dovute-dashboard" style="cursor:pointer;">
+                <div class="kpi-title">Tasse su Plusvalenze</div>
+                <div class="kpi-value text-warning">${s} ${Calc.fmt(totaleTasseDovute)}</div>
+                <div class="kpi-sub">stimate, anno corrente</div>
             </div>
         </div>
     </div>
@@ -1238,6 +1250,10 @@ dash.onclick = e => {
     const { action } = btn.dataset;
     if (action === 'dividendi-dashboard') {
         handlers.onDividendiDashboard?.();
+    }
+    if (action === 'tasse-dovute-dashboard') {
+        if (handlers.onTasseDovute) handlers.onTasseDovute();
+        else apriCassettoFiscale('tasse');
     }
 };
 }
