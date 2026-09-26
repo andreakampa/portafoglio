@@ -2,6 +2,7 @@ import { Calc } from '../calc.js';
 import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 import { lockScroll, unlockScroll } from './helpers.js';
+import { ExportUtil, renderExportDropdown } from '../export.js';
 
 let storicoState = {
     tab: 'compravendite', // 'compravendite' | 'dividendi' | 'interessi'
@@ -134,7 +135,10 @@ export function openStoricoModal(portfolio, dividendi, taxRegime = 'amministrato
                     <button id="storico-apply-range" class="btn btn-dark btn-sm">Applica</button>
                 </div>
                 <div id="storico-extra-filters" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px;"></div>
-                <div id="storico-fx-toggle-wrap" style="display:flex; justify-content:flex-end; margin-bottom:8px;"></div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div id="storico-fx-toggle-wrap" style="display:flex;"></div>
+                    <div id="storico-export-wrap"></div>
+                </div>
                 <div class="table-wrapper">
                     <table class="tx-table tx-table-compact" id="storico-table"></table>
                 </div>
@@ -293,6 +297,88 @@ function renderInterestTab(table) {
     });
 }
 
+function exportCompravenditeRows(rows, totaleTassaPresunta, totaleMinusGenerate, format) {
+    const columns = [
+        { key: 'date', label: 'Data' },
+        { key: 'type', label: 'Tipo' },
+        { key: 'symbol', label: 'Simbolo' },
+        { key: 'qty', label: 'Quantità', align: 'right' },
+        { key: 'importo', label: 'Importo Totale', align: 'right' },
+        { key: 'pnlPercent', label: 'Profitto %', align: 'right' },
+        { key: 'pnlEur', label: 'Profitto €', align: 'right' },
+        { key: 'esito', label: 'Esito' },
+        { key: 'tassaPresunta', label: 'Tassa Presunta', align: 'right' }
+    ];
+
+    const exportRows = rows.map(r => {
+        const pnlEur = storicoState.fxMode === 'broker' ? r.pnlEurBroker : r.pnlEurFiscal;
+        const isPlus  = r.type === 'sell' && r.pnlEurFiscal > 0;
+        const isMinus = r.type === 'sell' && r.pnlEurFiscal < 0;
+        const tassaPresunta = isPlus ? r.pnlEurFiscal * taxRateForAsset(r.tipoAsset) : null;
+        return {
+            date: r.date,
+            type: r.type === 'buy' ? 'Buy' : 'Sell',
+            symbol: r.symbol,
+            qty: Calc.fmt(r.qty, 4),
+            importo: r.currency === 'USD' ? `$ ${Calc.fmt(r.totalNative)}` : `€ ${Calc.fmt(r.totalEur)}`,
+            pnlPercent: r.pnlPercent !== null ? `${Calc.fmtSign(r.pnlPercent)}%` : '—',
+            pnlEur: pnlEur !== null && pnlEur !== undefined ? `€ ${Calc.fmt(pnlEur)}` : '—',
+            esito: isPlus ? 'Plus' : isMinus ? 'Minus' : '—',
+            tassaPresunta: tassaPresunta !== null ? `€ ${Calc.fmt(tassaPresunta)}` : '—'
+        };
+    });
+
+    const filename = `movimenti_compravendite_${ExportUtil.todayStr()}`;
+
+    if (format === 'pdf') {
+        ExportUtil.toPDF({
+            title: '📊 Movimenti — Compravendite',
+            subtitle: `Cambio: ${storicoState.fxMode === 'broker' ? 'al momento della transazione' : 'fiscale (storico per lotto)'}`,
+            columns,
+            rows: exportRows,
+            summary: [
+                { label: 'Totale minus generate', value: `− € ${Calc.fmt(totaleMinusGenerate)}` },
+                { label: 'Totale tassa presunta', value: `€ ${Calc.fmt(totaleTassaPresunta)}` }
+            ],
+            filename: `${filename}.pdf`
+        });
+    } else {
+        ExportUtil.toXLSX({ sheetName: 'Compravendite', columns, rows: exportRows, filename: `${filename}.xlsx` });
+    }
+}
+
+function exportDividendiRows(rows, totale, format) {
+    const columns = [
+        { key: 'date', label: 'Data' },
+        { key: 'symbol', label: 'Simbolo' },
+        { key: 'perShare', label: 'Dividendo €', align: 'right' },
+        { key: 'qty', label: 'Quantità', align: 'right' },
+        { key: 'importo', label: 'Importo Totale €', align: 'right' }
+    ];
+
+    const exportRows = rows.map(r => ({
+        date: r.date,
+        symbol: r.symbol,
+        perShare: `€ ${Calc.fmt(r.perShare, 4)}`,
+        qty: Calc.fmt(r.qty, 4),
+        importo: `€ ${Calc.fmt(r.totalEur)}`
+    }));
+
+    const filename = `movimenti_dividendi_${ExportUtil.todayStr()}`;
+
+    if (format === 'pdf') {
+        ExportUtil.toPDF({
+            title: '📊 Movimenti — Dividendi',
+            columns,
+            rows: exportRows,
+            summary: [{ label: 'Totale dividendi (periodo)', value: `€ ${Calc.fmt(totale)}` }],
+            filename: `${filename}.pdf`
+        });
+    } else {
+        ExportUtil.toXLSX({ sheetName: 'Dividendi', columns, rows: exportRows, filename: `${filename}.xlsx` });
+    }
+}
+
 function renderStorico(portfolio, dividendi, taxRegime) {
     document.getElementById('storico-tab-cv').classList.toggle('active', storicoState.tab === 'compravendite');
     document.getElementById('storico-tab-div').classList.toggle('active', storicoState.tab === 'dividendi');
@@ -304,10 +390,11 @@ function renderStorico(portfolio, dividendi, taxRegime) {
     const fxWrap = document.getElementById('storico-fx-toggle-wrap');
     const table  = document.getElementById('storico-table');
 
-    if (storicoState.tab === 'interessi') {
+        if (storicoState.tab === 'interessi') {
         document.getElementById('storico-filters').innerHTML = '';
         document.getElementById('storico-extra-filters').innerHTML = '';
         fxWrap.innerHTML = '';
+        document.getElementById('storico-export-wrap').innerHTML = '';
         renderInterestTab(table);
         return;
     }
@@ -334,9 +421,14 @@ function renderStorico(portfolio, dividendi, taxRegime) {
         const totaleTassaPresunta = rows
             .filter(r => r.type === 'sell' && r.pnlEurFiscal > 0)
             .reduce((s, r) => s + r.pnlEurFiscal * taxRateForAsset(r.tipoAsset), 0);
-        const totaleMinusGenerate = rows
+                const totaleMinusGenerate = rows
             .filter(r => r.type === 'sell' && r.pnlEurFiscal < 0)
             .reduce((s, r) => s + Math.abs(r.pnlEurFiscal), 0);
+
+        renderExportDropdown(document.getElementById('storico-export-wrap'), {
+            onPDF: () => exportCompravenditeRows(rows, totaleTassaPresunta, totaleMinusGenerate, 'pdf'),
+            onXLS: () => exportCompravenditeRows(rows, totaleTassaPresunta, totaleMinusGenerate, 'xlsx')
+        });
 
         table.innerHTML = `
             <thead><tr>
@@ -374,8 +466,14 @@ function renderStorico(portfolio, dividendi, taxRegime) {
             </tfoot>` : ''}`;
     } else {
         fxWrap.innerHTML = '';
-        let rows = buildDividendiRows(portfolio, dividendi).filter(r => inRange(r.date));
+                let rows = buildDividendiRows(portfolio, dividendi).filter(r => inRange(r.date));
         if (storicoState.ticker) rows = rows.filter(r => r.symbol === storicoState.ticker);
+
+        const totaleDividendiPeriodo = rows.reduce((s, r) => s + (r.totalEur || 0), 0);
+        renderExportDropdown(document.getElementById('storico-export-wrap'), {
+            onPDF: () => exportDividendiRows(rows, totaleDividendiPeriodo, 'pdf'),
+            onXLS: () => exportDividendiRows(rows, totaleDividendiPeriodo, 'xlsx')
+        });
 
         table.innerHTML = `
             <thead><tr>
