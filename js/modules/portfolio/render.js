@@ -24,7 +24,7 @@ function getSortValue(id, col, portfolio, positionMap, prevClose, currency, weig
         case 'dailyPnl': {
             const prPrev = prevClose[id] ?? null;
             const qta = pos.qta || 0;
-            if (prPrev === null || qta <= 0) return -Infinity;
+            if (prPrev === null || qta === 0) return -Infinity;
             return cv((pos.prLive - prPrev) * qta);
         }
         case 'cost':
@@ -104,10 +104,14 @@ function logoImg(nome, cssClass) {
 }
 
 // ── HELPER: ordina e raggruppa gli id del portfolio ────────────────────────
+// Nota: 'short' è un gruppo a sé — una qta negativa (posizione short aperta)
+// non deve mai finire in 'closed' (che assume qta ≈ 0), altrimenti il filtro
+// qta < 0.00001 la catturerebbe per sbaglio essendo vero anche per i negativi.
 function groupedSortedIds(portfolio, positionMap) {
     const ids = Object.keys(portfolio);
 
     const active      = [];
+    const short        = [];
     const closed      = [];
     const empty       = [];
     const transferred = [];
@@ -124,13 +128,15 @@ function groupedSortedIds(portfolio, positionMap) {
 
         if (txs.length === 0) {
             empty.push(id);
-        } else if (qtaTrasferita > 0 && qta < 0.00001) {
+        } else if (qtaTrasferita > 0 && Math.abs(qta) < 0.00001) {
             // Interamente trasferito
             transferred.push(id);
         } else if (qtaTrasferita > 0 && qta >= 0.00001) {
             // Parzialmente trasferito: appare in entrambe
             active.push(id);
             transferred.push(id);
+        } else if (qta < -0.00001) {
+            short.push(id);
         } else if (qta < 0.00001) {
             closed.push(id);
         } else {
@@ -142,11 +148,12 @@ function groupedSortedIds(portfolio, positionMap) {
         (portfolio[a].nome || '').localeCompare(portfolio[b].nome || '', 'it', { sensitivity: 'base' });
 
     active.sort(byName);
+    short.sort(byName);
     closed.sort(byName);
     empty.sort(byName);
     transferred.sort(byName);
 
-    return { active, closed, empty, transferred };
+    return { active, short, closed, empty, transferred };
 }
 
 function getExtendedMarketInfo(id, valuta, preMarkets, postMarkets, prLive, marketStates = {}) {
@@ -262,7 +269,7 @@ export const COLUMN_DEFS = [
         }
     },
     { id: 'shares', label: 'Shares', sortCol: 'shares',
-        cell(ctx) { return ctx.qta > 0 ? Calc.fmt(ctx.qta, 4) : '—'; }
+        cell(ctx) { return Math.abs(ctx.qta) > 0.00001 ? Calc.fmt(Math.abs(ctx.qta), 4) : '—'; }
     },
     { id: 'pmc', label: 'AC/Share', sortCol: 'pmc',
         cell(ctx) { return ctx.pmc > 0 ? Calc.fmt(ctx.pmc) : '—'; }
@@ -282,7 +289,7 @@ export const COLUMN_DEFS = [
     { id: 'dailyPnl', label: 'Daily P&L', sortCol: 'dailyPnl',
         cell(ctx) {
             const { id, qta, prPrev, prLive, cv, s, extMarket, varDay } = ctx;
-            const hasPosition = qta > 0 && prPrev !== null;
+            const hasPosition = Math.abs(qta) > 0.00001 && prPrev !== null;
             const dailyPnL = hasPosition ? cv((prLive - prPrev) * qta) : null;
 
             const priceRow = prPrev !== null
@@ -307,10 +314,10 @@ export const COLUMN_DEFS = [
         }
     },
     { id: 'cost', label: 'Total Cost', sortCol: 'cost',
-        cell(ctx) { return ctx.invEur > 0 ? ctx.costoDisplay : '—'; }
+        cell(ctx) { return Math.abs(ctx.invEur) > 0.00001 ? ctx.costoDisplay : '—'; }
     },
     { id: 'value', label: 'Market Value', sortCol: 'value',
-        cell(ctx) { return ctx.att > 0 ? `<b>${ctx.s} ${Calc.fmt(ctx.cv(ctx.att))}</b>` : '—'; }
+        cell(ctx) { return Math.abs(ctx.att) > 0.00001 ? `<b>${ctx.s} ${Calc.fmt(ctx.cv(ctx.att))}</b>` : '—'; }
     },
     { id: 'pesoCosto', label: '% Costo', sortCol: 'pesoCosto',
         cell(ctx) { return ctx.invEur > 0 && ctx.totCostoEur > 0 ? Calc.fmt((ctx.invEur / ctx.totCostoEur) * 100, 1) + '%' : '—'; }
@@ -322,14 +329,14 @@ export const COLUMN_DEFS = [
         tdClass(ctx) { return ctx.pnl >= 0 ? 'text-cyan fw-bold' : 'neg-loss'; },
         cell(ctx) {
             const { att, currency, pnlEur, cv, pnl, s, pnlP, rowId, pos } = ctx;
-            if (!(att > 0)) return '—';
+            if (Math.abs(att) < 0.00001) return '—';
             return `${currency === 'EUR' ? (pnlEur < 0 ? '-' : '') : (cv(pnl) < 0 ? '-' : '')}${s} ${Calc.fmt(Math.abs(currency === 'EUR' ? pnlEur : cv(pnl)))}<br><span id="${rowId}" class="fs-xs">(${Calc.fmtSign(pnlP)}%)</span>${pos?.fxEffect != null ? `<br><span style="font-size:9px;color:var(--text-muted);font-weight:400;">di cui cambio: ${pos.fxEffect >= 0 ? '+' : ''}€ ${Calc.fmt(pos.fxEffect)}</span>` : ''}`;
         }
     },
     { id: 'pnlNetU', label: 'P&L Net UNRL', sortCol: 'pnlNetU',
         cell(ctx) {
             const { att, currency, pnlAfterTaxEur, cv, pnlAfterTax, taxEur, tax, s } = ctx;
-            if (!(att > 0)) return '—';
+            if (Math.abs(att) < 0.00001) return '—';
             const netShown = currency === 'EUR' ? pnlAfterTaxEur : cv(pnlAfterTax);
             const taxShown = currency === 'EUR' ? taxEur : cv(tax);
             return `<span class="${netShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${s} ${Calc.fmt(netShown)}</span>
@@ -379,16 +386,32 @@ export const COLUMN_DEFS = [
     },
     { id: 'actions', label: 'Trading Tools', sortCol: null, locked: true,
         cell(ctx) {
-            const { id, groupClass } = ctx;
+            const { id, groupClass, qta = 0 } = ctx;
+            if (groupClass === 'row-transferred') {
+                return `<div class="action-btns">
+                    <button class="btn-action btn-action-history" data-action="history" data-id="${id}" title="Storico">📜</button>
+                </div>`;
+            }
+
+            const isShort     = qta < -0.00001;
+            const isLongOpen  = qta > 0.00001;
+
+            const tradeButtons = isShort
+                ? `<button class="btn-action btn-action-buy" data-action="cover" data-id="${id}" title="Copri Short">🔺</button>`
+                : isLongOpen
+                    ? `<button class="btn-action btn-action-buy"  data-action="buy"  data-id="${id}" title="Acquisto">＋</button>
+                       <button class="btn-action btn-action-sell" data-action="sell" data-id="${id}" title="Vendita">－</button>`
+                    : `<button class="btn-action btn-action-buy" data-action="buy" data-id="${id}" title="Acquisto">＋</button>
+                       <button class="btn-action btn-action-short" data-action="short" data-id="${id}" title="Vendita allo scoperto">🔻</button>`;
+
             return `<div class="action-btns">
                 <button class="btn-action btn-action-history" data-action="history" data-id="${id}" title="Storico">📜</button>
-                ${groupClass !== 'row-transferred' ? `
-                <button class="btn-action btn-action-buy"  data-action="buy"      data-id="${id}" title="Acquisto">＋</button>
-                <button class="btn-action btn-action-sell" data-action="sell"     data-id="${id}" title="Vendita">－</button>
+                ${tradeButtons}
+                ${!isShort ? `
                 <button class="btn-action btn-action-sim"  data-action="sim"      data-id="${id}" title="Simulazione">◎</button>
                 <button class="btn-action"                 data-action="transfer" data-id="${id}" title="Trasferisci">🔀</button>
-                <button class="btn-action btn-action-delete" data-action="delete" data-id="${id}" title="Elimina">✕</button>
                 ` : ''}
+                <button class="btn-action btn-action-delete" data-action="delete" data-id="${id}" title="Elimina">✕</button>
             </div>`;
         }
     },
@@ -406,10 +429,6 @@ export function reconcileColumnConfig(columnConfig) {
     for (const id of MIDDLE_COLUMN_IDS) {
         if (!order.includes(id)) {
             order.push(id);
-            // Una colonna assente dall'ordine salvato è "nuova" (non ancora vista
-            // dall'utente in questo config) — va nascosta SOLO se è definita come
-            // defaultHidden nel registro, indipendentemente dal fatto che esista
-            // già un config salvato o meno.
             const def = COLUMN_DEFS.find(c => c.id === id);
             if (def?.defaultHidden) hidden.add(id);
         }
@@ -693,7 +712,19 @@ export function renderPage(container) {
         }
         .row-transferred {
             opacity: 0.6;
-        }  
+        }
+        /* ── Short selling ── */
+        .badge-short {
+            background: rgba(224, 122, 46, 0.15);
+            color: #e07a2e;
+            border: 0.5px solid rgba(224, 122, 46, 0.4);
+        }
+        .row-short {
+            box-shadow: inset 3px 0 0 #e07a2e;
+        }
+        .btn-action-short {
+            color: #e07a2e;
+        }
     </style>
     `;
 
@@ -878,10 +909,11 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
 
     const { totMercatoEur = 0, totCostoEur = 0 } = weightTotals;
 
-    let { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
+    let { active, short, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
 
     if (positionSortState.col) {
         active      = applySort(active,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
+        short       = applySort(short,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
         closed      = applySort(closed,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
         empty       = applySort(empty,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
         transferred = applySort(transferred, positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
@@ -890,6 +922,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     // Stato visibilità gruppi collassabili
     if (typeof renderTable._showClosed === 'undefined') renderTable._showClosed = true;
     if (typeof renderTable._showEmpty  === 'undefined') renderTable._showEmpty  = true;
+    if (typeof renderTable._showShort  === 'undefined') renderTable._showShort  = true;
     // Nota: lo stato viene resettato ad ogni mount tramite resetRenderState()
 
     const renderGroup = (ids, groupClass, groupLabel, collapsible, showKey) => {
@@ -983,6 +1016,8 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
                 ? '<span class="badge-stato badge-empty">Vuoto</span>'
                 : groupClass === 'row-transferred'
                 ? '<span class="badge-stato badge-transferred">Trasferito</span>'
+                : groupClass === 'row-short'
+                ? '<span class="badge-stato badge-short">🔻 Short</span>'
                 : qtaTrasferita > 0
                 ? `<span class="badge-stato badge-partial-transfer" title="Parzialmente trasferito: ${Calc.fmt(qtaTrasferita, 4)} unità">🔀 Parz.</span>`
                 : '';
@@ -1012,6 +1047,7 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
     };
 
     renderGroup(active, '', '📈 Titoli attivi', false, null);
+    renderGroup(short, 'row-short', '🔻 Posizioni Short', true, '_showShort');
     renderGroup(closed, 'row-closed', '🔒 Posizioni chiuse', true, '_showClosed');
     renderGroup(empty, 'row-empty', '👁 Watchlist', true, '_showEmpty');
     renderGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti', true, '_showTransferred');
@@ -1022,6 +1058,8 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
   if (action === 'history') handlers.onHistory(id);
   if (action === 'buy') handlers.onTransaction(id, 'buy');
   if (action === 'sell') handlers.onTransaction(id, 'sell');
+  if (action === 'short') handlers.onTransaction(id, 'short_sell');
+  if (action === 'cover') handlers.onTransaction(id, 'buy_to_cover');
   if (action === 'sim') handlers.onSimulation(id);
   if (action === 'delete') handlers.onDelete(id);
   if (action === 'dividendi') handlers.onDividendi(id);
@@ -1035,6 +1073,7 @@ export function resetRenderState() {
     renderTable._showClosed      = true;
     renderTable._showEmpty       = true;
     renderTable._showTransferred = true;
+    renderTable._showShort       = true;
 }
 export function renderKPI({ portfolio, positionMap, currency, fiscalState, dividendi = {}, marginInterest = [], handlers = {} }) {
     const s = currency === 'EUR' ? '€' : '$';
@@ -1131,7 +1170,7 @@ dash.innerHTML = `
                 <div class="kpi-title">Controvalore</div>
                 <div class="kpi-value">${s} ${Calc.fmt(totAtt)}</div>
             </div>
-                        <div class="kpi-sep"></div>
+            <div class="kpi-sep"></div>
             <div class="kpi-item">
                 <div class="kpi-title">Commissioni Pagate</div>
                 <div class="kpi-value text-warning">${s} ${Calc.fmt(totComm)}</div>
@@ -1217,10 +1256,11 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
 
     const { totMercatoEur = 0, totCostoEur = 0 } = weightTotals;
 
-    let { active, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
+    let { active, short, closed, empty, transferred } = groupedSortedIds(portfolio, positionMap);
 
     if (positionSortState.col) {
         active      = applySort(active,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
+        short       = applySort(short,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
         closed      = applySort(closed,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
         empty       = applySort(empty,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
         transferred = applySort(transferred, positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency);
@@ -1318,6 +1358,15 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
             const priceColorClass = varDay === null ? '' : (varDay >= 0 ? 'pos-gain' : 'neg-loss');
             const extForHeader = getExtendedMarketInfo(id, v, preMarkets, postMarkets, prLive, marketStates);
 
+            const isShortM    = qta < -0.00001;
+            const isLongOpenM = qta > 0.00001;
+
+            const headerStatoBadge = groupClass === 'row-transferred'
+                ? '<span class="badge-stato badge-transferred">Trasferito</span>'
+                : groupClass === 'row-short'
+                ? '<span class="badge-stato badge-short">🔻 Short</span>'
+                : '';
+
             card.innerHTML = `
                 <div class="mobile-card-header" data-id="${id}">
                     <div class="mobile-card-left">
@@ -1327,7 +1376,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                                 <span class="ticker-name">${p.nome}</span>
                                ${dividendoDot(id, dividendi)}
                             </div>
-                            <span><span class="badge">${v}</span>${assetBadge}${groupClass === 'row-transferred' ? '<span class="badge-stato badge-transferred">Trasferito</span>' : ''}</span>
+                            <span><span class="badge">${v}</span>${assetBadge}${headerStatoBadge}</span>
                         </div>
                     </div>
                     ${sparklineHtml}
@@ -1345,7 +1394,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                     <div class="mobile-card-summary">
                         <div class="mobile-card-row">
                             <span class="text-muted">P&L Non Realizzato</span>
-                            <span class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${att > 0 ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))} (${Calc.fmtSign(pnlP)}%)` : '—'}</span>
+                            <span class="${pnl >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">${Math.abs(att) > 0.00001 ? `${s} ${Calc.fmt(currency === 'EUR' ? pnlEur : cv(pnl))} (${Calc.fmtSign(pnlP)}%)` : '—'}</span>
                         </div>
                         <div class="mobile-card-row">
                             <span class="text-muted">Prezzo</span>
@@ -1361,15 +1410,15 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                         })()}
                         <div class="mobile-card-row">
                             <span class="text-muted">Q.tà / PMC</span>
-                            <span>${qta > 0 ? `${Calc.fmt(qta, 4)} / ${Calc.fmt(pmc)}` : '—'}</span>
+                            <span>${Math.abs(qta) > 0.00001 ? `${Calc.fmt(Math.abs(qta), 4)} / ${Calc.fmt(pmc)}` : '—'}</span>
                         </div>
                         <div class="mobile-card-row">
                             <span class="text-muted">Costo Totale</span>
-                            <span>${invEur > 0 ? costoDisplay : '—'}</span>
+                            <span>${Math.abs(invEur) > 0.00001 ? costoDisplay : '—'}</span>
                         </div>
                         <div class="mobile-card-row">
                             <span class="text-muted">Controvalore</span>
-                            <span>${att > 0 ? `${s} ${Calc.fmt(cv(att))}` : '—'}</span>
+                            <span>${Math.abs(att) > 0.00001 ? `${s} ${Calc.fmt(cv(att))}` : '—'}</span>
                         </div>
                         <div class="mobile-card-row">
                             <span class="text-muted">% Costo / % Mercato</span>
@@ -1384,13 +1433,13 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                         <div class="mobile-card-row">
                             <span class="text-muted">P&L After Tax</span>
                             <span class="${unrealizedNetShown >= 0 ? 'pos-gain' : 'neg-loss'} fw-bold">
-                                ${att > 0 ? `${s} ${Calc.fmt(unrealizedNetShown)}` : '—'}
+                                ${Math.abs(att) > 0.00001 ? `${s} ${Calc.fmt(unrealizedNetShown)}` : '—'}
                             </span>
                         </div>
                         <div class="mobile-card-row">
                             <span class="text-muted">Tasse stimate</span>
                             <span class="text-warning">
-                                ${att > 0 ? `${s} ${Calc.fmt(unrealizedTaxShown)}` : '—'}
+                                ${Math.abs(att) > 0.00001 ? `${s} ${Calc.fmt(unrealizedTaxShown)}` : '—'}
                             </span>
                         </div>
                         <div class="mobile-card-row">
@@ -1407,12 +1456,19 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
                         </div>
                         <div class="mobile-card-actions">
                             <button class="btn btn-dark btn-sm" data-action="history" data-id="${id}">📜 Storico</button>
-                            ${groupClass !== 'row-transferred' ? `
-                            <button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
-                            <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
-                            <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
-                            <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>
-                            ` : ''}
+                            ${groupClass !== 'row-transferred' ? (
+                                isShortM
+                                    ? `<button class="btn btn-success btn-sm" data-action="cover" data-id="${id}">🔺 Copri</button>
+                                       <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>`
+                                    : isLongOpenM
+                                        ? `<button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
+                                           <button class="btn btn-purple btn-sm" data-action="sell" data-id="${id}">－ Vendi</button>
+                                           <button class="btn btn-sm" data-action="sim" data-id="${id}" style="background:#2a7f5e;">◎ Sim</button>
+                                           <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>`
+                                        : `<button class="btn btn-success btn-sm" data-action="buy" data-id="${id}">＋ Compra</button>
+                                           <button class="btn btn-sm" data-action="short" data-id="${id}" style="background:#e07a2e;">🔻 Short</button>
+                                           <button class="btn btn-danger btn-sm" data-action="delete" data-id="${id}">🗑 Elimina</button>`
+                            ) : ''}
                         </div>
                     </div>
                 </div>
@@ -1433,6 +1489,8 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
     if (action === 'history') handlers.onHistory(id);
     if (action === 'buy') handlers.onTransaction(id, 'buy');
     if (action === 'sell') handlers.onTransaction(id, 'sell');
+    if (action === 'short') handlers.onTransaction(id, 'short_sell');
+    if (action === 'cover') handlers.onTransaction(id, 'buy_to_cover');
     if (action === 'sim') handlers.onSimulation(id);
     if (action === 'delete') handlers.onDelete(id);
     if (action === 'dividendi') handlers.onDividendi(id);
@@ -1444,6 +1502,7 @@ export function renderMobileCards({ portfolio, positionMap, prevClose, currency,
     };
 
     renderMobileGroup(active, '', '📈 Titoli attivi', false, null);
+    renderMobileGroup(short, 'row-short', '🔻 Posizioni Short', true, '_showShort');
     renderMobileGroup(closed, 'row-closed', '🔒 Posizioni chiuse', true, '_showClosed');
     renderMobileGroup(empty, 'row-empty', '👁 Watchlist', true, '_showEmpty');
     renderMobileGroup(transferred, 'row-transferred', '🔀 Titoli trasferiti', true, '_showTransferred');

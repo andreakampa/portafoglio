@@ -4,6 +4,13 @@ import { Toast } from '../../../core/toast.js';
 import { todayISO, lockScroll, unlockScroll } from './helpers.js';
 import { calcolaCompensazione } from '../../../api/fiscale.js';
 
+const HEADER_CONFIG = {
+    buy:          { icon: '🟢', label: 'Acquisto',             color: 'var(--success)', btnClass: 'btn-success' },
+    sell:         { icon: '🔴', label: 'Vendita',               color: 'var(--purple)',  btnClass: 'btn-purple'  },
+    short_sell:   { icon: '🔻', label: 'Vendita allo scoperto', color: 'var(--warning)', btnClass: 'btn-warning' },
+    buy_to_cover: { icon: '🔺', label: 'Copertura Short',       color: 'var(--success)', btnClass: 'btn-success' }
+};
+
 export function openTransactionModal(id, type, portfolio, prices, onSave, activePortfolio = null) {
     const p = portfolio[id];
     const taxRegimeAttivo = activePortfolio?.taxRegime || 'amministrato';
@@ -11,11 +18,16 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-transazione');
     const isBuy = type === 'buy';
+    const hc = HEADER_CONFIG[type] || HEADER_CONFIG.buy;
+
+    // Per 'sell' il massimo è la quantità long aperta; per 'buy_to_cover' è il
+    // valore assoluto dello short aperto (qta è negativa quando c'è uno short).
+    const maxQty = type === 'sell' ? qta : type === 'buy_to_cover' ? Math.abs(qta) : null;
 
     overlay.innerHTML = `
-        <div class="modal" style="border-top: 3px solid ${isBuy ? 'var(--success)' : 'var(--purple)'}">
+        <div class="modal" style="border-top: 3px solid ${hc.color}">
             <div class="modal-header">
-                <h3>${isBuy ? '🟢 Acquisto' : '🔴 Vendita'} — ${p.nome}</h3>
+                <h3>${hc.icon} ${hc.label} — ${p.nome}</h3>
                 <button class="btn-x" id="tx-close">✕</button>
             </div>
             <div class="modal-body">
@@ -27,15 +39,15 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                     <div>
                         <span class="modal-label">
                             Quantità
-                            ${!isBuy ? `<span class="text-muted fs-xs">(max: ${Calc.fmt(qta, 4)})</span> <button id="tx-qta-max" style="margin-left:6px;padding:1px 7px;font-size:10px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;vertical-align:middle;">MAX</button>` : ''}
+                            ${(type === 'sell' || type === 'buy_to_cover') ? `<span class="text-muted fs-xs">(max: ${Calc.fmt(maxQty, 4)})</span> <button id="tx-qta-max" style="margin-left:6px;padding:1px 7px;font-size:10px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;vertical-align:middle;">MAX</button>` : ''}
                         </span>
-                        <input type="number" id="tx-qta" step="any" placeholder="0" ${!isBuy ? `max="${qta}"` : ''}>
+                        <input type="number" id="tx-qta" step="any" placeholder="0" ${(type === 'sell' || type === 'buy_to_cover') ? `max="${maxQty}"` : ''}>
                     </div>
                     <div>
                         <span class="modal-label">Prezzo Eseguito</span>
                         <input type="number" id="tx-prezzo" step="any" value="${prLive}">
                     </div>
-                                        <div>
+                    <div>
                         <span class="modal-label">Commissione</span>
                         <div style="display:flex; gap:6px;">
                             <input type="number" id="tx-comm" step="any" placeholder="0.00" style="flex:1;">
@@ -56,16 +68,20 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                         <input type="number" id="tx-fx" step="any" placeholder="caricamento...">
                     </div>` : ''}
                 </div>
-                ${!isBuy ? `
+                ${type === 'sell' ? `
                 <div style="display:flex; gap:8px; margin-top:14px;">
                     <button type="button" id="tx-mode-normale" class="btn btn-ghost" style="flex:1; font-weight:700;">Vendita normale</button>
                     <button type="button" id="tx-mode-lotti" class="btn btn-ghost" style="flex:1; font-weight:700;">📦 Vendita a lotti</button>
                 </div>
                 <div id="tx-lotti-panel" style="display:none; margin-top:10px;"></div>
                 ` : ''}
+                ${type === 'buy_to_cover' ? `
+                <div style="padding:8px 10px;background:var(--bg2);border-radius:6px;font-size:12px;color:var(--text-muted);border:1px solid var(--border);margin-top:14px;">
+                    ℹ️ La copertura consuma i lotti short in ordine LIFO (dal più recente al più vecchio).
+                </div>` : ''}
                 <div id="tx-preview" class="preview-box" style="display:none; margin-top:14px;"></div>
-                <button id="tx-confirm" class="btn ${isBuy ? 'btn-success' : 'btn-purple'} btn-full" style="margin-top:16px;">
-                    Conferma ${isBuy ? 'Acquisto' : 'Vendita'}
+                <button id="tx-confirm" class="btn ${hc.btnClass} btn-full" style="margin-top:16px;">
+                    Conferma ${hc.label}
                 </button>
                 <button id="tx-cancel" class="btn btn-ghost btn-full" style="margin-top:8px;">Annulla</button>
             </div>
@@ -95,12 +111,16 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
 
     let saleMode = 'normale';
 
-    if (!isBuy) {
+    // Bottone MAX: vale sia per la vendita normale che per la copertura short
+    if (type === 'sell' || type === 'buy_to_cover') {
         document.getElementById('tx-qta-max').onclick = () => {
-            document.getElementById('tx-qta').value = qta;
+            document.getElementById('tx-qta').value = maxQty;
             preview();
         };
+    }
 
+    // Selezione a lotti: solo per la vendita long normale
+    if (type === 'sell') {
         const btnNormale = document.getElementById('tx-mode-normale');
         const btnLotti   = document.getElementById('tx-mode-lotti');
         const lottiPanel = document.getElementById('tx-lotti-panel');
@@ -242,11 +262,11 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
     }
 
     const preview = () => txPreview(id, type, portfolio, prices, activePortfolio);
-        document.getElementById('tx-qta').oninput    = preview;
-        document.getElementById('tx-prezzo').oninput = preview;
-        document.getElementById('tx-comm').oninput   = preview;
-        document.getElementById('tx-comm-currency')?.addEventListener('change', preview);
-        document.getElementById('tx-margin')?.addEventListener('input', preview);
+    document.getElementById('tx-qta').oninput    = preview;
+    document.getElementById('tx-prezzo').oninput = preview;
+    document.getElementById('tx-comm').oninput   = preview;
+    document.getElementById('tx-comm-currency')?.addEventListener('change', preview);
+    document.getElementById('tx-margin')?.addEventListener('input', preview);
 
     document.getElementById('tx-confirm').onclick = async () => {
         const q  = parseFloat(document.getElementById('tx-qta').value);
@@ -264,6 +284,13 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                 return;
             }
         }
+        if (type === 'buy_to_cover') {
+            const { qta } = Calc.positionSync(portfolio[id], taxRegimeAttivo);
+            if (q > Math.abs(qta) + 0.0001) {
+                Toast.show('Quantità superiore allo short aperto', 'err');
+                return;
+            }
+        }
         let lotAllocation = null;
         if (type === 'sell' && saleMode === 'lotti') {
             lotAllocation = [];
@@ -277,12 +304,12 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
             }
         }
 
-                if (!portfolio[id].transactions) portfolio[id].transactions = [];
+        if (!portfolio[id].transactions) portfolio[id].transactions = [];
         const fxInp = document.getElementById('tx-fx');
         const fxSave = fxInp ? parseFloat(fxInp.value) : NaN;
         const commCurrency = document.getElementById('tx-comm-currency')?.value || 'EUR';
         const marginInp = document.getElementById('tx-margin');
-        const marginAmount = Math.min(parseFloat(marginInp?.value) || 0, q * pr + c);
+        const marginAmount = type === 'buy' ? Math.min(parseFloat(marginInp?.value) || 0, q * pr + c) : 0;
         portfolio[id].transactions.push({
             date: dt, type, qty: q, price: pr, commission: c,
             ...(commCurrency !== 'EUR' ? { commissionCurrency: commCurrency } : {}),
@@ -293,7 +320,7 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
         });
         closeModal();
         await onSave();
-        Toast.show(`${isBuy ? 'Acquisto' : 'Vendita'} di ${p.nome} registrata`, 'ok');
+        Toast.show(`${hc.label} di ${p.nome} registrata`, 'ok');
     };
 }
 
@@ -329,7 +356,7 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
 
     box.style.display = 'block';
 
-        if (type === 'buy') {
+    if (type === 'buy') {
         const newCost = (qta * pmc) + (q * pr) + cNative;
         const newQta  = qta + q;
         const newPmc  = newQta > 0 ? newCost / newQta : 0;
@@ -342,7 +369,47 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
             Costo operazione: <b>${s} ${Calc.fmt(q * pr + cNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)<br>
             Nuovo PMC: <b class="hl">${Calc.fmt(newPmc)}</b> (attuale: ${Calc.fmt(pmc)})<br>
             Nuova Q.tà: <b>${Calc.fmt(newQta, 4)}</b>${marginHint}`;
+
+    } else if (type === 'short_sell') {
+        const currentShortQty = Math.abs(qta);
+        const currentProceedsNative = currentShortQty * pmc;
+        const newUnitProceeds = pr - (cNative / q);
+        const newProceedsNative = currentProceedsNative + (newUnitProceeds * q);
+        const newShortQty = currentShortQty + q;
+        const newPmcShort = newShortQty > 0 ? newProceedsNative / newShortQty : 0;
+        box.innerHTML = `
+            Incasso operazione: <b>${s} ${Calc.fmt(q * pr - cNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)<br>
+            Nuovo prezzo medio short: <b class="hl">${Calc.fmt(newPmcShort)}</b>${currentShortQty > 0 ? ` (attuale: ${Calc.fmt(pmc)})` : ''}<br>
+            Nuova Q.tà short: <b>${Calc.fmt(newShortQty, 4)}</b>`;
+
+    } else if (type === 'buy_to_cover') {
+        const currentShortQty = Math.abs(qta);
+        if (q > currentShortQty + 0.0001) {
+            box.innerHTML = `<span style="color:var(--danger);">⚠️ Quantità superiore allo short aperto (${Calc.fmt(currentShortQty, 4)})</span>`;
+            return;
+        }
+        const pnlLordoNative = (pmc - pr) * q - cNative;
+        const costoRiacquistoNative = q * pr + cNative;
+        const pnlLordoEur = assetIsUSD ? pnlLordoNative / cachedRate : pnlLordoNative;
+
+        const taxPct   = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
+        const taxLabel = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
+        const tax      = pnlLordoEur > 0 ? pnlLordoEur * taxPct : 0;
+        const pnlNettoEur = pnlLordoEur - tax;
+
+        box.innerHTML = `
+            <div style="display:grid; gap:4px;">
+                <div>Costo riacquisto: <b>${s} ${Calc.fmt(costoRiacquistoNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)</div>
+                <div>P&L lordo: <b class="${pnlLordoNative >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordoNative)}</b>${assetIsUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlLordoEur)})</span>` : ''}</div>
+                ${pnlLordoEur > 0 ? `<div>Tasse teoriche (${taxLabel}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b></div>` : ''}
+                <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
+                    P&L netto teorico: <b class="${pnlNettoEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNettoEur)}</b>
+                </div>
+                <div style="margin-top:10px;">Q.tà short rimanente: <b>${Calc.fmt(currentShortQty - q, 4)}</b></div>
+            </div>`;
+
     } else {
+        // sell (long)
         const pnlLordoNative = (pr - pmc) * q - cNative;
         const costoBaseEur   = (pmcEur || pmc) * q;
         const proceedsEur    = assetIsUSD ? ((q * pr - cNative) / cachedRate) : (q * pr - cNative);
@@ -354,7 +421,6 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
         const pnlNettoEur  = pnlLordoEur - tax;
         const eurHint      = assetIsUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlLordoEur)})</span>` : '';
 
-        // Calcola residuo disponibile per compensazione (regime amministrato, sempre in €)
         let minusHtml = '';
         if (activePortfolio?.taxRegime !== 'dichiarativo' && pnlLordoEur > 0) {
             const { residuoFinale } = calcolaCompensazione(portfolio, activePortfolio?.taxRegime || 'amministrato');

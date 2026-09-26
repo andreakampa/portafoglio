@@ -30,6 +30,29 @@ function consumeLotsLIFO(lots, qtyToConsume) {
     return { costNative, costEur, exactLotMatch };
 }
 
+// Speculare a consumeLotsLIFO ma per i lotti SHORT: qui il lotto porta
+// l'incasso ottenuto all'apertura (non un costo), e la copertura lo consuma
+// nello stesso ordine LIFO.
+function consumeLotsLIFOShort(lots, qtyToConsume) {
+    let remaining = qtyToConsume;
+    let proceedsNative = 0, proceedsEur = 0;
+    let exactLotMatch = true;
+    for (let i = lots.length - 1; i >= 0 && remaining > 0.00001; i--) {
+        const lot = lots[i];
+        const used = Math.min(lot.qty, remaining);
+        proceedsNative += lot.unitProceedsNative * used;
+        proceedsEur += lot.unitProceedsEur * used;
+        lot.qty -= used;
+        remaining -= used;
+        if (lot.qty < 0.00001) {
+            lots.splice(i, 1);
+        } else {
+            exactLotMatch = false;
+        }
+    }
+    return { proceedsNative, proceedsEur, exactLotMatch };
+}
+
 export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxRegime = 'amministrato') {
     const p = portfolio[id];
     const overlay = document.getElementById('modal-history');
@@ -103,7 +126,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
     const s = currency === 'EUR' ? '€' : '$';   // simbolo secondo il toggle del sito
     const nativeS = isUSD ? '$' : '€';          // simbolo nativo della posizione (per gli hint)
     const rate = Exchange.rate || 1;
-        const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
     const totalMargine = txsSorted.reduce((sum, tx) => sum + (tx.type === 'buy' ? (tx.marginAmount || 0) : 0), 0);
 
     // PMC: se il sito è su EUR e la posizione è USD, mostriamo il PMC fiscale (cambio storico) come primario
@@ -111,16 +134,16 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
     const pmcHint = isUSD
         ? ` <span style="font-size:11px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(pmc)} nativo)</span>` : '';
 
-    // realizedPnL è già calcolato in € fiscale (cambio storico per ogni vendita)
+    // realizedPnL è già calcolato in € fiscale (cambio storico per ogni vendita), somma long + short
     const realizedDisplay = currency === 'EUR' ? realizedPnL : Exchange.convert(realizedPnL, 'EUR', currency);
     const realizedHint = isUSD && realizedPnL !== 0
         ? ` <span style="font-size:11px;color:var(--text-muted)">(fiscale, cambio storico)</span>` : '';
 
     document.getElementById('hist-summary').innerHTML =
-        `Q.tà: <b>${Calc.fmt(qta, 4)}</b> &nbsp;|&nbsp;
+        `Q.tà: <b>${Calc.fmt(Math.abs(qta), 4)}</b>${qta < -0.00001 ? ' <span class="badge-stato badge-short">🔻 Short</span>' : ''} &nbsp;|&nbsp;
          PMC: <b>${s} ${Calc.fmt(pmcDisplay)}</b>${pmcHint} &nbsp;|&nbsp;
          P&L Realizzato: <b class="${realizedDisplay >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(realizedDisplay)}</b>${realizedHint} &nbsp;|&nbsp;
-                  Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>${totalMargine > 0 ? ` &nbsp;|&nbsp; Margine tot.: <b>${nativeS} ${Calc.fmt(totalMargine)}</b>` : ''}`;
+         Commissioni tot.: <b>€ ${Calc.fmt(totalComm)}</b>${totalMargine > 0 ? ` &nbsp;|&nbsp; Margine tot.: <b>${nativeS} ${Calc.fmt(totalMargine)}</b>` : ''}`;
 
     const arrowEl = document.getElementById('hist-date-arrow');
     if (arrowEl) arrowEl.textContent = historySortState.dir === 'asc' ? ' ▲' : ' ▼';
@@ -131,7 +154,8 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
         return;
     }
 
-    let openLots = []; // ricostruzione LIFO: [{ qty, unitCostNative, unitCostEur, date }]
+    let openLots = [];      // ricostruzione LIFO long: [{ qty, unitCostNative, unitCostEur, date }]
+    let openShortLots = [];  // ricostruzione LIFO short: [{ qty, unitProceedsNative, unitProceedsEur, date }]
     tbody.innerHTML = '';
     const rows = []; // righe costruite in ordine cronologico ascendente (richiesto per LIFO/PMC corretti)
 
@@ -158,7 +182,23 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
             const unitCostNative = pr + (c / q);
             const unitCostEur = isUSD ? unitCostNative / txRate : unitCostNative;
             openLots.push({ qty: q, unitCostNative, unitCostEur, date: tx.date });
-                        } else {
+        } else if (tx.type === 'short_sell') {
+            // Apertura short: il lotto porta l'incasso per unità, non un costo
+            const unitProceedsNative = pr - (c / q);
+            const unitProceedsEur = isUSD ? unitProceedsNative / txRate : unitProceedsNative;
+            openShortLots.push({ qty: q, unitProceedsNative, unitProceedsEur, date: tx.date });
+        } else if (tx.type === 'buy_to_cover') {
+            const { proceedsNative, proceedsEur, exactLotMatch } = consumeLotsLIFOShort(openShortLots, q);
+            lotSaleType = exactLotMatch ? 'exact' : 'partial';
+            tradePnL = Calc.round(proceedsNative - (pr * q + c));
+            if (isUSD) {
+                const costoBuybackEur = (pr * q + c) / txRate;
+                tradePnLEur = Calc.round(proceedsEur - costoBuybackEur);
+                tradePnLBroker = Calc.round(tradePnL / txRate);
+            } else {
+                tradePnLEur = tradePnL;
+            }
+        } else {
             const { costNative: costoBaseNative, costEur: costoBaseEur, exactLotMatch } = consumeLotsLIFO(openLots, q);
             lotSaleType = exactLotMatch ? 'exact' : 'partial';
             tradePnL = Calc.round((pr * q - c) - costoBaseNative);
@@ -172,14 +212,21 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
             }
         }
 
-        // PMC visualizzato: media ponderata dei lotti ancora aperti dopo questa transazione
-        const openQty = openLots.reduce((s, l) => s + l.qty, 0);
-        const rPmc = openQty > 0
-            ? openLots.reduce((s, l) => s + l.qty * l.unitCostNative, 0) / openQty
-            : 0;
-        const rPmcEur = openQty > 0
-            ? openLots.reduce((s, l) => s + l.qty * l.unitCostEur, 0) / openQty
-            : 0;
+        // PMC visualizzato: media ponderata dei lotti ancora aperti dopo questa
+        // transazione — long se ci sono lotti long aperti, altrimenti short
+        // (i due non coesistono mai per lo stesso titolo).
+        let openQty, rPmc, rPmcEur;
+        if (openLots.length) {
+            openQty = openLots.reduce((s, l) => s + l.qty, 0);
+            rPmc = openQty > 0 ? openLots.reduce((s, l) => s + l.qty * l.unitCostNative, 0) / openQty : 0;
+            rPmcEur = openQty > 0 ? openLots.reduce((s, l) => s + l.qty * l.unitCostEur, 0) / openQty : 0;
+        } else if (openShortLots.length) {
+            openQty = openShortLots.reduce((s, l) => s + l.qty, 0);
+            rPmc = openQty > 0 ? openShortLots.reduce((s, l) => s + l.qty * l.unitProceedsNative, 0) / openQty : 0;
+            rPmcEur = openQty > 0 ? openShortLots.reduce((s, l) => s + l.qty * l.unitProceedsEur, 0) / openQty : 0;
+        } else {
+            openQty = 0; rPmc = 0; rPmcEur = 0;
+        }
 
         // Converte un valore nativo nella valuta scelta dal toggle del sito.
         // Per le posizioni USD usa il cambio storico della transazione (coerente col resto dei calcoli fiscali).
@@ -187,7 +234,9 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
             if (!isUSD) return currency === 'EUR' ? nativeVal : nativeVal * rate;
             return currency === 'EUR' ? nativeVal / txRate : nativeVal;
         };
-        const totale = tx.type === 'buy' ? q * pr + c : tx.type === 'transfer' ? q * pr : q * pr - c;
+        const totale = (tx.type === 'buy' || tx.type === 'buy_to_cover') ? q * pr + c
+                     : tx.type === 'transfer' ? q * pr
+                     : q * pr - c; // sell, short_sell
         const taxPct  = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
         const pnlTax  = tradePnLEur !== null && tradePnLEur > 0 ? tradePnLEur * taxPct : 0;
         const pnlNetto = tradePnLEur !== null ? tradePnLEur - pnlTax : null;
@@ -203,9 +252,18 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
     if (!hasManual && isRecent) return ' <span title="Tasso BCE non disponibile per questa data — considera di inserire il tasso manualmente" style="cursor:help;color:var(--warning);">⚠️</span>';
     return '';
 })()}</td>
-                        <td class="${tx.type === 'transfer' ? 'tx-transfer' : tx.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${(() => {
+                        <td class="${tx.type === 'transfer' ? 'tx-transfer' : (tx.type === 'buy' || tx.type === 'buy_to_cover') ? 'tx-buy' : 'tx-sell'}">${(() => {
                                if (tx.type !== 'transfer') {
                     if (tx.type === 'buy') return '🔀 Acq.';
+                    if (tx.type === 'short_sell') return '🔻 Short';
+                    if (tx.type === 'buy_to_cover') {
+                        const badge = lotSaleType === 'exact'
+                            ? ' <span title="Copertura corrispondente a lotto/i interi — non frazionata" style="cursor:help;display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">📦 lotto</span>'
+                            : lotSaleType === 'partial'
+                                ? ' <span title="Copertura parziale di un singolo lotto short" style="cursor:help;display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--warning-dim, rgba(230,162,60,0.15));color:var(--warning);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">🧩 lotto parziale</span>'
+                                : '';
+                        return `🔺 Copertura${badge}`;
+                    }
                     const badge = lotSaleType === 'exact'
                         ? ' <span title="Vendita corrispondente a lotto/i interi — non frazionata" style="cursor:help;display:inline-flex;align-items:center;gap:2px;margin-left:5px;background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;">📦 lotto</span>'
                         : lotSaleType === 'partial'
@@ -227,7 +285,7 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
            <td>${isUSD
                 ? `${nativeS} ${Calc.fmt(pr)} <span style="font-size:10px;color:var(--text-muted)">(${s} ${Calc.fmt(rowConv(pr))})</span>`
                 : `${s} ${Calc.fmt(rowConv(pr))}`}</td>
-                        <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}${tx.marginAmount ? `<br><span title="Finanziato a margine" style="font-size:10px;color:var(--text-muted);">🏦 ${nativeS} ${Calc.fmt(tx.marginAmount)}</span>` : ''}</td>
+            <td>${(tx.commissionCurrency === 'USD' ? '$ ' : '€ ')}${Calc.fmt(c)}${tx.marginAmount ? `<br><span title="Finanziato a margine" style="font-size:10px;color:var(--text-muted);">🏦 ${nativeS} ${Calc.fmt(tx.marginAmount)}</span>` : ''}</td>
             <td>${s} ${Calc.fmt(rowConv(totale))}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(totale)})</span>` : ''}</td>
             ${isUSD ? `<td style="font-size:11px;color:var(--text-muted);">${tx.exchangeRate ? Calc.fmt(parseFloat(tx.exchangeRate), 4) : (Exchange._memoryCache.get(tx.date)?.rate ? Calc.fmt(Exchange._memoryCache.get(tx.date).rate, 4) : '—')}</td>` : ''}
             <td>${s} ${Calc.fmt(currency === 'EUR' && isUSD ? rPmcEur : rPmc)}${isUSD ? ` <span style="font-size:10px;color:var(--text-muted)">(${nativeS} ${Calc.fmt(rPmc)})</span>` : ''}</td>
@@ -337,6 +395,8 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                         <select id="edit-tx-tipo">
                             <option value="buy"  ${origTx.type === 'buy'  ? 'selected' : ''}>🟢 Acquisto</option>
                             <option value="sell" ${origTx.type === 'sell' ? 'selected' : ''}>🔴 Vendita</option>
+                            <option value="short_sell" ${origTx.type === 'short_sell' ? 'selected' : ''}>🔻 Short</option>
+                            <option value="buy_to_cover" ${origTx.type === 'buy_to_cover' ? 'selected' : ''}>🔺 Copertura</option>
                         </select>
                     </div>
                     <div>
@@ -347,7 +407,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                         <span class="modal-label">Prezzo</span>
                         <input type="number" id="edit-tx-prezzo" step="any" value="${origTx.price}" ${isTransferred ? 'readonly style="opacity:0.5;cursor:not-allowed;"' : ''}>
                     </div>
-                                        <div>
+                    <div>
                         <span class="modal-label">Commissione</span>
                         <div style="display:flex; gap:6px;">
                             <input type="number" id="edit-tx-comm" step="any" value="${origTx.commission || 0}" style="flex:1;" ${isTransferred ? 'readonly style="opacity:0.5;cursor:not-allowed;"' : ''}>
@@ -477,7 +537,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
         const newType = document.getElementById('edit-tx-tipo').value;
         const newQty  = parseFloat(document.getElementById('edit-tx-qta').value);
         const newPr   = parseFloat(document.getElementById('edit-tx-prezzo').value);
-                const newComm = parseFloat(document.getElementById('edit-tx-comm').value) || 0;
+        const newComm = parseFloat(document.getElementById('edit-tx-comm').value) || 0;
         const newMargin = parseFloat(document.getElementById('edit-tx-margin')?.value) || 0;
 
         if (!newDate || isNaN(newQty) || newQty <= 0 || isNaN(newPr) || newPr <= 0) {
@@ -530,7 +590,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                     sourcePortfolioId: origTx.sourcePortfolioId,
                     transferId: origTx.transferId
                 } : {}),
-                                ...(editCommCurrency !== 'EUR' ? { commissionCurrency: editCommCurrency } : {}),
+                ...(editCommCurrency !== 'EUR' ? { commissionCurrency: editCommCurrency } : {}),
                 ...(isManual && fxVal > 0 ? { exchangeRate: fxVal } : {}),
                 ...(newType === 'buy' && newMargin > 0 ? { marginAmount: newMargin } : {})
             };
