@@ -2,6 +2,7 @@ import { Calc } from './calc.js';
 import { Exchange } from '../../api/exchange.js';
 import { Search } from '../../api/search.js';
 import { getTasseDovuteAnnoCorrenteDashboard, apriCassettoFiscale } from '../../api/fiscale.js';
+import { ExportUtil, renderExportDropdown } from './export.js';
 
 // ── Sort state tabella posizioni ────────────────────────────────────────
 let positionSortState = { col: null, dir: 'asc' };
@@ -497,10 +498,13 @@ export function renderPage(container) {
         <input type="hidden" id="input-logo-url">
     </div>
 
-    <div class="card desktop-only" id="card-table">
+        <div class="card desktop-only" id="card-table">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
             <span>💼 Posizioni</span>
-            <button id="btn-column-config" class="btn-toggle" title="Configura colonne" style="font-size:16px;padding:2px 10px;">⚙️</button>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <div id="posizioni-export-wrap"></div>
+                <button id="btn-column-config" class="btn-toggle" title="Configura colonne" style="font-size:16px;padding:2px 10px;">⚙️</button>
+            </div>
         </div>
         <div class="table-scroll-wrapper" id="table-scroll-wrapper" style="position:relative;">
             <button class="table-scroll-btn table-scroll-left" id="tbl-scroll-left" title="Scorri sinistra">&#8249;</button>
@@ -895,6 +899,82 @@ const pnlAfterTaxEur = pnlEur - taxEur;
     return map;
 }
 
+function buildPositionExportRows(ids, portfolio, positionMap, currency) {
+    const s = currency === 'EUR' ? '€' : '$';
+    return ids.map(id => {
+        const p = portfolio[id];
+        const pos = positionMap[id] || {};
+        const v = pos.valuta || (p.valuta || 'EUR').toUpperCase();
+        const cv = x => Exchange.convert(x, v, currency);
+        const qta = pos.qta || 0;
+        const invEur = pos.invEur || 0;
+        const att = pos.att || 0;
+        const hasPos = Math.abs(att) > 0.00001;
+        const pnlGrossShown = currency === 'EUR' ? (pos.pnlEur || 0) : cv(pos.pnl || 0);
+        const pnlNetShown = currency === 'EUR' ? (pos.pnlAfterTaxEur || 0) : cv(pos.pnlAfterTax || 0);
+        return {
+            symbol: p.nome,
+            shares: Calc.fmt(Math.abs(qta), 4),
+            pmc: pos.pmc > 0 ? Calc.fmt(pos.pmc) : '—',
+            price: Calc.fmt(pos.prLive || 0),
+            cost: hasPos ? (currency === 'EUR' ? `€ ${Calc.fmt(invEur)}` : `${s} ${Calc.fmt(cv(pos.inv || 0))}`) : '—',
+            value: hasPos ? `${s} ${Calc.fmt(cv(att))}` : '—',
+            pnlGross: hasPos ? `${pnlGrossShown >= 0 ? '+' : ''}${s} ${Calc.fmt(pnlGrossShown)}` : '—',
+            pnlP: pos.pnlP != null && hasPos ? `${Calc.fmtSign(pos.pnlP)}%` : '—',
+            pnlNet: hasPos ? `${pnlNetShown >= 0 ? '+' : ''}${s} ${Calc.fmt(pnlNetShown)}` : '—'
+        };
+    });
+}
+
+function exportPositions(ids, portfolio, positionMap, currency, format) {
+    const s = currency === 'EUR' ? '€' : '$';
+    let sumInv = 0, sumAtt = 0, sumTax = 0;
+    for (const id of ids) {
+        const pos = positionMap[id];
+        if (!pos) continue;
+        const v = pos.valuta || (portfolio[id].valuta || 'EUR').toUpperCase();
+        const cv = x => Exchange.convert(x, v, currency);
+        sumInv += currency === 'EUR' ? (pos.invEur || 0) : cv(pos.inv || 0);
+        sumAtt += currency === 'EUR' ? (pos.attEur || 0) : cv(pos.att || 0);
+        sumTax += currency === 'EUR' ? (pos.taxEur || 0) : cv(pos.tax || 0);
+    }
+    const pnlUnrl = sumAtt - sumInv;
+    const pnlUnrlNet = pnlUnrl - sumTax;
+
+    const columns = [
+        { key: 'symbol', label: 'Simbolo' },
+        { key: 'shares', label: 'Shares', align: 'right' },
+        { key: 'pmc', label: 'AC/Share', align: 'right' },
+        { key: 'price', label: 'Prezzo', align: 'right' },
+        { key: 'cost', label: 'Costo Tot.', align: 'right' },
+        { key: 'value', label: 'Controvalore', align: 'right' },
+        { key: 'pnlGross', label: 'P&L Gross', align: 'right' },
+        { key: 'pnlP', label: '%', align: 'right' },
+        { key: 'pnlNet', label: 'P&L Net', align: 'right' }
+    ];
+    const rows = buildPositionExportRows(ids, portfolio, positionMap, currency);
+    const filename = `portafoglio_${ExportUtil.todayStr()}`;
+
+    if (format === 'pdf') {
+        ExportUtil.toPDF({
+            title: '💼 Portafoglio — Riepilogo Posizioni',
+            subtitle: `Valuta: ${currency}`,
+            columns,
+            rows,
+            summary: [
+                { label: 'Investito', value: `${s} ${Calc.fmt(sumInv)}` },
+                { label: 'Controvalore', value: `${s} ${Calc.fmt(sumAtt)}` },
+                { label: 'P&L Gross', value: `${pnlUnrl >= 0 ? '+' : ''}${s} ${Calc.fmt(pnlUnrl)}` },
+                { label: 'Tasse su Plusvalenze', value: `${s} ${Calc.fmt(sumTax)}` },
+                { label: 'P&L Net (After Tax)', value: `${pnlUnrlNet >= 0 ? '+' : ''}${s} ${Calc.fmt(pnlUnrlNet)}` }
+            ],
+            filename: `${filename}.pdf`
+        });
+    } else {
+        ExportUtil.toXLSX({ sheetName: 'Posizioni', columns, rows, filename: `${filename}.xlsx` });
+    }
+}
+
 export function renderTable({ portfolio, positionMap, prevClose, currency, preMarkets = {}, postMarkets = {}, opens = {}, marketStates = {}, week52Lows = {}, week52Highs = {}, dividendi = {}, weightTotals = {}, columnConfig = null }, handlers) {
     const tbody = document.getElementById('portfolio-tbody');
     if (!tbody) return;
@@ -918,6 +998,15 @@ export function renderTable({ portfolio, positionMap, prevClose, currency, preMa
         closed      = applySort(closed,      positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
         empty       = applySort(empty,       positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
         transferred = applySort(transferred, positionSortState.col, positionSortState.dir, portfolio, positionMap, prevClose, currency, weightTotals);
+    }
+
+    const exportWrap = document.getElementById('posizioni-export-wrap');
+    if (exportWrap) {
+        const exportIds = [...active, ...short];
+        renderExportDropdown(exportWrap, {
+            onPDF: () => exportPositions(exportIds, portfolio, positionMap, currency, 'pdf'),
+            onXLS: () => exportPositions(exportIds, portfolio, positionMap, currency, 'xlsx')
+        });
     }
 
     // Stato visibilità gruppi collassabili
