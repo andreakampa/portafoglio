@@ -13,6 +13,15 @@ function nowStr() {
     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// I font standard di jsPDF (Helvetica) non supportano gli emoji Unicode:
+// se passati a doc.text() producono caratteri corrotti e spaziatura anomala.
+// Li rimuoviamo prima di scrivere titolo/sottotitolo nel PDF.
+function stripEmoji(str) {
+    return String(str || '')
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\uFE0F]/gu, '')
+        .trim();
+}
+
 export const ExportUtil = {
     todayStr,
 
@@ -31,11 +40,11 @@ export const ExportUtil = {
 
         doc.setFontSize(15);
         doc.setFont(undefined, 'bold');
-        doc.text(title, margin, 40);
+        doc.text(stripEmoji(title), margin, 40);
         doc.setFontSize(9);
         doc.setFont(undefined, 'normal');
         doc.setTextColor(120);
-        if (subtitle) doc.text(subtitle, margin, 56);
+        if (subtitle) doc.text(stripEmoji(subtitle), margin, 56);
         doc.text(`Generato il ${todayStr()} ore ${nowStr()}`, pageWidth - margin, 40, { align: 'right' });
         doc.setTextColor(0);
 

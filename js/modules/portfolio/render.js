@@ -912,6 +912,7 @@ function buildPositionExportRows(ids, portfolio, positionMap, currency) {
         const hasPos = Math.abs(att) > 0.00001;
         const pnlGrossShown = currency === 'EUR' ? (pos.pnlEur || 0) : cv(pos.pnl || 0);
         const pnlNetShown = currency === 'EUR' ? (pos.pnlAfterTaxEur || 0) : cv(pos.pnlAfterTax || 0);
+        const taxShown = currency === 'EUR' ? (pos.taxEur || 0) : cv(pos.tax || 0);
         return {
             symbol: p.nome,
             shares: Calc.fmt(Math.abs(qta), 4),
@@ -921,7 +922,8 @@ function buildPositionExportRows(ids, portfolio, positionMap, currency) {
             value: hasPos ? `${s} ${Calc.fmt(cv(att))}` : '—',
             pnlGross: hasPos ? `${pnlGrossShown >= 0 ? '+' : ''}${s} ${Calc.fmt(pnlGrossShown)}` : '—',
             pnlP: pos.pnlP != null && hasPos ? `${Calc.fmtSign(pos.pnlP)}%` : '—',
-            pnlNet: hasPos ? `${pnlNetShown >= 0 ? '+' : ''}${s} ${Calc.fmt(pnlNetShown)}` : '—'
+            pnlNet: hasPos ? `${pnlNetShown >= 0 ? '+' : ''}${s} ${Calc.fmt(pnlNetShown)}` : '—',
+            tax: hasPos ? `${s} ${Calc.fmt(taxShown)}` : '—'
         };
     });
 }
@@ -950,7 +952,8 @@ function exportPositions(ids, portfolio, positionMap, currency, format) {
         { key: 'value', label: 'Controvalore', align: 'right' },
         { key: 'pnlGross', label: 'P&L Gross', align: 'right' },
         { key: 'pnlP', label: '%', align: 'right' },
-        { key: 'pnlNet', label: 'P&L Net', align: 'right' }
+        { key: 'pnlNet', label: 'P&L Net', align: 'right' },
+        { key: 'tax', label: 'Tasse Stimate', align: 'right' }
     ];
     const rows = buildPositionExportRows(ids, portfolio, positionMap, currency);
     const filename = `portafoglio_${ExportUtil.todayStr()}`;
