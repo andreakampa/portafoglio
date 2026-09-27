@@ -842,8 +842,8 @@ export async function buildPositionMap(portfolio, prices, taxRegime = 'amministr
         const p      = portfolio[id];
         const pos    = positions[i];
         const v      = (p.valuta || 'EUR').toUpperCase();
-        const prLive = prices[id] ?? pos.pmc;
-        const rate   = Exchange.rate || 1;
+         const prLive = prices[id] ?? pos.pmc;
+        const rate   = Exchange.rates?.[v] || Exchange.rate || 1;
 
         const inv = pos.qta * pos.pmc;
 const att = pos.qta * prLive;
@@ -852,11 +852,11 @@ const pnl = att - inv;
 const invEur = v === 'EUR' ? inv : (pos.totalCostEur ?? inv / rate);
 const attEur = v === 'EUR' ? att : att / rate;
 const pnlEur = attEur - invEur;
-const pnlEurPuro = pnlEur - (v === 'USD' && pos.totalCostNative > 0 && pos.totalCostEur > 0
+const pnlEurPuro = pnlEur - (v !== 'EUR' && pos.totalCostNative > 0 && pos.totalCostEur > 0
     ? (() => {
         const tassoStorico = pos.totalCostNative / pos.totalCostEur;
-        const valoreCorrentivoUSD = pos.qta * prLive;
-        return (valoreCorrentivoUSD / (Exchange.rate || 1)) - (valoreCorrentivoUSD / tassoStorico);
+        const valoreCorrentivoNative = pos.qta * prLive;
+        return (valoreCorrentivoNative / rate) - (valoreCorrentivoNative / tassoStorico);
     })()
     : 0);
 
@@ -866,13 +866,13 @@ const pnlAfterTaxNative = pnl - taxNative;
 const taxEur = Calc.taxOnGain(pnlEur, p.tipoAsset);
 const pnlAfterTaxEur = pnlEur - taxEur;
 
-// Effetto cambio per titoli USD
+// Effetto cambio per titoli in valuta estera
         let fxEffect = null;
-        if (v === 'USD' && pos.totalCostNative > 0 && pos.totalCostEur > 0) {
+        if (v !== 'EUR' && pos.totalCostNative > 0 && pos.totalCostEur > 0) {
             const tassoStorico = pos.totalCostNative / pos.totalCostEur;
-            const valoreCorrentivoUSD = pos.qta * prLive;
-            const attEurConTassoStorico = valoreCorrentivoUSD / tassoStorico;
-            const attEurConTassoAttuale = valoreCorrentivoUSD / rate;
+            const valoreCorrentivoNative = pos.qta * prLive;
+            const attEurConTassoStorico = valoreCorrentivoNative / tassoStorico;
+            const attEurConTassoAttuale = valoreCorrentivoNative / rate;
             fxEffect = attEurConTassoAttuale - attEurConTassoStorico;
         }
 

@@ -51,9 +51,10 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                         <span class="modal-label">Commissione</span>
                         <div style="display:flex; gap:6px;">
                             <input type="number" id="tx-comm" step="any" placeholder="0.00" style="flex:1;">
-                            <select id="tx-comm-currency" style="width:80px;">
+                             <select id="tx-comm-currency" style="width:80px;">
                                 <option value="EUR">€ EUR</option>
                                 <option value="USD">$ USD</option>
+                                <option value="CAD">C$ CAD</option>
                             </select>
                         </div>
                     </div>
@@ -62,9 +63,9 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
                         <span class="modal-label">Margine <span class="text-muted fs-xs">(0 = tutto cash)</span></span>
                         <input type="number" id="tx-margin" step="any" placeholder="0.00" min="0">
                     </div>` : ''}
-                    ${p.valuta === 'USD' ? `
+                    ${p.valuta !== 'EUR' ? `
                     <div>
-                        <span class="modal-label">Tasso EUR/USD <span class="text-muted fs-xs">(auto-compilato, modificabile)</span></span>
+                        <span class="modal-label">Tasso EUR/${p.valuta} <span class="text-muted fs-xs">(auto-compilato, modificabile)</span></span>
                         <input type="number" id="tx-fx" step="any" placeholder="caricamento...">
                     </div>` : ''}
                 </div>
@@ -89,18 +90,18 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
     overlay.classList.add('visible');
     lockScroll();
 
-    if (p.valuta === 'USD') {
+    if (p.valuta !== 'EUR') {
         const fxField = document.getElementById('tx-fx');
         if (fxField) {
-            Exchange.getRateForDate(new Date().toISOString().slice(0, 10))
+            Exchange.getRateForDate(new Date().toISOString().slice(0, 10), p.valuta)
                 .then(r => { if (fxField && r > 0) fxField.value = r.toFixed(4); })
-                .catch(() => { if (fxField) fxField.value = (Exchange.rate || '').toFixed(4); });
+                .catch(() => { if (fxField) fxField.value = (Exchange.rates[p.valuta] || Exchange.rate || '').toFixed(4); });
             document.getElementById('tx-data').addEventListener('change', e => {
                 fxField.value = '';
                 fxField.placeholder = 'caricamento...';
-                Exchange.getRateForDate(e.target.value)
+                Exchange.getRateForDate(e.target.value, p.valuta)
                     .then(r => { if (fxField && r > 0) fxField.value = r.toFixed(4); })
-                    .catch(() => { if (fxField) fxField.value = (Exchange.rate || '').toFixed(4); });
+                    .catch(() => { if (fxField) fxField.value = (Exchange.rates[p.valuta] || Exchange.rate || '').toFixed(4); });
             });
         }
     }
@@ -162,13 +163,13 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
             panel.innerHTML = `<div class="text-muted fs-xs">Nessun lotto disponibile.</div>`;
             return;
         }
-        const isUSD = p.valuta === 'USD';
-        const sym = isUSD ? '$' : '€';
+        const isForeign = p.valuta !== 'EUR';
+        const sym = p.valuta === 'USD' ? '$' : p.valuta === 'CAD' ? 'C$' : '€';
 
         panel.innerHTML = lots.map(l => {
             let pmcLabel = `${sym} ${Calc.fmt(l.price)}`;
-            if (isUSD) {
-                const lotRate = l.exchangeRate || Exchange._memoryCache.get(l.date)?.rate || Exchange.rate || 1;
+            if (isForeign) {
+                const lotRate = l.exchangeRate || Exchange._memoryCache.get(`${p.valuta}_${l.date}`)?.rate || Exchange.rates[p.valuta] || Exchange.rate || 1;
                 pmcLabel += ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(l.price / lotRate)})</span>`;
             }
             return `
@@ -194,17 +195,19 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
         const pr = parseFloat(document.getElementById('tx-prezzo').value) || 0;
         const cInput = parseFloat(document.getElementById('tx-comm').value) || 0;
         const commCurrency = document.getElementById('tx-comm-currency')?.value || 'EUR';
-        const isUSD = p.valuta === 'USD';
-        const sym = isUSD ? '$' : '€';
-        const cachedRate = Exchange._memoryCache.get(dt)?.rate || Exchange.rate || 1;
+        const isForeign = p.valuta !== 'EUR';
+        const sym = p.valuta === 'USD' ? '$' : p.valuta === 'CAD' ? 'C$' : '€';
+        const rateFor = (curr) => Exchange._memoryCache.get(`${curr}_${dt}`)?.rate || Exchange.rates[curr] || Exchange.rate || 1;
+        const cachedRate = rateFor(p.valuta);
 
         let cNative;
-        if (commCurrency === (isUSD ? 'USD' : 'EUR')) {
+        if (commCurrency === p.valuta) {
             cNative = cInput;
-        } else if (commCurrency === 'USD' && !isUSD) {
-            cNative = cInput / cachedRate;
-        } else {
+        } else if (commCurrency === 'EUR') {
             cNative = cInput * cachedRate;
+        } else {
+            const commEur = cInput / rateFor(commCurrency);
+            cNative = isForeign ? commEur * cachedRate : commEur;
         }
 
         let qtyTotale = 0;
@@ -234,19 +237,19 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
             const pnlNativo    = ricavoNativo - costoNativo;
             pnlNativoTotale   += pnlNativo;
 
-            const lotRate   = lot.exchangeRate || Exchange._memoryCache.get(lot.date)?.rate || Exchange.rate || 1;
-            const costoEur  = isUSD ? costoNativo / lotRate : costoNativo;
-            const ricavoEur = isUSD ? ricavoNativo / cachedRate : ricavoNativo;
+            const lotRate   = lot.exchangeRate || Exchange._memoryCache.get(`${p.valuta}_${lot.date}`)?.rate || cachedRate;
+            const costoEur  = isForeign ? costoNativo / lotRate : costoNativo;
+            const ricavoEur = isForeign ? ricavoNativo / cachedRate : ricavoNativo;
             const pnlEur    = ricavoEur - costoEur;
             pnlEurTotale   += pnlEur;
 
             const pnlPct  = costoNativo > 0 ? (pnlNativo / costoNativo) * 100 : 0;
-            const eurHint = isUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlEur)})</span>` : '';
+              const eurHint = isForeign ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlEur)})</span>` : '';
             return `<div class="text-muted fs-xs">${lot.date}: ${Calc.fmt(q, 4)} pz → <b class="${pnlNativo >= 0 ? 'pos-gain' : 'neg-loss'}">${sym} ${Calc.fmt(pnlNativo)}</b>${eurHint} (${pnlPct >= 0 ? '+' : ''}${Calc.fmt(pnlPct)}%)</div>`;
         }).join('');
 
         const taxPct        = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
-        const baseImponibile = isUSD ? pnlEurTotale : pnlNativoTotale;
+          const baseImponibile = isForeign ? pnlEurTotale : pnlNativoTotale;
         const tax            = baseImponibile > 0 ? baseImponibile * taxPct : 0;
         const pnlNettoEur    = baseImponibile - tax;
 
@@ -255,7 +258,7 @@ export function openTransactionModal(id, type, portfolio, prices, onSave, active
             ${dettaglio}
             <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border);">
                 P&L lordo totale: <b class="${pnlNativoTotale >= 0 ? 'pos-gain' : 'neg-loss'}">${sym} ${Calc.fmt(pnlNativoTotale)}</b>
-                ${isUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlEurTotale)})</span>` : ''}<br>
+                ${isForeign ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlEurTotale)})</span>` : ''}<br>
                 ${baseImponibile > 0 ? `Tasse teoriche (su € ${Calc.fmt(baseImponibile)}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b><br>` : ''}
                 P&L netto teorico: <b class="${pnlNettoEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNettoEur)}</b>
             </div>`;
@@ -334,25 +337,28 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
 
     const { qta, pmc, pmcEur } = Calc.positionSync(portfolio[id], activePortfolio?.taxRegime || 'amministrato');
     const p = portfolio[id];
-    const s = p.valuta === 'USD' ? '$' : '€';
-    const assetIsUSD = p.valuta === 'USD';
+    const s = p.valuta === 'USD' ? '$' : p.valuta === 'CAD' ? 'C$' : '€';
+    const assetIsForeign = p.valuta !== 'EUR';
 
     const commCurrency = document.getElementById('tx-comm-currency')?.value || 'EUR';
-    const cachedRate = Exchange._memoryCache.get(dt)?.rate || Exchange.rate || 1;
+    const rateFor = (curr) => Exchange._memoryCache.get(`${curr}_${dt}`)?.rate || Exchange.rates[curr] || Exchange.rate || 1;
+    const cachedRate = rateFor(p.valuta);
 
     let cNative;
-    if (commCurrency === (assetIsUSD ? 'USD' : 'EUR')) {
+    if (commCurrency === p.valuta) {
         cNative = c;
-    } else if (commCurrency === 'USD' && !assetIsUSD) {
-        cNative = c / cachedRate;
-    } else {
+    } else if (commCurrency === 'EUR') {
         cNative = c * cachedRate;
+    } else {
+        const commEur = c / rateFor(commCurrency);
+        cNative = assetIsForeign ? commEur * cachedRate : commEur;
     }
 
-    const commHint = commCurrency !== (assetIsUSD ? 'USD' : 'EUR')
+    const commSym = commCurrency === 'USD' ? '$ ' : commCurrency === 'CAD' ? 'C$ ' : '€ ';
+    const commHint = commCurrency !== p.valuta
         ? ` <span class="text-muted fs-xs">(≈ ${s} ${Calc.fmt(cNative)})</span>`
         : '';
-    const commLabel = `${commCurrency === 'USD' ? '$ ' : '€ '}${Calc.fmt(c)}${commHint}`;
+    const commLabel = `${commSym}${Calc.fmt(c)}${commHint}`;
 
     box.style.display = 'block';
 
@@ -390,7 +396,7 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
         }
         const pnlLordoNative = (pmc - pr) * q - cNative;
         const costoRiacquistoNative = q * pr + cNative;
-        const pnlLordoEur = assetIsUSD ? pnlLordoNative / cachedRate : pnlLordoNative;
+        const pnlLordoEur = assetIsForeign ? pnlLordoNative / cachedRate : pnlLordoNative;
 
         const taxPct   = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
         const taxLabel = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
@@ -400,7 +406,7 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
         box.innerHTML = `
             <div style="display:grid; gap:4px;">
                 <div>Costo riacquisto: <b>${s} ${Calc.fmt(costoRiacquistoNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)</div>
-                <div>P&L lordo: <b class="${pnlLordoNative >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordoNative)}</b>${assetIsUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlLordoEur)})</span>` : ''}</div>
+                <div>P&L lordo: <b class="${pnlLordoNative >= 0 ? 'pos-gain' : 'neg-loss'}">${s} ${Calc.fmt(pnlLordoNative)}</b>${assetIsForeign ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlLordoEur)})</span>` : ''}</div>
                 ${pnlLordoEur > 0 ? `<div>Tasse teoriche (${taxLabel}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b></div>` : ''}
                 <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
                     P&L netto teorico: <b class="${pnlNettoEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlNettoEur)}</b>
@@ -412,14 +418,14 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
         // sell (long)
         const pnlLordoNative = (pr - pmc) * q - cNative;
         const costoBaseEur   = (pmcEur || pmc) * q;
-        const proceedsEur    = assetIsUSD ? ((q * pr - cNative) / cachedRate) : (q * pr - cNative);
+        const proceedsEur    = assetIsForeign ? ((q * pr - cNative) / cachedRate) : (q * pr - cNative);
         const pnlLordoEur    = proceedsEur - costoBaseEur;
 
         const taxPct      = p.tipoAsset === 'bond' ? 0.125 : p.tipoAsset === 'crypto' ? 0.33 : 0.26;
         const taxLabel     = p.tipoAsset === 'bond' ? '12,5%' : p.tipoAsset === 'crypto' ? '33%' : '26%';
         const tax          = pnlLordoEur > 0 ? pnlLordoEur * taxPct : 0;
         const pnlNettoEur  = pnlLordoEur - tax;
-        const eurHint      = assetIsUSD ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlLordoEur)})</span>` : '';
+        const eurHint      = assetIsForeign ? ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(pnlLordoEur)})</span>` : '';
 
         let minusHtml = '';
         if (activePortfolio?.taxRegime !== 'dichiarativo' && pnlLordoEur > 0) {
@@ -449,7 +455,7 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
 
         const netReceiptEur = proceedsEur - tax;
         const grossReceiptNative = q * pr - cNative;
-        const taxNative = assetIsUSD ? tax * cachedRate : tax;
+        const taxNative = assetIsForeign ? tax * cachedRate : tax;
         const netReceiptNative = grossReceiptNative - taxNative;
 
         box.innerHTML = `
@@ -458,10 +464,10 @@ function txPreview(id, type, portfolio, prices, activePortfolio) {
                 <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted);">Cassa</div>
                 <div>Incasso lordo: <b>${s} ${Calc.fmt(grossReceiptNative)}</b> &nbsp;(comm.:&nbsp; <b class="text-warning">${commLabel}</b>)${eurHint}</div>
                 ${pnlLordoEur > 0
-                    ? `<div>Tasse teoriche (${taxLabel}, su € ${Calc.fmt(pnlLordoEur)}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b>${assetIsUSD ? ` <span class="text-muted fs-xs">(≈ $ ${Calc.fmt(taxNative)})</span>` : ''}</div>`
+                    ? `<div>Tasse teoriche (${taxLabel}, su € ${Calc.fmt(pnlLordoEur)}): <b class="neg-loss">− € ${Calc.fmt(tax)}</b>${assetIsForeign ? ` <span class="text-muted fs-xs">(≈ $ ${Calc.fmt(taxNative)})</span>` : ''}</div>`
                     : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
                 <div style="border-top:1px solid var(--border); margin-top:2px; padding-top:4px;">
-                    Incasso netto (ti arriva in conto): <b class="${netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(netReceiptEur)}</b>${assetIsUSD ? ` <span class="text-muted fs-xs">(≈ $ ${Calc.fmt(netReceiptNative)})</span>` : ''}
+                    Incasso netto (ti arriva in conto): <b class="${netReceiptEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(netReceiptEur)}</b>${assetIsForeign ? ` <span class="text-muted fs-xs">(≈ $ ${Calc.fmt(netReceiptNative)})</span>` : ''}
                 </div>
 
                 <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-top:12px;">Profitto rispetto al costo</div>

@@ -7,7 +7,7 @@ const SEARCH_PROXIES = [
 
 const CURRENCY_MAP = {
     'EUR': 'EUR', 'USD': 'USD', 'GBp': 'EUR', 'GBP': 'EUR',
-    'CHF': 'CHF', 'JPY': 'USD', 'CAD': 'USD', 'AUD': 'USD',
+    'CHF': 'CHF', 'JPY': 'USD', 'CAD': 'CAD', 'AUD': 'USD',
 };
 
 const EUR_SUFFIXES = [
@@ -15,9 +15,12 @@ const EUR_SUFFIXES = [
     '.WA', '.HE', '.CO', '.OL', '.ST', '.F', '.XETRA'
 ];
 
+const CAD_SUFFIXES = ['.TO', '.V', '.CN', '.NE'];
+
 function resolveCurrency(ticker, yahooRawCurrency) {
     const upper = (ticker || '').toUpperCase();
     if (EUR_SUFFIXES.some(s => upper.endsWith(s))) return 'EUR';
+    if (CAD_SUFFIXES.some(s => upper.endsWith(s))) return 'CAD';
     return CURRENCY_MAP[yahooRawCurrency] || (yahooRawCurrency?.startsWith('EUR') ? 'EUR' : 'USD');
 }
 

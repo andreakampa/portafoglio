@@ -142,12 +142,12 @@ export const Calc = {
 
     _toEur(amount, currency, rate = 1) {
         if (!Number.isFinite(amount)) return 0;
-        return (currency || 'EUR').toUpperCase() === 'USD' ? amount / rate : amount;
+        return (currency || 'EUR').toUpperCase() !== 'EUR' ? amount / rate : amount;
     },
 
     _fromEur(amount, currency, rate = 1) {
         if (!Number.isFinite(amount)) return 0;
-        return (currency || 'EUR').toUpperCase() === 'USD' ? amount * rate : amount;
+        return (currency || 'EUR').toUpperCase() !== 'EUR' ? amount * rate : amount;
     },
 
     normalizeTx(tx, p) {
@@ -252,8 +252,9 @@ export const Calc = {
             const commRaw = +(tx.commission || 0);
             const commCurr = (tx.commissionCurrency || 'EUR').toUpperCase();
             const txRate = getRateSync(tx);
-            const c = commCurr === 'USD' && v !== 'USD' ? commRaw / txRate
-                    : commCurr === 'EUR' && v === 'USD' ? commRaw * txRate
+            const c = commCurr === v ? commRaw
+                    : commCurr === 'EUR' && v !== 'EUR' ? commRaw * txRate
+                    : v === 'EUR' && commCurr !== 'EUR' ? commRaw / txRate
                     : commRaw;
             totalComm += commRaw;
 
@@ -566,7 +567,8 @@ export const Calc = {
     // non introdurre una dipendenza tra i due moduli. Se in futuro vuoi
     // consolidare, questa è la funzione candidata a diventare la fonte unica.
     transactionRows(holding, taxRegime = 'amministrato') {
-        const isUSD = (holding.valuta || 'EUR').toUpperCase() === 'USD';
+        const nativeCurrency = (holding.valuta || 'EUR').toUpperCase();
+        const isUSD = nativeCurrency !== 'EUR';
         const txs = (holding.transactions || [])
             .filter(tx => tx.type === 'buy' || tx.type === 'sell')
             .slice()
@@ -595,7 +597,7 @@ export const Calc = {
                     date: tx.date, type: 'buy', qty: q,
                     priceNative: pr, totalNative,
                     totalEur: isUSD ? totalNative / txRate : totalNative,
-                    currency: isUSD ? 'USD' : 'EUR',
+                    currency: nativeCurrency,
                     pnlPercent: null, pnlEurBroker: null, pnlEurFiscal: null
                 });
                 continue;
@@ -632,7 +634,7 @@ export const Calc = {
             rows.push({
                 date: tx.date, type: 'sell', qty: q,
                 priceNative: pr, totalNative, totalEur,
-                currency: isUSD ? 'USD' : 'EUR',
+                 currency: nativeCurrency,
                 pnlPercent, pnlEurBroker, pnlEurFiscal
             });
         }
@@ -690,8 +692,9 @@ export const Calc = {
                 const commRaw = +(tx.commission || 0);
                 const commCurr = (tx.commissionCurrency || 'EUR').toUpperCase();
                 const txRate  = getRate(tx);
-                const c = commCurr === 'USD' && v !== 'USD' ? commRaw / txRate
-                        : commCurr === 'EUR' && v === 'USD' ? commRaw * txRate
+                const c = commCurr === v ? commRaw
+                        : commCurr === 'EUR' && v !== 'EUR' ? commRaw * txRate
+                        : v === 'EUR' && commCurr !== 'EUR' ? commRaw / txRate
                         : commRaw;
                 totalComm += commRaw;
 

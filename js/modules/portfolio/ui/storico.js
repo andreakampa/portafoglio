@@ -238,8 +238,7 @@ function renderInterestTab(table) {
     }
 
     const rows = buildInterestRows(activePortfolio);
-    const rate = Exchange.rate || 1;
-    const totaleEur = rows.reduce((sum, r) => sum + (r.currency === 'USD' ? r.amount / rate : r.amount), 0);
+    const totaleEur = rows.reduce((sum, r) => sum + (r.currency === 'EUR' ? r.amount : r.amount / (Exchange.rates?.[r.currency] || Exchange.rate || 1)), 0);
 
     table.innerHTML = `
         <thead><tr>
@@ -252,6 +251,7 @@ function renderInterestTab(table) {
                     <select id="mi-currency">
                         <option value="EUR">EUR</option>
                         <option value="USD">USD</option>
+                        <option value="CAD">CAD</option>
                     </select>
                 </td>
                 <td><input type="number" id="mi-amount" step="0.01" min="0" placeholder="0.00" style="width:100px;"></td>
@@ -261,7 +261,7 @@ function renderInterestTab(table) {
                 <tr>
                     <td>${formatPeriod(r.period)}</td>
                     <td>${r.currency}</td>
-                    <td>${r.currency === 'USD' ? '$' : '€'} ${Calc.fmt(r.amount)}</td>
+                    <td>${r.currency === 'USD' ? '$' : r.currency === 'CAD' ? 'C$' : '€'} ${Calc.fmt(r.amount)}</td>
                     <td><button class="btn-del-mi" data-id="${r.id}" title="Elimina">✕</button></td>
                 </tr>
             `).join('') : `<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--text-muted);">Nessun interesse registrato</td></tr>`}
@@ -320,7 +320,7 @@ function exportCompravenditeRows(rows, totaleTassaPresunta, totaleMinusGenerate,
             type: r.type === 'buy' ? 'Buy' : 'Sell',
             symbol: r.symbol,
             qty: Calc.fmt(r.qty, 4),
-            importo: r.currency === 'USD' ? `$ ${Calc.fmt(r.totalNative)}` : `€ ${Calc.fmt(r.totalEur)}`,
+              importo: r.currency !== 'EUR' ? `${r.currency === 'USD' ? '$' : r.currency === 'CAD' ? 'C$' : r.currency} ${Calc.fmt(r.totalNative)}` : `€ ${Calc.fmt(r.totalEur)}`,
             pnlPercent: r.pnlPercent !== null ? `${Calc.fmtSign(r.pnlPercent)}%` : '—',
             pnlEur: pnlEur !== null && pnlEur !== undefined ? `€ ${Calc.fmt(pnlEur)}` : '—',
             esito: isPlus ? 'Plus' : isMinus ? 'Minus' : '—',
@@ -447,8 +447,8 @@ function renderStorico(portfolio, dividendi, taxRegime) {
                         <td class="${r.type === 'buy' ? 'tx-buy' : 'tx-sell'}">${r.type === 'buy' ? '🟢 Buy' : '🔴 Sell'}</td>
                         <td>${r.symbol}</td>
                         <td>${Calc.fmt(r.qty, 4)}</td>
-                        <td>${r.currency === 'USD'
-                            ? `$ ${Calc.fmt(r.totalNative)} <span style="font-size:10px;color:var(--text-muted)">(€ ${Calc.fmt(r.totalEur)})</span>`
+                        <td>${r.currency !== 'EUR'
+                            ? `${r.currency === 'USD' ? '$' : r.currency === 'CAD' ? 'C$' : r.currency} ${Calc.fmt(r.totalNative)} <span style="font-size:10px;color:var(--text-muted)">(€ ${Calc.fmt(r.totalEur)})</span>`
                             : `€ ${Calc.fmt(r.totalEur)}`}</td>
                         <td>${r.pnlPercent !== null ? `<span class="${r.pnlPercent >= 0 ? 'pos-gain' : 'neg-loss'}">${Calc.fmtSign(r.pnlPercent)}%</span>` : '—'}</td>
                         <td>${pnlEur !== null && pnlEur !== undefined ? `<span class="${pnlEur >= 0 ? 'pos-gain' : 'neg-loss'}">€ ${Calc.fmt(pnlEur)}</span>` : '—'}</td>

@@ -21,13 +21,13 @@ function toISODate(dateStr) {
   return dateStr;
 }
 
-const BDITALIA_URL = (dateStr) =>
+const BDITALIA_URL = (dateStr, currency = 'USD') =>
   `https://tassidicambio.bancaditalia.it/terzevalute-wf-web/rest/v1.0/dailyRates` +
-  `?lang=it&currencyIsoCode=USD&referenceDate=${dateStr}`;
+  `?lang=it&currencyIsoCode=${currency}&referenceDate=${dateStr}`;
 
-const BDITALIA_PROXIES = (dateStr) => [
-  `${PROXY}?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
-  `https://api.allorigins.win/get?url=${encodeURIComponent(BDITALIA_URL(dateStr))}`,
+const BDITALIA_PROXIES = (dateStr, currency = 'USD') => [
+  `${PROXY}?url=${encodeURIComponent(BDITALIA_URL(dateStr, currency))}`,
+  `https://api.allorigins.win/get?url=${encodeURIComponent(BDITALIA_URL(dateStr, currency))}`,
 ];
 
 function withTimeout(ms = 6000) {
@@ -51,7 +51,8 @@ function parseMaybeJson(value) {
 }
 
 export const Exchange = {
-  rate: 1.08,
+  rate: 1.08,                       // retro-compatibilità: alias di rates.USD
+  rates: { USD: 1.08, CAD: 1.47 },
 
   _memoryCache: new Map(),
   _pendingRates: new Map(),
@@ -69,7 +70,9 @@ export const Exchange = {
         const data = i === 1 ? parseMaybeJson(raw.contents) : raw;
 
         if (data?.result === 'success' && data?.rates?.USD > 0) {
+          this.rates.USD = data.rates.USD;
           this.rate = data.rates.USD;
+          if (data.rates.CAD > 0) this.rates.CAD = data.rates.CAD;
           this._liveRateTs = Date.now();
           return true;
         }
@@ -81,15 +84,18 @@ export const Exchange = {
 
   convert(value, from, to) {
     if (from === to) return value;
-    return from === 'EUR' ? value * this.rate : value / this.rate;
+    const currency = from === 'EUR' ? to : from;
+    const r = this.rates[currency] || this.rate;
+    return from === 'EUR' ? value * r : value / r;
   },
 
-  async getRateForDate(dateStr) {
-    if (!dateStr) return this.rate;
+  async getRateForDate(dateStr, currency = 'USD') {
+    if (!dateStr) return this.rates[currency] || this.rate;
 
     this._ensureStorageLoaded();
 
-    const key = toISODate(dateStr);
+    const dateKey = toISODate(dateStr);
+    const key = `${currency}_${dateKey}`;
     const memEntry = this._memoryCache.get(key);
 
     if (memEntry && isFresh(memEntry.ts, HIST_TTL)) {
@@ -100,9 +106,9 @@ export const Exchange = {
       return this._pendingRates.get(key);
     }
 
-    const request = this._fetchHistoricRate(key)
+    const request = this._fetchHistoricRate(dateKey, currency)
       .then((rate) => {
-        const finalRate = rate || this.rate;
+        const finalRate = rate || this.rates[currency] || this.rate;
         this._memoryCache.set(key, { rate: finalRate, ts: Date.now() });
         this._saveFxCacheThrottled();
         return finalRate;
@@ -115,11 +121,11 @@ export const Exchange = {
     return request;
   },
 
-  async _fetchHistoricRate(dateStr, _depth = 0) {
+  async _fetchHistoricRate(dateStr, currency = 'USD', _depth = 0) {
     if (_depth > 7) return null; // max 7 giorni indietro
 
     const key = toISODate(dateStr);
-    const proxies = BDITALIA_PROXIES(key);
+    const proxies = BDITALIA_PROXIES(key, currency);
 
     for (let i = 0; i < proxies.length; i++) {
       try {
@@ -142,7 +148,7 @@ export const Exchange = {
     const prev = new Date(key);
     prev.setDate(prev.getDate() - 1);
     const prevStr = prev.toISOString().slice(0, 10);
-    return this._fetchHistoricRate(prevStr, _depth + 1);
+    return this._fetchHistoricRate(prevStr, currency, _depth + 1);
   },
 
   _normalizeProxyPayload(raw, proxyIndex) {
@@ -166,7 +172,7 @@ export const Exchange = {
     return [];
   },
 
-  async prefetchRatesForDates(dates = []) {
+  async prefetchRatesForDates(dates = [], currency = 'USD') {
     this._ensureStorageLoaded();
 
     const normalized = [...new Set(
@@ -176,37 +182,42 @@ export const Exchange = {
     )];
 
     const missing = normalized.filter((dateStr) => {
-      const cached = this._memoryCache.get(dateStr);
+      const cached = this._memoryCache.get(`${currency}_${dateStr}`);
       return !(cached && isFresh(cached.ts, HIST_TTL));
     });
 
     if (!missing.length) return true;
 
     await Promise.all(
-      missing.map(dateStr => this.getRateForDate(dateStr))
+      missing.map(dateStr => this.getRateForDate(dateStr, currency))
     );
 
     return true;
   },
 
   async prefetchRatesForPortfolio(portfolio = {}) {
-    const dates = [];
+    const byCurrency = {};
 
     Object.values(portfolio || {}).forEach((asset) => {
-      if (!asset || asset.valuta !== 'USD') return;
+      const v = (asset?.valuta || 'EUR').toUpperCase();
+      if (!asset || v === 'EUR') return;
+      if (!byCurrency[v]) byCurrency[v] = [];
       (asset.transactions || []).forEach((tx) => {
-        if (tx?.date) dates.push(tx.date);
+        if (tx?.date) byCurrency[v].push(tx.date);
       });
     });
 
-    return this.prefetchRatesForDates(dates);
+    return Promise.all(
+      Object.entries(byCurrency).map(([currency, dates]) => this.prefetchRatesForDates(dates, currency))
+    ).then(() => true);
   },
 
   async getWeightedHistoricRate(transactions, fromCurrency, toCurrency) {
     if (fromCurrency === toCurrency) return 1;
+    const currency = fromCurrency === 'EUR' ? toCurrency : fromCurrency;
 
     const buys = (transactions || []).filter(t => t.type === 'buy');
-    if (!buys.length) return this.rate;
+    if (!buys.length) return this.rates[currency] || this.rate;
 
     await this.prefetchRatesForDates(
       buys
@@ -214,14 +225,15 @@ export const Exchange = {
           const manual = parseFloat(tx.exchangeRate);
           return !(manual && isFinite(manual) && manual > 0);
         })
-        .map(tx => tx.date)
+        .map(tx => tx.date),
+      currency
     );
 
     const rates = await Promise.all(
       buys.map(async (tx) => {
         const manual = parseFloat(tx.exchangeRate);
         if (manual && isFinite(manual) && manual > 0) return manual;
-        return this.getRateForDate(tx.date);
+        return this.getRateForDate(tx.date, currency);
       })
     );
 
@@ -234,7 +246,7 @@ export const Exchange = {
       totalBase += qty * rates[index];
     });
 
-    return totalQty > 0 ? totalBase / totalQty : this.rate;
+    return totalQty > 0 ? totalBase / totalQty : (this.rates[currency] || this.rate);
   },
 
   _ensureStorageLoaded() {

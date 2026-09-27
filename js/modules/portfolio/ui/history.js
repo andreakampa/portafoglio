@@ -60,18 +60,24 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxReg
     overlay.innerHTML = `
         <div class="modal modal-wide">
             <div class="modal-header">
-                <h3>📜 Storico — ${p.nome}${p.valuta === 'USD' ? ` <button id="hist-fix-valuta" title="Correggi valuta a EUR" style="margin-left:8px;padding:2px 8px;font-size:11px;font-weight:700;background:var(--warning);color:#fff;border:none;border-radius:4px;cursor:pointer;">$ → €</button>` : ''} <button id="hist-pac-btn" title="Gestisci PAC" style="margin-left:6px;padding:2px 8px;font-size:11px;font-weight:600;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:4px;cursor:pointer;">↻ PAC</button></h3>
+                <h3>📜 Storico — ${p.nome}
+                    <select id="hist-change-valuta" title="Cambia valuta del titolo" style="margin-left:8px;font-size:11px;font-weight:700;padding:2px 4px;border-radius:4px;border:1px solid var(--border);">
+                        <option value="EUR" ${p.valuta === 'EUR' ? 'selected' : ''}>EUR</option>
+                        <option value="USD" ${p.valuta === 'USD' ? 'selected' : ''}>USD</option>
+                        <option value="CAD" ${p.valuta === 'CAD' ? 'selected' : ''}>CAD</option>
+                    </select>
+                    <button id="hist-pac-btn" title="Gestisci PAC" style="margin-left:6px;padding:2px 8px;font-size:11px;font-weight:600;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:4px;cursor:pointer;">↻ PAC</button></h3>
                 <button class="btn-x" id="hist-close">✕</button>
             </div>
             <div class="modal-body">
                 <div class="preview-box" id="hist-summary" style="margin-bottom:14px;"></div>
                 <div class="table-wrapper">
-                    ${p.valuta === 'USD' ? `<p style="margin:0 0 8px;font-size:11px;color:var(--text-muted);">ℹ️ Per le posizioni in USD: il P&L <b>fiscale</b> (€) usa il cambio storico di acquisto ed è il valore da dichiarare; il P&L <b>broker</b> (€) converte il guadagno nativo in dollari al cambio della vendita, come generalmente mostrato dal tuo broker.</p>` : ''}
+                    ${p.valuta !== 'EUR' ? `<p style="margin:0 0 8px;font-size:11px;color:var(--text-muted);">ℹ️ Per le posizioni in ${p.valuta}: il P&L <b>fiscale</b> (€) usa il cambio storico di acquisto ed è il valore da dichiarare; il P&L <b>broker</b> (€) converte il guadagno nativo al cambio della vendita, come generalmente mostrato dal tuo broker.</p>` : ''}
                     <table class="tx-table tx-table-compact">
                         <thead><tr>
                             <th class="sort-header" data-col="date" id="hist-date-th">Data<span class="sort-arrow" id="hist-date-arrow"></span></th><th>Tipo</th><th>Q.tà</th>
                             <th>Prezzo</th><th>Comm.</th><th>Totale</th>
-                            ${portfolio[id]?.valuta === 'USD' ? '<th>Tasso €/$</th>' : ''}
+                            ${portfolio[id]?.valuta !== 'EUR' ? `<th>Tasso €/${portfolio[id]?.valuta}</th>` : ''}
                             <th>PMC</th><th>P&L Lordo${p.valuta === 'USD' ? ' <span title="Fiscale: usa il cambio storico di acquisto, è il valore da dichiarare. Broker: converte il guadagno in dollari al cambio della vendita, come mostrato dal tuo broker." style="cursor:help;color:var(--text-muted);">ⓘ</span>' : ''}</th><th>P&L Netto</th><th></th>
                         </tr></thead>
                         <tbody id="hist-tbody"></tbody>
@@ -103,9 +109,14 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxReg
         });
     });
 
-    document.getElementById('hist-fix-valuta')?.addEventListener('click', async () => {
-        if (!confirm(`Cambiare la valuta di ${p.nome} da USD a EUR?\nAttenzione: i tassi di cambio salvati sulle transazioni verranno rimossi.`)) return;
-        p.valuta = 'EUR';
+    document.getElementById('hist-change-valuta')?.addEventListener('change', async (e) => {
+        const newValuta = e.target.value;
+        if (newValuta === p.valuta) return;
+        if (!confirm(`Cambiare la valuta di ${p.nome} da ${p.valuta} a ${newValuta}?\nAttenzione: i tassi di cambio salvati sulle transazioni verranno rimossi — andranno reinseriti manualmente per riflettere il nuovo cambio.`)) {
+            e.target.value = p.valuta;
+            return;
+        }
+        p.valuta = newValuta;
         p.transactions = (p.transactions || []).map(tx => {
             const { exchangeRate, ...rest } = tx;
             return rest;
@@ -113,7 +124,7 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxReg
         await onSave();
         overlay.classList.remove('visible');
         unlockScroll();
-        Toast.show(`${p.nome} ora è in EUR`, 'ok');
+        Toast.show(`${p.nome} ora è in ${newValuta}`, 'ok');
     });
 
     renderHistoryContent(id, portfolio, onSave, currency, taxRegime);
@@ -122,10 +133,10 @@ export function openHistoryModal(id, portfolio, onSave, currency = 'EUR', taxReg
 function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime = 'amministrato') {
     const p = portfolio[id];
     const { qta, pmc, pmcEur, realizedPnL, totalComm } = Calc.positionSync(p, taxRegime);
-    const isUSD = p.valuta === 'USD';
+    const isUSD = p.valuta !== 'EUR'; // nome storico: ora significa "valuta estera", non solo USD
     const s = currency === 'EUR' ? '€' : '$';   // simbolo secondo il toggle del sito
-    const nativeS = isUSD ? '$' : '€';          // simbolo nativo della posizione (per gli hint)
-    const rate = Exchange.rate || 1;
+    const nativeS = p.valuta === 'USD' ? '$' : p.valuta === 'CAD' ? 'C$' : '€'; // simbolo nativo della posizione
+    const rate = Exchange.rates?.[p.valuta] || Exchange.rate || 1;
     const txsSorted = (p.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
     const totalMargine = txsSorted.reduce((sum, tx) => sum + (tx.type === 'buy' ? (tx.marginAmount || 0) : 0), 0);
 
@@ -372,7 +383,8 @@ function renderHistoryContent(id, portfolio, onSave, currency = 'EUR', taxRegime
 function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amministrato') {
     document.getElementById('modal-edit-tx')?.remove();
 
-    const isUSD = portfolio[id].valuta === 'USD';
+     const isUSD = portfolio[id].valuta !== 'EUR'; // significa "valuta estera"
+    const valutaLabel = portfolio[id].valuta;
     const isTransferred = !!origTx.transferred;
 
     const wrap = document.createElement('div');
@@ -414,6 +426,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                             <select id="edit-tx-comm-currency" style="width:80px;" ${isTransferred ? 'disabled' : ''}>
                                 <option value="EUR" ${(origTx.commissionCurrency || 'EUR') === 'EUR' ? 'selected' : ''}>€ EUR</option>
                                 <option value="USD" ${origTx.commissionCurrency === 'USD' ? 'selected' : ''}>$ USD</option>
+                                <option value="CAD" ${origTx.commissionCurrency === 'CAD' ? 'selected' : ''}>C$ CAD</option>
                             </select>
                         </div>
                     </div>
@@ -425,7 +438,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                     ${isUSD ? `
                     <div>
                         <span class="modal-label">
-                            Tasso EUR/USD
+                            Tasso EUR/${valutaLabel}
                             <span class="text-muted fs-xs">(modifica se la banca differisce)</span>
                         </span>
                         <div style="display:flex; gap:6px; align-items:center;">
@@ -479,7 +492,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
             fxReset.style.display = 'none';
             autoRate = null;
 
-            Exchange._fetchHistoricRate(origTx.date)
+            Exchange._fetchHistoricRate(origTx.date, portfolio[id].valuta)
                 .then(rate => {
                     if (!rate || rate <= 0) return;
                     autoRate = rate;
@@ -488,7 +501,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                 })
                 .catch(() => {});
         } else {
-            Exchange._fetchHistoricRate(origTx.date)
+            Exchange._fetchHistoricRate(origTx.date, portfolio[id].valuta)
                 .then(rate => {
                     if (!rate || rate <= 0) throw new Error();
                     Exchange._memoryCache.set(origTx.date, { rate, ts: Date.now() });
@@ -510,7 +523,7 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
             fxReset.style.display = 'none';
             autoRate = null;
 
-            Exchange._fetchHistoricRate(e.target.value)
+            Exchange._fetchHistoricRate(e.target.value, portfolio[id].valuta)
                 .then(rate => {
                     if (!rate || rate <= 0) throw new Error();
                     Exchange._memoryCache.set(e.target.value, { rate, ts: Date.now() });

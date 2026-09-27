@@ -26,10 +26,11 @@ export async function openSimModal(id, portfolio, prices, taxRegime = 'amministr
 
     const prLive = prices[id] ?? pmc;
     const overlay = document.getElementById('modal-simulazione');
-    const isUSD = p.valuta === 'USD';
-    const rate = Exchange.rate || 1.08;
-    const toEur = v => isUSD ? v / rate : v;
-    const toNative = v => isUSD ? v * rate : v;
+     const isForeign = p.valuta !== 'EUR';
+    const currencySymbol = p.valuta === 'USD' ? '$' : p.valuta === 'CAD' ? 'C$' : '€';
+    const rate = Exchange.rates?.[p.valuta] || Exchange.rate || 1.08;
+    const toEur = v => isForeign ? v / rate : v;
+    const toNative = v => isForeign ? v * rate : v;
 
     overlay.innerHTML = `
         <div class="modal" style="border-top: 3px solid var(--warning)">
@@ -167,12 +168,12 @@ export async function openSimModal(id, portfolio, prices, taxRegime = 'amministr
             panel.innerHTML = `<div class="text-muted fs-xs">Nessun lotto disponibile.</div>`;
             return;
         }
-        const sym = isUSD ? '$' : '€';
+        const sym = currencySymbol;
 
         panel.innerHTML = lots.map(l => {
             let pmcLabel = `${sym} ${Calc.fmt(l.price)}`;
-            if (isUSD) {
-                const lotRate = l.exchangeRate || Exchange._memoryCache.get(l.date)?.rate || Exchange.rate || 1;
+            if (isForeign) {
+                const lotRate = l.exchangeRate || Exchange._memoryCache.get(`${p.valuta}_${l.date}`)?.rate || rate;
                 pmcLabel += ` <span class="text-muted fs-xs">(≈ € ${Calc.fmt(l.price / lotRate)})</span>`;
             }
             return `
@@ -234,7 +235,7 @@ const calcSimBuy = () => {
     const c = parseFloat(document.getElementById('sim-comm').value) || 0;
     const box = document.getElementById('sim-result');
     const cartBtn = document.getElementById('sim-add-cart-buy');
-    const s = p.valuta === 'USD' ? '$' : '€';
+      const s = currencySymbol;
 
     lastBuyResult = null;
     cartBtn.style.display = 'none';
@@ -252,7 +253,7 @@ const calcSimBuy = () => {
             commission: c,
             qta,
             pmc,
-            isUSD,
+            isUSD: isForeign,
             rate
         });
 
@@ -267,8 +268,8 @@ const calcSimBuy = () => {
             return;
         }
 
-        const convLine = isUSD
-            ? `<br>Budget convertito: <b>$ ${Calc.fmt(result.budgetNative)}</b> &nbsp;|&nbsp; Comm. ≈ <b>$ ${Calc.fmt(result.commissionNative)}</b>`
+         const convLine = isForeign
+            ? `<br>Budget convertito: <b>${s} ${Calc.fmt(result.budgetNative)}</b> &nbsp;|&nbsp; Comm. ≈ <b>${s} ${Calc.fmt(result.commissionNative)}</b>`
             : '';
 
         box.style.display = 'block';
@@ -294,7 +295,7 @@ const calcSimBuy = () => {
             commission: c,
             qta,
             pmc,
-            isUSD,
+            isUSD: isForeign,
             rate
         });
 
@@ -303,7 +304,7 @@ const calcSimBuy = () => {
             return;
         }
 
-        const convLine = isUSD
+        const convLine = isForeign
             ? `<br>Costo in EUR: <b>€ ${Calc.fmt(result.totalEur)}</b>`
             : '';
 
@@ -355,7 +356,7 @@ const calcSimBuy = () => {
             commission: c,
             lots,
             tipoAsset: p.tipoAsset,
-            isUSD,
+            isUSD: isForeign,
             rate,
             minusDisponibili
         });
@@ -382,7 +383,7 @@ const calcSimBuy = () => {
             <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--border); display:grid; gap:4px;">
 
                 <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted);">Cassa</div>
-                <div>Incasso lordo: <b>${isUSD ? `$ ${Calc.fmt(result.grossReceipt)} ≈ € ${Calc.fmt(result.grossReceiptEur)}` : `€ ${Calc.fmt(result.grossReceipt)}`}</b></div>
+                <div>Incasso lordo: <b>${isForeign ? `${currencySymbol} ${Calc.fmt(result.grossReceipt)} ≈ € ${Calc.fmt(result.grossReceiptEur)}` : `€ ${Calc.fmt(result.grossReceipt)}`}</b></div>
                 ${result.pnl > 0
                     ? `<div>Tasse (${result.taxLabel}): <b class="neg-loss">− € ${Calc.fmt(result.tax)}</b></div>`
                     : `<div style="color:var(--text-muted)">Nessuna tassa (operazione in perdita)</div>`}
@@ -437,7 +438,7 @@ const calcSimSell = () => {
         pmc,
         pmcEur,
         tipoAsset: p.tipoAsset,
-        isUSD,
+        isUSD: isForeign,
         rate,
         minusDisponibili
     });
