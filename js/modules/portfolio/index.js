@@ -19,7 +19,6 @@ import { Dividendi } from '../../api/dividendi.js';
 import { openDividendiModal } from './ui/dividendi.js';
 import { openStoricoModal } from './ui/storico.js';
 import { AiAgent } from './ui/ai.js';
-import { AiAgent } from './ui/ai.js';
 
 const DEFAULT_PORTFOLIO_NAME = 'Portafoglio principale';
 const DEFAULT_TAX_REGIME = 'amministrato';
