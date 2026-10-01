@@ -4,7 +4,7 @@
 
 // ⚠️ Sostituisci con l'URL del tuo Worker (lo stesso usato in yahoo.js),
 // senza "/chat" e senza "?url=".
-const WORKER_URL = 'https://finance-proxy.NOME.workers.dev';
+const WORKER_URL = 'https://finance-proxy.andrea-kampa.workers.dev/';
 
 const KEY_STORAGE = 'gemini_api_key';
 const CACHE_PREFIX = 'ai_analysis_';
