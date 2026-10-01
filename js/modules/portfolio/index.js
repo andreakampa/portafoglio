@@ -18,6 +18,7 @@ import { generaPacTransazioni } from './ui/pac.js';
 import { Dividendi } from '../../api/dividendi.js';
 import { openDividendiModal } from './ui/dividendi.js';
 import { openStoricoModal } from './ui/storico.js';
+import { AiAgent } from './ui/ai.js';
 
 const DEFAULT_PORTFOLIO_NAME = 'Portafoglio principale';
 const DEFAULT_TAX_REGIME = 'amministrato';
@@ -173,6 +174,11 @@ aggiornaBadgeFiscale(this.portfolio, this._getActivePortfolio()?.taxRegime || 'a
         await this._refreshPrices();
 await this._aggiornaDividendi();
         this._autoTimer = setInterval(() => this._backgroundRefresh(), 5 * 60 * 1000);
+
+        AiAgent.init({
+            getContext: () => this._buildAiContext(),
+            getPortfolioId: () => this.activePortfolioId
+        });
         
     }
 
@@ -212,6 +218,7 @@ await this._aggiornaDividendi();
 
     destroy() {
         clearInterval(this._autoTimer);
+        AiAgent.destroy();
         this._portfolioSwitcherBound = false;
         if (this._docClickSwitcher) document.removeEventListener('click', this._docClickSwitcher);
         if (this._docClickSuggest) document.removeEventListener('click', this._docClickSuggest);
@@ -1170,6 +1177,53 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
             }
         }
         return { totMercatoEur, totCostoEur };
+    }
+
+    async _buildAiContext() {
+        this._syncActivePortfolio();
+        const pf = this._getActivePortfolio();
+        const positionMap = await buildPositionMap(this.portfolio, this.prices);
+
+        let tot = 0;
+        for (const id in positionMap) {
+            const pos = positionMap[id];
+            if (pos && pos.qta > 0) tot += pos.attEur || 0;
+        }
+
+        const pct = (a, b) => {
+            const r = (a / b - 1) * 100;
+            return b && isFinite(r) ? +r.toFixed(2) : null;
+        };
+
+        const posizioni = [];
+        for (const id in positionMap) {
+            const pos = positionMap[id];
+            if (!pos || pos.qta <= 0) continue;
+            const asset = this.portfolio[id] || {};
+            const prezzo = this.prices[id];
+            posizioni.push({
+                ticker: asset.ticker || asset.nome || id,
+                tipo: asset.tipoAsset || 'stock',
+                valuta: asset.valuta || 'EUR',
+                pesoPct: tot ? +(((pos.attEur || 0) / tot) * 100).toFixed(2) : null,
+                plPct: pos.invEur ? pct(pos.attEur, pos.invEur) : null,
+                prezzo: prezzo ?? null,
+                varGiornalieraPct: pct(prezzo, this.prevClose[id]),
+                distDaMax52wPct: pct(prezzo, this.week52Highs[id]),
+                distDaMin52wPct: pct(prezzo, this.week52Lows[id]),
+                mercato: this.marketStates[id] || null
+            });
+        }
+        posizioni.sort((a, b) => (b.pesoPct || 0) - (a.pesoPct || 0));
+
+        return {
+            legenda: 'pesoPct = peso sul valore di mercato del portafoglio; plPct = profitto/perdita sul costo; ' +
+                     'distDaMax52wPct negativo = drawdown dal massimo a 52 settimane; varGiornalieraPct = variazione rispetto alla chiusura precedente.',
+            portafoglio: pf?.name || 'Portafoglio',
+            regimeFiscale: pf?.taxRegime || 'amministrato',
+            numeroPosizioni: posizioni.length,
+            posizioni
+        };
     }
 
     _handlers() {
