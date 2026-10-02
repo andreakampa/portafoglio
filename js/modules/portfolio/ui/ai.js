@@ -307,7 +307,14 @@ async function ask(question, opts = {}) {
     const wait = addMsg('model', '<i>Sto analizzando i dati…</i>');
 
     try {
-        const context = await getContext();
+        let context;
+        try {
+            context = await getContext();
+        } catch (e) {
+            console.error('AI: errore nel contesto', e);
+            wait.innerHTML = 'Non riesco a leggere i dati del portafoglio. Dettaglio: ' + esc(e.message || e);
+            return;
+        }
         const res = await fetch(`${WORKER_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Gemini-Key': key },
@@ -333,7 +340,7 @@ async function ask(question, opts = {}) {
             store.set(CACHE_PREFIX + pid, JSON.stringify({ ts: Date.now(), text: data.answer }));
         }
     } catch {
-        wait.innerHTML = 'Non riesco a contattare il server. Controlla la connessione e riprova.';
+        wait.innerHTML = 'Non riesco a contattare il server (' + esc(WORKER_URL) + '). Controlla l\'indirizzo del Worker in ai.js.';
     } finally {
         setBusy(false);
         $('ai-msgs').scrollTop = $('ai-msgs').scrollHeight;
