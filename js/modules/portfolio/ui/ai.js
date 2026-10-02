@@ -326,6 +326,7 @@ async function ask(question, opts = {}) {
 
         if (!res.ok || !data.answer) {
             wait.innerHTML = errorHtml(data.error, res.status);
+            if (data.detail) wait.innerHTML += '<div class="ai-note">' + esc(data.status + ': ' + data.detail) + '</div>';
             if (data.error === 'chiave_mancante' || data.error === 'chiave_non_valida') {
                 showKeyBox('Controlla o sostituisci la chiave.');
             }
