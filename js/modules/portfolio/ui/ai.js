@@ -13,7 +13,7 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1 ora
 const ANALYSIS_PROMPT =
     'Analizza il mio portafoglio. Includi: (1) concentrazione e sbilanciamenti per peso, ' +
     '(2) drawdown delle posizioni rispetto al massimo a 52 settimane, ' +
-    '(3) posizioni che oggi si muovono di più, (4) segnali di possibile sopravvalutazione o ' +
+    '(3) posizioni che oggi si muovono di più, (4) sentiment per titolo (positivo, neutro o negativo) ricavato SOLO dai titoli di notizie forniti, se presenti, (5) segnali di possibile sopravvalutazione o ' +
     'sottovalutazione che puoi dedurre SOLO dai dati forniti. ' +
     'Chiudi con una tabella riassuntiva e 3-5 punti di attenzione.';
 

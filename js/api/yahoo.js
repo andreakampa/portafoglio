@@ -136,7 +136,7 @@ export const Yahoo = {
             const data = await r.json();
             const items = (data.news || [])
                 .filter(n => n?.title &&
-                    (!Array.isArray(n.relatedTickers) || !n.relatedTickers.length || n.relatedTickers.includes(ticker)))
+                    Array.isArray(n.relatedTickers) && n.relatedTickers.includes(ticker))
                 .map(n => ({
                     titolo: String(n.title).slice(0, 160),
                     fonte: n.publisher || null,
