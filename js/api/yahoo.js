@@ -10,6 +10,10 @@ const PROXIES_30D = [
     ticker => `https://api.allorigins.win/get?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/' + ticker + '?interval=1d&range=1mo')}`,
 ];
 
+// Cache in memoria delle notizie (15 minuti): evita di rifare le richieste a ogni domanda all'AI.
+const NEWS_TTL_MS = 15 * 60 * 1000;
+const _newsCache = {};
+
 export const Yahoo = {
     async fetchPrice(ticker) {
     for (let i = 0; i < PROXIES.length; i++) {
@@ -118,5 +122,47 @@ export const Yahoo = {
             }
         });
         return sparklines;
+    },
+
+    // Titoli di notizie recenti per un ticker, solo tramite il tuo Worker
+    // (nessun proxy di terze parti). Restituisce [] se non ce ne sono o in caso di errore.
+    async fetchNews(ticker, limit = 3) {
+        const hit = _newsCache[ticker];
+        if (hit && Date.now() - hit.ts < NEWS_TTL_MS) return hit.items.slice(0, limit);
+        try {
+            const target = 'https://query1.finance.yahoo.com/v1/finance/search?q=' +
+                encodeURIComponent(ticker) + '&quotesCount=0&newsCount=8';
+            const r = await fetch(`${PROXY}?url=${encodeURIComponent(target)}`, { signal: AbortSignal.timeout(6000) });
+            const data = await r.json();
+            const items = (data.news || [])
+                .filter(n => n?.title &&
+                    (!Array.isArray(n.relatedTickers) || !n.relatedTickers.length || n.relatedTickers.includes(ticker)))
+                .map(n => ({
+                    titolo: String(n.title).slice(0, 160),
+                    fonte: n.publisher || null,
+                    data: n.providerPublishTime
+                        ? new Date(n.providerPublishTime * 1000).toISOString().slice(0, 10)
+                        : null
+                }));
+            _newsCache[ticker] = { ts: Date.now(), items };
+            return items.slice(0, limit);
+        } catch (e) {
+            return [];
+        }
+    },
+
+    // Notizie per più titoli in parallelo: { id: ticker } -> { id: [notizie] }
+    async fetchNewsMap(tickerMap, limit = 3) {
+        const entries = Object.entries(tickerMap);
+        const results = await Promise.allSettled(
+            entries.map(([id, ticker]) =>
+                this.fetchNews(ticker, limit).then(items => ({ id, items }))
+            )
+        );
+        const out = {};
+        results.forEach(({ status, value }) => {
+            if (status === 'fulfilled' && value?.items?.length) out[value.id] = value.items;
+        });
+        return out;
     }
 };
