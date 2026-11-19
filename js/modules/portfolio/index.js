@@ -21,6 +21,7 @@ import { openStoricoModal } from './ui/storico.js';
 import { AiAgent } from './ui/ai.js';
 import { IbkrSync } from './ui/ibkr.js';
 import { countTxWithoutId, ensureTxIds } from './ibkr-import.js';
+import { escapeHtml } from './ui/helpers.js';
 
 const DEFAULT_PORTFOLIO_NAME = 'Portafoglio principale';
 const DEFAULT_TAX_REGIME = 'amministrato';
@@ -311,9 +312,6 @@ renderMobileCards(state, handlers);
          this._syncActivePortfolio();
         this._ensurePortfolioSwitcher();
                 this._lastKnownPortfoliosJSON = stableStringify(stripEmpty(this.portfolioState.portfolios) || {});
-    }
-
-    async _save() {
     }
 
      async _persistPortfolioState() {
@@ -1045,18 +1043,20 @@ Toast.show(`Portafoglio attivo: ${this._getActivePortfolio()?.name || '—'}`, '
                     suggestBox.innerHTML = '<div class=\"suggest-empty\">Nessun risultato</div>';
                     return;
                 }
+                // I risultati arrivano da Yahoo (dati esterni): sempre con escape.
+                const e = escapeHtml;
                 suggestBox.innerHTML = results.map(r => `
                     <div class=\"suggest-item\"
-                         data-ticker=\"${r.ticker}\"
-                         data-currency=\"${r.currency}\"
-                         data-name=\"${r.name}\"
-                         data-tipo=\"${r.tipoAsset}\"
-                         data-tipolabel=\"${r.tipoLabel}\"
-                         data-logo=\"${r.logoUrl || ''}\">
-                        ${r.logoUrl ? `<img src=\"${r.logoUrl}\" class=\"suggest-logo\" alt=\"\">` : ''}
-                        <span class=\"suggest-ticker\">${r.ticker}</span>
-                        <span class=\"suggest-name\">${r.name}</span>
-                        <span class=\"suggest-meta\">${r.exchange} · ${r.currency} · ${r.tipoLabel}</span>
+                         data-ticker=\"${e(r.ticker)}\"
+                         data-currency=\"${e(r.currency)}\"
+                         data-name=\"${e(r.name)}\"
+                         data-tipo=\"${e(r.tipoAsset)}\"
+                         data-tipolabel=\"${e(r.tipoLabel)}\"
+                         data-logo=\"${e(r.logoUrl || '')}\">
+                        ${r.logoUrl ? `<img src=\"${e(r.logoUrl)}\" class=\"suggest-logo\" alt=\"\">` : ''}
+                        <span class=\"suggest-ticker\">${e(r.ticker)}</span>
+                        <span class=\"suggest-name\">${e(r.name)}</span>
+                        <span class=\"suggest-meta\">${e(r.exchange)} · ${e(r.currency)} · ${e(r.tipoLabel)}</span>
                     </div>`).join('');
 
                 suggestBox.querySelectorAll('.suggest-item').forEach(el => {

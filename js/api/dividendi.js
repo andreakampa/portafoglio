@@ -1,6 +1,6 @@
 import { Exchange } from './exchange.js';
 
-const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';
+import { PROXY } from './config.js';
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 
 function cacheKey(portfolioId = 'default') {

@@ -1,0 +1,9 @@
+// Pubblicazione: npx wrangler@4 deploy -c workers/ibkr-relay/wrangler.jsonc
+{
+  "name": "ibkr-relay",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-18",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true }
+}

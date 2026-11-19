@@ -1,10 +1,7 @@
-// js/pages/portfolio/ui/ai.js
+// js/modules/portfolio/ui/ai.js
 // Assistente AI del portafoglio (Gemini, chiave dell'utente nel suo browser).
 // Il Worker Cloudflare fa solo da ponte: non conserva nessuna chiave.
-
-// ⚠️ Sostituisci con l'URL del tuo Worker (lo stesso usato in yahoo.js),
-// senza "/chat" e senza "?url=".
-const WORKER_URL = 'https://finance-proxy.andrea-kampa.workers.dev';
+import { PROXY as WORKER_URL } from '../../../api/config.js';
 
 const KEY_STORAGE = 'gemini_api_key';
 const CACHE_PREFIX = 'ai_analysis_';
@@ -341,7 +338,7 @@ async function ask(question, opts = {}) {
             store.set(CACHE_PREFIX + pid, JSON.stringify({ ts: Date.now(), text: data.answer }));
         }
     } catch {
-        wait.innerHTML = 'Non riesco a contattare il server (' + esc(WORKER_URL) + '). Controlla l\'indirizzo del Worker in ai.js.';
+        wait.innerHTML = 'Non riesco a contattare il server (' + esc(WORKER_URL) + '). Controlla l\'indirizzo del Worker in api/config.js.';
     } finally {
         setBusy(false);
         $('ai-msgs').scrollTop = $('ai-msgs').scrollHeight;

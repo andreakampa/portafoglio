@@ -1,0 +1,9 @@
+// Pubblicazione: npx wrangler@4 deploy -c workers/finance-proxy/wrangler.jsonc
+{
+  "name": "finance-proxy",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-03-14",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true }
+}

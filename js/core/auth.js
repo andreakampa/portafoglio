@@ -1,6 +1,5 @@
 import { Toast } from './toast.js';
 
-const CONFIG_KEY  = 'ptpro_config_v5';
 const FB_APP_URL  = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 const FB_AUTH_URL = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
