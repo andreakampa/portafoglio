@@ -598,6 +598,10 @@ function openEditModal(id, origTx, portfolio, onSave, currency, taxRegime = 'amm
                 date: newDate, type: newType,
                 qty: newQty, price: newPr, commission: newComm,
                 ...(isPac ? { source: 'pac' } : {}),
+                ...(origTx.id ? { id: origTx.id } : {}),
+                ...(origTx.externalId ? { externalId: origTx.externalId, source: origTx.source, ...(origTx.ibkrFx ? { ibkrFx: origTx.ibkrFx } : {}) } : {}),
+                ...(origTx.lotAllocation && newQty === origTx.qty ? { lotAllocation: origTx.lotAllocation } : {}),
+                ...(origTx.saleMode ? { saleMode: origTx.saleMode } : {}),
                 ...(origTx.transferred ? {
                     transferred: true,
                     sourcePortfolioId: origTx.sourcePortfolioId,
@@ -771,7 +775,7 @@ function openTransferEditModal(id, origTx, portfolio, onSave, currency, taxRegim
         // Aggiorna anche nel destinazione
         if (linkedPortfolio) {
             const linkedAsset = linkedPortfolio.assets?.[id];
-            if (linkedAsset) {a
+            if (linkedAsset) {
                 const linkIdx = linkedAsset.transactions.findIndex(
                     t => t.transferId === origTx.transferId && t.type === 'transfer'
                 );

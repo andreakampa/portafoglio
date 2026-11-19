@@ -19,6 +19,8 @@ import { Dividendi } from '../../api/dividendi.js';
 import { openDividendiModal } from './ui/dividendi.js';
 import { openStoricoModal } from './ui/storico.js';
 import { AiAgent } from './ui/ai.js';
+import { IbkrSync } from './ui/ibkr.js';
+import { countTxWithoutId, ensureTxIds } from './ibkr-import.js';
 
 const DEFAULT_PORTFOLIO_NAME = 'Portafoglio principale';
 const DEFAULT_TAX_REGIME = 'amministrato';
@@ -154,6 +156,7 @@ export class PortfolioPage {
         }
 
          await Promise.all([Exchange.update(), this._loadData()]);
+        await this._migrateTxIds();
         this._startStaleWatch();
         this.columnConfig = await DB.load('column_config');
         this._updateExchangeLabel();
@@ -173,6 +176,7 @@ export class PortfolioPage {
         await this._aggiornaAllPac();
 
 initCassettoFiscale(() => this._getActivePortfolio(), () => this._save());
+IbkrSync.init({ getState: () => this.portfolioState, save: () => this._save() });
 
 aggiornaBadgeFiscale(this.portfolio, this._getActivePortfolio()?.taxRegime || 'amministrato');
 
@@ -185,6 +189,12 @@ await this._aggiornaDividendi();
             getPortfolioId: () => this.activePortfolioId
         });
         
+    }
+
+    async _migrateTxIds() {
+        if (!countTxWithoutId(this.portfolioState)) return;
+        await DB.save('backup_prima_migrazione_id', this.portfolioState); // copia di sicurezza
+        await this._persistPortfolioState(); // assegna gli id e salva
     }
 
     async _aggiornaAllPac() {
@@ -313,6 +323,7 @@ renderMobileCards(state, handlers);
     }
 
      async _persistPortfolioState() {
+        ensureTxIds(this.portfolioState); // ogni movimento ha sempre un id
         // Impostiamo la baseline PRIMA di salvare, non dopo: l'evento SSE
         // di conferma della nostra stessa scrittura può arrivare prima che
         // la fetch del salvataggio risponda, quindi va già "atteso".
