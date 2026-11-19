@@ -138,3 +138,66 @@ input {
 .skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* ── Componenti dati (fase 1) ────────────────────── */
+:root { --pos: #15803d; --neg: #c2383a; --warn-bg: #fff7e6; --warn-border: #f0c36d; }
+@media (prefers-color-scheme: dark) { :root { --pos: #3ccf74; --neg: #ff6b6d; --warn-bg: #2a2112; --warn-border: #7a5a1c; } }
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+.small { font-size: .85rem; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.pills { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.pills::-webkit-scrollbar { display: none; }
+.pill {
+  flex: none; display: inline-flex; align-items: baseline; gap: 6px; min-height: 36px; padding: 0 14px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+.pill.active { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+.pill-sub { font-size: .7rem; opacity: .75; font-weight: 500; }
+
+.kpis { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.kpi { display: grid; gap: 2px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.kpi-label { color: var(--muted); font-size: .8rem; font-weight: 600; }
+.kpi-value { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kpi-hint { color: var(--muted); font-size: .75rem; }
+
+.toolbar { display: flex; justify-content: flex-end; }
+label.inline { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--muted); }
+select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+
+.card.warn { background: var(--warn-bg); border-color: var(--warn-border); }
+.card.warn summary { cursor: pointer; font-weight: 600; }
+.card.warn ul { margin: 8px 0 0; padding-left: 18px; }
+
+.pos-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pos-card { gap: 4px; padding: 14px 16px; }
+.pos-card-head { display: flex; align-items: center; gap: 8px; }
+.pos-day { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pos-card-main { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.pos-value { font-size: 1.15rem; font-weight: 700; }
+.pos-card-meta { font-size: .85rem; font-variant-numeric: tabular-nums; }
+.pos-table { display: none; }
+@media (min-width: 900px) {
+  .pos-cards { display: none; }
+  .pos-table {
+    display: table; width: 100%; border-collapse: collapse; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  }
+  .pos-table th, .pos-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); text-align: left; }
+  .pos-table th.num, .pos-table td.num { text-align: right; }
+  .pos-table th { color: var(--muted); font-size: .8rem; font-weight: 600; background: var(--surface-2); }
+  .pos-table tbody tr:last-child td { border-bottom: none; }
+  .pos-table tbody tr:hover { background: var(--surface-2); }
+}
+
+.plain-list { list-style: none; margin: 0; padding: 0; }
+.plain-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.plain-list li:last-child { border-bottom: none; }
+.linklike { background: none; border: none; padding: 0; color: var(--text); font: inherit; font-weight: 650; cursor: pointer; text-align: left; }
+.fiscal-lines { list-style: none; margin: 0; padding: 0; }
+.fiscal-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.fiscal-lines li:last-child { border-bottom: none; }
+.fiscal-lines .num { display: grid; justify-items: end; align-content: start; gap: 2px; }
