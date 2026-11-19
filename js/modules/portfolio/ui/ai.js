@@ -4,7 +4,7 @@
 
 // ⚠️ Sostituisci con l'URL del tuo Worker (lo stesso usato in yahoo.js),
 // senza "/chat" e senza "?url=".
-const WORKER_URL = 'https://finance-proxy.andrea-kampa.workers.dev/';
+const WORKER_URL = 'https://finance-proxy.andrea-kampa.workers.dev';
 
 const KEY_STORAGE = 'gemini_api_key';
 const CACHE_PREFIX = 'ai_analysis_';
@@ -13,7 +13,7 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1 ora
 const ANALYSIS_PROMPT =
     'Analizza il mio portafoglio. Includi: (1) concentrazione e sbilanciamenti per peso, ' +
     '(2) drawdown delle posizioni rispetto al massimo a 52 settimane, ' +
-    '(3) posizioni che oggi si muovono di più, (4) segnali di possibile sopravvalutazione o ' +
+    '(3) posizioni che oggi si muovono di più, (4) sentiment per titolo (positivo, neutro o negativo) ricavato SOLO dai titoli di notizie forniti, se presenti, (5) segnali di possibile sopravvalutazione o ' +
     'sottovalutazione che puoi dedurre SOLO dai dati forniti. ' +
     'Chiudi con una tabella riassuntiva e 3-5 punti di attenzione.';
 
@@ -218,7 +218,7 @@ function build() {
     <div class="ai-keymsg" id="ai-keymsg"></div>
     Chiave Gemini (si crea gratis su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>).
     Resta salvata solo in questo browser.
-    <input id="ai-key-input" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false">
+    <input id="ai-key-input" type="password" placeholder="Chiave…" autocomplete="off" spellcheck="false">
     <button id="ai-key-save" class="primary" type="button">Salva chiave</button>
     <button id="ai-key-remove" type="button">Rimuovi</button>
     <div style="margin-top:6px;color:#6a6960;">
@@ -249,8 +249,8 @@ function build() {
 
     $('ai-key-save').addEventListener('click', () => {
         const v = $('ai-key-input').value.trim();
-        if (!/^AIza[0-9A-Za-z_-]{30,}$/.test(v)) {
-            $('ai-keymsg').textContent = 'La chiave non sembra valida: deve iniziare con "AIza".';
+        if (!/^[A-Za-z0-9._-]{20,300}$/.test(v)) {
+            $('ai-keymsg').textContent = 'La chiave non sembra valida: controlla di averla copiata per intero, senza spazi.';
             return;
         }
         store.set(KEY_STORAGE, v);
@@ -307,7 +307,14 @@ async function ask(question, opts = {}) {
     const wait = addMsg('model', '<i>Sto analizzando i dati…</i>');
 
     try {
-        const context = await getContext();
+        let context;
+        try {
+            context = await getContext();
+        } catch (e) {
+            console.error('AI: errore nel contesto', e);
+            wait.innerHTML = 'Non riesco a leggere i dati del portafoglio. Dettaglio: ' + esc(e.message || e);
+            return;
+        }
         const res = await fetch(`${WORKER_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Gemini-Key': key },
@@ -319,6 +326,7 @@ async function ask(question, opts = {}) {
 
         if (!res.ok || !data.answer) {
             wait.innerHTML = errorHtml(data.error, res.status);
+            if (data.detail) wait.innerHTML += '<div class="ai-note">' + esc(data.status + ': ' + data.detail) + '</div>';
             if (data.error === 'chiave_mancante' || data.error === 'chiave_non_valida') {
                 showKeyBox('Controlla o sostituisci la chiave.');
             }
@@ -333,7 +341,7 @@ async function ask(question, opts = {}) {
             store.set(CACHE_PREFIX + pid, JSON.stringify({ ts: Date.now(), text: data.answer }));
         }
     } catch {
-        wait.innerHTML = 'Non riesco a contattare il server. Controlla la connessione e riprova.';
+        wait.innerHTML = 'Non riesco a contattare il server (' + esc(WORKER_URL) + '). Controlla l\'indirizzo del Worker in ai.js.';
     } finally {
         setBusy(false);
         $('ai-msgs').scrollTop = $('ai-msgs').scrollHeight;
