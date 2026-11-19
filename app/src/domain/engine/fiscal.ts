@@ -6,11 +6,20 @@ export const YEARS_CARRY_FORWARD = 4
 
 export type Category = 'strumenti' | 'crypto'
 
+/** Aliquota effettiva sul guadagno pieno (per mostrarla all'utente). */
 export function taxRateFor(assetType: AssetType | undefined): number {
   if (assetType === 'bond') return 0.125
   if (assetType === 'crypto') return 0.33
   return 0.26
 }
+
+/**
+ * Titoli di Stato e "white list": plus e minus entrano nel calcolo per il 48,08%,
+ * poi tassati al 26% (= 12,5% effettivo). Così una minus su BTP compensa meno di una su azioni.
+ */
+export const BOND_WEIGHT = 0.4808
+const baseWeight = (assetType: AssetType | undefined) => (assetType === 'bond' ? BOND_WEIGHT : 1)
+const baseRate = (assetType: AssetType | undefined) => (assetType === 'crypto' ? 0.33 : 0.26)
 
 export const categoryFor = (assetType: AssetType | undefined): Category => (assetType === 'crypto' ? 'crypto' : 'strumenti')
 
@@ -42,8 +51,9 @@ export interface FiscalLine {
   year: number
   side: 'long' | 'short' | 'manuale'
   gainEur: number
-  /** Minus usate per compensare questa plus. */
+  /** Minus usate per compensare questa plus (per i titoli di Stato: sulla base al 48,08%). */
   compensatedEur: number
+  /** Imponibile al 26% (33% per crypto) dopo la compensazione. */
   taxableEur: number
   taxEur: number
   excluded: 'fondo-etf' | null
@@ -143,7 +153,7 @@ export function computeFiscal(
     const base = { key: it.key, assetId: e.assetId, assetName: e.assetName, assetType: e.assetType, date: e.date, year, side: e.side }
 
     if (e.gainEur < -0.005) {
-      addLoss(category, year, -e.gainEur)
+      addLoss(category, year, -e.gainEur * baseWeight(e.assetType))
       lines.push({ ...base, gainEur: e.gainEur, compensatedEur: 0, taxableEur: 0, taxEur: 0, excluded: null })
       continue
     }
@@ -153,11 +163,12 @@ export function computeFiscal(
     }
 
     const excluded = plusNotCompensable(e.assetType) ? ('fondo-etf' as const) : null
-    const compensatedEur = excluded ? 0 : consumeLosses(category, year, e.gainEur)
-    const taxableEur = e.gainEur - compensatedEur
+    const taxBase = e.gainEur * baseWeight(e.assetType)
+    const compensatedEur = excluded ? 0 : consumeLosses(category, year, taxBase)
+    const taxableEur = taxBase - compensatedEur
     lines.push({
       ...base, gainEur: e.gainEur, compensatedEur, taxableEur,
-      taxEur: taxableEur * taxRateFor(e.assetType), excluded,
+      taxEur: taxableEur * baseRate(e.assetType), excluded,
     })
   }
 

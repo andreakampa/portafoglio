@@ -67,9 +67,24 @@ describe('cassetto fiscale', () => {
     expect(r.lines[2]!.compensatedEur).toBeCloseTo(100, 8)
   })
 
-  it('aliquote: 12,5% titoli di stato, 33% crypto', () => {
+  it('aliquote: titoli di Stato 12,5% effettivo (48,08% × 26%), crypto 33%', () => {
     const r = computeFiscal([ev('2026-01-10', 100, 'bond'), ev('2026-01-11', 100, 'crypto')])
-    expect(r.lines.map(l => l.taxEur)).toEqual([12.5, 33])
+    expect(r.lines[0]!.taxEur).toBeCloseTo(12.5, 2)
+    expect(r.lines[1]!.taxEur).toBeCloseTo(33, 8)
+  })
+
+  it('titoli di Stato: la minus compensa solo per il 48,08%', () => {
+    const r = computeFiscal([ev('2026-01-10', -100, 'bond'), ev('2026-03-10', 100, 'stock')])
+    const plus = r.lines[1]!
+    expect(plus.compensatedEur).toBeCloseTo(48.08, 8)
+    expect(plus.taxEur).toBeCloseTo((100 - 48.08) * 0.26, 8)
+  })
+
+  it('titoli di Stato: una minus su azioni compensa la plus su BTP sulla base ridotta', () => {
+    const r = computeFiscal([ev('2026-01-10', -100, 'stock'), ev('2026-03-10', 100, 'bond')])
+    expect(r.lines[1]!.compensatedEur).toBeCloseTo(48.08, 8)
+    expect(r.lines[1]!.taxEur).toBe(0)
+    expect(availableLosses(r, 2026)).toBeCloseTo(51.92, 8)
   })
 
   it('le minus inserite a mano entrano nel cassetto', () => {
