@@ -56,6 +56,26 @@ export const DB = {
         }
     },
 
+    // Accesso a percorsi fuori da users/{uid} (members, invites, admins).
+    // method: 'GET' | 'PUT' | 'PATCH' | 'DELETE'. Ritorna { ok, status, data }.
+    // Nessun toast: chi chiama decide come mostrare l'errore.
+    async rootRequest(method, path, body) {
+        const token = await this._getToken();
+        if (!token) return { ok: false, status: 401, data: null };
+        const url = `${getDbUrl()}${path || ''}.json?auth=${token}`;
+        try {
+            const r = await fetch(url, {
+                method,
+                headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+                body: body !== undefined ? JSON.stringify(body) : undefined
+            });
+            const data = await r.json().catch(() => null);
+            return { ok: r.ok, status: r.status, data };
+        } catch (e) {
+            return { ok: false, status: 0, data: null };
+        }
+    },
+
     async _getToken() {
         try {
             const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');

@@ -81,7 +81,7 @@ favicon/                icone e web manifest
 
 ## Funzionalità
 
-- Login/registrazione Firebase con codice invito
+- Login Firebase; registrazione solo con invito monouso creato dall'admin (Impostazioni → Inviti)
 - **Multi-portafoglio**: creazione, cambio, regime fiscale per portafoglio (amministrato/dichiarativo)
 - Aggiunta titoli con ricerca e autocompletamento (nome, ticker, ISIN)
 - Movimenti: acquisto, vendita, short sell, buy to cover, trasferimento tra portafogli
@@ -117,21 +117,34 @@ Realtime Database (Europe West 1). Dati per utente sotto `/users/{uid}/`:
 Ogni asset: `nome` (ticker), `valuta`, `tipoAsset` (`stock`/`bond`/`crypto`…), `commDefault`, `logoUrl`,
 `pac`, `transactions[]`. Ogni movimento: `{ id, date, type, qty, price, commission, ... }`.
 
-Regole di sicurezza:
+### Accesso e inviti
 
-```json
-{
-  "rules": {
-    "inviteCode": { ".read": true, ".write": false },
-    "users": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
-      }
-    }
-  }
-}
+Le regole sono in [`database.rules.json`](database.rules.json) e sono la vera protezione: i controlli
+nel browser servono solo a mostrare la schermata giusta.
+
+| Percorso | Chi legge | Chi scrive |
+|---|---|---|
+| `admins/{uid}: true` | l'utente stesso | nessuno dal sito (solo console o CLI) |
+| `invites/{CODICE}` `{ createdBy, createdAt, note, usedBy }` | admin | admin; `usedBy` una sola volta, da chi lo riscatta |
+| `members/{uid}` `{ invite, email, joinedAt }` | l'utente stesso, admin | admin, oppure l'utente stesso una volta con un invito libero |
+| `users/{uid}/…` | l'utente, solo se è in `members` | l'utente, solo se è in `members` |
+
+- **Registrazione:** crea l'account Firebase, poi con una sola scrittura atomica crea `members/{uid}`
+  e segna l'invito come usato. Se l'invito non è valido, l'account appena creato viene eliminato.
+- **Account senza invito:** al login vede la schermata "Serve un invito".
+- **Inviti:** l'admin li crea in Impostazioni → Inviti. Il codice è di 12 caratteri, vale una sola volta e si può eliminare finché è libero.
+- **Nuovo admin:** `firebase database:set /admins/<uid> --data true`.
+
+Test delle regole sugli emulatori (servono Java e Firebase CLI; non toccano il database vero):
+
 ```
+npm run test:rules
+```
+
+Pubblicazione delle regole: `firebase deploy --only database`.
+
+Prove del sito con gli emulatori: avviare `firebase emulators:start --only auth,database`, poi su
+`localhost` eseguire nella console `localStorage.ptpro_emulator = '1'` e ricaricare la pagina.
 
 ## Cloudflare Worker
 
