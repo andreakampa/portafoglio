@@ -1,75 +1,125 @@
-test commit
-
 # Portafoglio Tracker Pro
 
-Sito statico ospitato su GitHub Pages per il tracking del portafoglio azionario.
-URL: https://andreakampa.github.io/portafoglio/
+Web app per il monitoraggio di uno o più portafogli di investimento (azioni, ETF, obbligazioni, crypto),
+con calcolo del prezzo medio di carico, plus/minusvalenze e fiscalità italiana.
+
+- Sito statico ospitato su GitHub Pages: https://andreakampa.github.io/portafoglio/
+- Accesso riservato: account Firebase, registrazione solo con codice invito
 
 ## Stack
-- HTML + CSS + JavaScript vanilla (ES6 modules)
-- Firebase Realtime Database (per salvare i dati)
-- Yahoo Finance API via Cloudflare Worker proxy (per i prezzi live)
-- Cambio EUR/USD via open.er-api.com
-- Nessun framework, nessun bundler
 
-## Struttura file
+- HTML + CSS + JavaScript vanilla (moduli ES6), nessun framework, nessun bundler
+- **Firebase Auth** (email/password) e **Firebase Realtime Database** (REST + streaming SSE)
+- **Cloudflare Worker** (`finance-proxy.andrea-kampa.workers.dev`) come ponte verso Yahoo Finance, Gemini e IBKR
+- **Yahoo Finance** per prezzi, ricerca titoli e dividendi
+- **open.er-api.com** per il cambio attuale, **Banca d'Italia** per i cambi storici
+- **Google Gemini** per l'assistente AI (chiave API dell'utente, salvata solo nel suo browser)
+- **jsPDF + jspdf-autotable + SheetJS** (da CDN) per l'export PDF/Excel
 
-### Root
-- `index.html` → shell HTML: navbar, overlay auth (setup/login), container pagine, script entry point
+## Avvio in locale
 
-### css/
-- `base.css` → variabili CSS dark theme, reset, utility classes, spinner, skeleton loader
-- `components.css` → bottoni, card, stat-card, tabelle, form, modali, toast, auth box, badge
-- `layout.css` → navbar, main content, dashboard grid, responsive mobile
+Non serve build. Basta servire la cartella con un server statico (i moduli ES6 non funzionano da `file://`):
 
-### js/
-- `app.js` → entry point: inizializza Auth, Router, eventi navbar e logout
+```
+npx serve .
+```
 
-### js/core/
-- `auth.js` → setup prima configurazione, login con SHA-256, sessione con sessionStorage
-- `router.js` → SPA router hash-based (#portfolio, #settings), mount/destroy pagine
-- `db.js` → load/save dati su Firebase Realtime Database (fetch REST con token JWT)
-- `cache.js` → cache prezzi in localStorage con TTL 8 minuti
-- `toast.js` → notifiche toast (ok/err/info)
+oppure l'estensione *Live Server* di VS Code.
 
-### js/api/
-- `exchange.js` → fetch cambio EUR/USD da open.er-api.com tramite Cloudflare Worker, singleton
-- `yahoo.js` → fetch prezzi live da Yahoo Finance tramite Cloudflare Worker + allorigins.win come fallback
-- `search.js` → ricerca ticker Yahoo Finance tramite Cloudflare Worker + allorigins.win come fallback
+## Struttura
 
-### js/modules/portfolio/
-- `index.js` → orchestratore: carica dati Firebase, aggiorna prezzi, gestisce stato, chiama render
-- `calc.js` → calcoli puri: PMC da storico transazioni, P&L, after-tax (26% azioni, 12.5% BTP)
-- `render.js` → rendering HTML tabella posizioni e KPI dashboard (stat cards)
-- `ui.js` → modali: transazione (acquisto/vendita), storico transazioni, simulazione acquisto
+```
+index.html              shell: overlay di login, navbar, contenitore pagine, script CDN
+css/
+  base.css              variabili tema, reset, utility, spinner, skeleton
+  components.css        bottoni, card, tabelle, form, modali, toast, badge
+  layout.css            navbar, griglia dashboard, responsive mobile
+  cart.css              pannello carrello
+js/
+  app.js                entry point: login → router → eventi navbar/logout
+  core/
+    auth.js             Firebase Auth: login, registrazione con codice invito, logout
+    router.js           router SPA a hash (#portfolio, #settings); pagine con mount()/destroy()
+    db.js               load/save/watch su Realtime Database (REST con token, SSE per il tempo reale)
+    cache.js            cache prezzi in localStorage (TTL 8 min)
+    toast.js            notifiche
+  api/
+    config.js           costante PROXY (URL del Worker), unica fonte
+    yahoo.js            prezzi live, pre/post market, apertura, minimi/massimi 52 settimane
+    search.js           ricerca titoli (nome, ticker, ISIN)
+    exchange.js         cambio EUR/USD attuale e storico (Banca d'Italia), con cache
+    dividendi.js        storico e stima dividendi da Yahoo
+    fiscale.js          cassetto fiscale: minusvalenze compensabili per anno e categoria
+  modules/
+    settings/index.js   cambio password, svuota cache
+    portfolio/
+      index.js          orchestratore della pagina: stato, caricamento, salvataggio, refresh,
+                        selettore multi-portafoglio, configurazione colonne, blocco anti-conflitto
+      calc.js           calcoli puri: PMC, P&L, tasse, regime amministrato/dichiarativo,
+                        short, trasferimenti, compensazione minusvalenze
+      render.js         KPI, tabella posizioni (ordinabile, colonne configurabili), card mobile, loghi
+      export.js         export PDF/XLSX
+      ui.js             barrel che riesporta le modali
+      ui-sim-legacy.js  simulazione di acquisto/vendita (in uso)
+      ibkr-flex.js          parser XML del report Flex IBKR
+      ibkr-flex-client.js   download del report tramite relay
+      ibkr-import.js        piano di import, applicazione, id dei movimenti
+      ui/
+        transactions.js movimenti: acquisto, vendita, short sell, buy to cover
+        history.js      storico per titolo, lotti, valuta del titolo, cambio storico
+        storico.js      movimenti di tutto il portafoglio (compravendite e dividendi), export
+        transfer.js     trasferimento di un titolo tra portafogli
+        pac.js          piani di accumulo con generazione automatica delle rate
+        dividendi.js    dividendi per titolo/portafoglio, netto accreditato
+        cart.js         carrello di acquisti simulati, per portafoglio
+        sim-core.js     logica di simulazione condivisa
+        ai.js           assistente AI (Gemini) con analisi del portafoglio
+        ibkr.js         collegamento IBKR: impostazioni, sync giornaliero, revisione e annullamento import
+        helpers.js      utility condivise
+favicon/                icone e web manifest
+```
 
-### js/modules/settings/
-- `index.js` → pagina impostazioni: modifica URL Firebase, cambio password, svuota cache
+## Funzionalità
 
-## Funzionalità implementate
-- Setup iniziale con URL Firebase e password (SHA-256)
-- Login con sessione persistente (sessionStorage)
-- Aggiunta titoli con ticker Yahoo Finance (azioni, ETF, obbligazioni, crypto)
-- Ricerca titoli con autocompletamento (nome, ticker, ISIN)
-- Storico transazioni per ogni titolo (acquisto/vendita)
-- Calcolo automatico PMC, P&L realizzato e non realizzato
-- Tassazione automatica: 26% azioni/ETF, 12.5% titoli di stato
-- Controvalore after-tax
-- Prezzi live da Yahoo Finance con cache 8 min
-- Cambio EUR/USD real-time
-- Visualizzazione in EUR o USD
-- Simulazione acquisto (nuovo PMC, azioni acquistabili con budget)
-- Aggiornamento automatico prezzi ogni 5 minuti
-- Loghi ticker con cascata multi-provider + fallback SVG generato
-- Responsive mobile con card espandibili
+- Login/registrazione Firebase con codice invito
+- **Multi-portafoglio**: creazione, cambio, regime fiscale per portafoglio (amministrato/dichiarativo)
+- Aggiunta titoli con ricerca e autocompletamento (nome, ticker, ISIN)
+- Movimenti: acquisto, vendita, short sell, buy to cover, trasferimento tra portafogli
+- Calcolo PMC, P&L realizzato e non realizzato, controvalore after-tax
+- Fiscalità: 26% azioni/ETF, 12,5% titoli di stato, 33% crypto;
+  minusvalenze compensabili per 4 anni, separate per categoria (cassetto fiscale)
+- Cambio storico alla data del movimento (Banca d'Italia) per i titoli in valuta
+- Prezzi live con pre/post market e range 52 settimane, refresh automatico ogni 5 minuti
+- Visualizzazione in EUR o USD; pesi sul portafoglio attivo o su tutti i portafogli
+- PAC con generazione automatica delle rate
+- Dividendi: storico, stima, netto realmente accreditato
+- Carrello di acquisti simulati e simulazione PMC
+- Tabella con colonne riordinabili/nascondibili (salvate su Firebase), card espandibili su mobile
+- Export PDF ed Excel di posizioni e movimenti
+- Assistente AI (Gemini) per analisi del portafoglio, con cache di 1 ora
+- Import automatico da IBKR (Flex Query): revisione prima dell'applicazione, backup e annullamento
+- Sincronizzazione in tempo reale: se i dati cambiano da un altro dispositivo, la pagina si blocca
+  e chiede di ricaricare, per evitare sovrascritture
 
 ## Firebase
-- Realtime Database (Europe West 1)
-- Autenticazione tramite Firebase Auth (email/password)
-- Struttura dati: `/users/{uid}/portafoglio/{id}` con campi:
-  - `nome` (ticker), `valuta`, `tipoAsset`, `commDefault`, `logoUrl`, `transactions[]`
-  - ogni transazione: `{ date, type, qty, price, commission }`
-- Regole di sicurezza:
+
+Realtime Database (Europe West 1). Dati per utente sotto `/users/{uid}/`:
+
+| Percorso | Contenuto |
+|---|---|
+| `portfolio_state` | `{ activePortfolioId, portfolios: { [id]: { id, name, taxRegime, assets, fiscal, marginInterest } } }` |
+| `column_config` | `{ order: [...], hidden: [...] }` |
+| `ibkr_config` | token, Query ID e portafoglio di destinazione per l'import IBKR |
+| `ibkr_backup_ultimo_import` | copia dello stato prima dell'ultimo import IBKR |
+| `backup_prima_migrazione_id` | copia di sicurezza prima dell'assegnazione degli id ai movimenti |
+| `portafoglio` | formato legacy (singolo portafoglio), migrato automaticamente |
+
+Ogni asset: `nome` (ticker), `valuta`, `tipoAsset` (`stock`/`bond`/`crypto`…), `commDefault`, `logoUrl`,
+`pac`, `transactions[]`. Ogni movimento: `{ id, date, type, qty, price, commission, ... }`.
+
+Regole di sicurezza:
+
+```json
 {
   "rules": {
     "inviteCode": { ".read": true, ".write": false },
@@ -81,32 +131,35 @@ URL: https://andreakampa.github.io/portafoglio/
     }
   }
 }
+```
+
 ## Cloudflare Worker
-- URL: `https://finance-proxy.andrea-kampa.workers.dev`
-- Funge da proxy CORS per Yahoo Finance e open.er-api.com
-- Piano gratuito: 100.000 richieste/giorno
-- Codice Worker:
-export default {
-  async fetch(request) {
-    const url = new URL(request.url);
-    const target = url.searchParams.get('url');
-    if (!target) return new Response('Missing url param', { status: 400 });
-    const response = await fetch(target, {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
-    });
-    const body = await response.text();
-    return new Response(body, {
-      status: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      }
-    });
-  }
-};
-## Note future
-- Per aggiungere una nuova pagina: creare `js/modules/nuovapagina/index.js` con `mount()` e `destroy()`, registrarla in `router.js` e aggiungere il link in `index.html`
-- I calcoli fiscali sono in `calc.js` → modificare solo lì le aliquote
-- Il proxy Cloudflare è in `yahoo.js`, `exchange.js` e `search.js` → costante `PROXY` in cima ai file
-- Se il Worker Cloudflare smette di funzionare, `allorigins.win` subentra automaticamente come fallback
-- I loghi ticker usano cascata: financialmodelingprep → parqet → eodhd → SVG generato
+
+Il codice dei Worker è in `workers/` (piano gratuito, 100.000 richieste/giorno).
+Entrambi rispondono solo a `https://andreakampa.github.io` e a `localhost` (per le prove).
+
+**`workers/finance-proxy`** → `https://finance-proxy.andrea-kampa.workers.dev`
+- `?url=<indirizzo>` → proxy CORS, solo verso i domini in `ALLOWED_HOSTS`
+  (Yahoo Finance, open.er-api.com, Banca d'Italia); se non risponde il sito usa `api.allorigins.win`
+- `/chat` → inoltra a Gemini la domanda con la chiave dell'utente (header `X-Gemini-Key`), senza conservarla.
+  Il Worker non ha una chiave propria: ogni utente usa la sua
+
+**`workers/ibkr-relay`** → `https://ibkr-relay.andrea-kampa.workers.dev` (`/send`, `/get`):
+scarica il report Flex (limiti IBKR: 1 richiesta/s, 10/min per token). Non salva nulla.
+
+Pubblicazione (serve Node.js e un login una tantum con `npx wrangler@4 login`):
+
+```
+npx wrangler@4 deploy -c workers/finance-proxy/wrangler.jsonc
+```
+
+Per un nuovo dominio del sito: aggiungerlo ad `ALLOWED_ORIGINS` in entrambi i Worker e ripubblicarli.
+
+## Note per lo sviluppo
+
+- Nuova pagina: creare `js/modules/<nome>/index.js` con una classe che espone `mount()` e `destroy()`,
+  registrarla in `router.js` e aggiungere il link in `index.html`
+- Aliquote e logica fiscale: `calc.js` e `api/fiscale.js`
+- URL del Worker: solo in `api/config.js` (costante `PROXY`), importato da tutti i moduli
+- Dati esterni (Yahoo, IBKR, nomi inseriti) in `innerHTML`: sempre con `escapeHtml` di `ui/helpers.js`
+- Loghi: cascata financialmodelingprep → parqet → eodhd → SVG generato

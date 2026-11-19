@@ -1,3 +1,11 @@
+// Escape per testo inserito in innerHTML (contenuto e attributi tra virgolette).
+// Da usare sempre per dati esterni: Yahoo, IBKR, nomi inseriti dagli utenti.
+export function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
 export function todayISO() {
     return new Date().toISOString().slice(0, 10);
 }

@@ -1,9 +1,6 @@
 import { Cache } from '../../core/cache.js';
 import { Toast } from '../../core/toast.js';
-import { Auth } from '../../core/auth.js';
 import { Exchange } from '../../api/exchange.js';
-
-const CONFIG_KEY = 'ptpro_config_v5';
 
 export class SettingsPage {
     constructor(container) { this.container = container; }

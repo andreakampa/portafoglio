@@ -2,9 +2,9 @@ import { Calc } from '../calc.js';
 import { Exchange } from '../../../api/exchange.js';
 import { Toast } from '../../../core/toast.js';
 import { lockScroll, unlockScroll } from './helpers.js';
+import { PROXY } from '../../../api/config.js';
 
 const PAC_SOURCE = 'pac';
-const PROXY = 'https://finance-proxy.andrea-kampa.workers.dev';
 
 export function openPacModal(id, portfolio, onSave) {
     const p = portfolio[id];
