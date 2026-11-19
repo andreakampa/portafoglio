@@ -4,7 +4,37 @@ Web app per il monitoraggio di uno o più portafogli di investimento (azioni, ET
 con calcolo del prezzo medio di carico, plus/minusvalenze e fiscalità italiana.
 
 - Sito statico ospitato su GitHub Pages: https://andreakampa.github.io/portafoglio/
+- Nuova versione in costruzione (PWA): https://andreakampa.github.io/portafoglio/v2/
 - Accesso riservato: account Firebase, registrazione solo con codice invito
+
+## Nuova versione (`app/`)
+
+Riscrittura progressiva con **Vite + React + TypeScript**, installabile come app (PWA) su Android e PC.
+Usa lo stesso Firebase e gli stessi dati del sito attuale: le due versioni convivono finché la nuova
+non è completa.
+
+```
+cd app
+npm install
+npm run dev        # http://localhost:5173/portafoglio/v2/
+npm run check      # tipi + linter + test (da lanciare prima di ogni commit)
+```
+
+| Cartella | Contenuto |
+|---|---|
+| `src/domain/` | modello dei dati e calcoli puri (PMC, fiscale…), con test |
+| `src/auth/` | login, registrazione con invito, schermata "Serve un invito" |
+| `src/data/` | lettura dei dati da Firebase in tempo reale |
+| `src/layout/` | struttura: barra in basso su telefono, laterale su PC |
+| `src/pages/` | schermate |
+
+Prove con dati finti: `firebase emulators:start --only auth,database`, poi su localhost
+`localStorage.ptpro_emulator = '1'` e ricarica (compare la scritta "Emulatore attivo").
+
+**Pubblicazione automatica** (`.github/workflows/pages.yml`): a ogni PR girano tipi, linter, test
+unitari, build e test delle regole del database. Su `main`, se tutto passa, vengono pubblicati insieme
+il sito attuale e la nuova app in `/v2/`. Il service worker aggiorna l'app da solo: dopo una
+pubblicazione non serve più Ctrl+F5.
 
 ## Stack
 

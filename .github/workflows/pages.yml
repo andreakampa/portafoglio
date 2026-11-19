@@ -1,0 +1,79 @@
+name: Test e pubblicazione
+
+# Su ogni PR: controlli e test. Su main: se tutto passa, pubblica su GitHub Pages
+#   /portafoglio/      sito attuale (index.html, css, js, favicon)
+#   /portafoglio/v2/   nuova app (app/, compilata con Vite)
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-e-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Dipendenze della nuova app
+        working-directory: app
+        run: npm ci
+
+      - name: Tipi, linter e test unitari
+        working-directory: app
+        run: npm run check
+
+      - name: Build della nuova app
+        working-directory: app
+        run: npm run build
+
+      # Le regole del database si testano sugli emulatori Firebase (serve Java).
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Test delle regole del database
+        run: |
+          npm install -g firebase-tools@15 --loglevel=error
+          npm run test:rules
+
+      - name: Prepara il sito (attuale + /v2)
+        run: |
+          mkdir _site
+          cp -r index.html css js favicon _site/
+          cp -r app/dist _site/v2
+
+      - name: Carica il sito
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  pubblica:
+    if: github.event_name != 'pull_request'
+    needs: test-e-build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5
