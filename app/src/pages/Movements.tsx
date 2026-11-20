@@ -1,0 +1,154 @@
+import { useMemo, useState } from 'react'
+import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
+import { useComputedPortfolio } from '../data/useComputedPortfolio'
+import { buildMovements, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
+import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
+
+const TODAY = new Date().toISOString().slice(0, 10)
+type Filter = 'all' | 'trades' | 'short' | 'transfer'
+const FILTERS: { key: Filter; label: string; kinds: MovementKind[] }[] = [
+  { key: 'all', label: 'Tutti', kinds: ['buy', 'sell', 'short_sell', 'buy_to_cover', 'transfer_in', 'transfer_out'] },
+  { key: 'trades', label: 'Compravendite', kinds: ['buy', 'sell'] },
+  { key: 'short', label: 'Short', kinds: ['short_sell', 'buy_to_cover'] },
+  { key: 'transfer', label: 'Trasferimenti', kinds: ['transfer_in', 'transfer_out'] },
+]
+const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
+
+export function Movements() {
+  const c = useComputedPortfolio()
+  const [tab, setTab] = useState<'trades' | 'interest'>('trades')
+  const [period, setPeriod] = useState<Period>('ytd')
+  const [filter, setFilter] = useState<Filter>('all')
+  const [search, setSearch] = useState('')
+
+  const all = useMemo(() => (c.status === 'ready' ? buildMovements(c.portfolio, c.result) : []), [c])
+
+  if (c.status === 'loading') return <section className="page"><h1>Movimenti</h1><div className="card skeleton" style={{ height: 240 }} /></section>
+  if (c.status === 'error') return <section className="page"><h1>Movimenti</h1><div className="card error">{c.message}</div></section>
+  if (c.status === 'empty') return <section className="page"><h1>Movimenti</h1><div className="card">Nessun portafoglio.</div></section>
+
+  const years = [...new Set(all.map(m => m.date.slice(0, 4)))].filter(y => y !== String(THIS_YEAR)).sort().reverse()
+  const [from, to] = periodRange(period, TODAY)
+  const kinds = FILTERS.find(f => f.key === filter)!.kinds
+  const q = search.trim().toUpperCase()
+  const list = all.filter(m => m.date >= from && m.date < to && kinds.includes(m.kind) && (!q || m.symbol.toUpperCase().includes(q)))
+  const gain = list.reduce((s, m) => s + (m.gainEur ?? 0), 0)
+  const interest = marginInterest(c.portfolio).filter(r => `${r.period}-01` >= from.slice(0, 8) + '01' && `${r.period}-01` < to)
+
+  const periods: { key: Period; label: string }[] = [
+    { key: '1m', label: '1 mese' },
+    { key: '3m', label: '3 mesi' },
+    { key: 'ytd', label: String(THIS_YEAR) },
+    ...years.map(y => ({ key: y as Period, label: y })),
+    { key: 'all', label: 'Tutto' },
+  ]
+
+  return (
+    <section className="page">
+      <header className="page-head">
+        <h1>Movimenti</h1>
+        <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={c.select} />
+      </header>
+
+      <div className="pills" role="tablist" aria-label="Sezione">
+        <button type="button" role="tab" aria-selected={tab === 'trades'} className={`pill ${tab === 'trades' ? 'active' : ''}`} onClick={() => setTab('trades')}>Operazioni</button>
+        <button type="button" role="tab" aria-selected={tab === 'interest'} className={`pill ${tab === 'interest' ? 'active' : ''}`} onClick={() => setTab('interest')}>Interessi margine</button>
+      </div>
+
+      <div className="pills" role="tablist" aria-label="Periodo">
+        {periods.map(p => (
+          <button key={p.key} type="button" role="tab" aria-selected={period === p.key} className={`pill small-pill ${period === p.key ? 'active' : ''}`} onClick={() => setPeriod(p.key)}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'trades' ? (
+        <>
+          <div className="filters">
+            <select value={filter} onChange={e => setFilter(e.target.value as Filter)} aria-label="Tipo di movimento">
+              {FILTERS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+            </select>
+            <input type="search" placeholder="Cerca titolo" value={search} onChange={e => setSearch(e.target.value)} aria-label="Cerca titolo" />
+          </div>
+
+          <div className="kpis">
+            <Kpi label="Movimenti" value={String(list.length)} />
+            <Kpi label="Plus/minus del periodo" value={eur(gain, true)} className={tone(gain)} hint="vendite e chiusure short" />
+          </div>
+
+          {list.length === 0 ? (
+            <div className="card muted">Nessun movimento in questo periodo.</div>
+          ) : (
+            <>
+              <ul className="mov-list">
+                {list.map(m => <MovementItem key={m.key} m={m} />)}
+              </ul>
+              <table className="pos-table mov-table">
+                <thead>
+                  <tr>
+                    <th>Data</th><th>Titolo</th><th>Tipo</th><th className="num">Quantità</th><th className="num">Prezzo</th>
+                    <th className="num">Controvalore</th><th className="num">Commissioni</th><th className="num">Plus/minus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map(m => (
+                    <tr key={m.key}>
+                      <td>{fmtDate(m.date)}</td>
+                      <td><b>{m.symbol}</b></td>
+                      <td><span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>{m.marginAmount > 0 && <span className="badge" title="Finanziato a margine">margine {money(m.marginAmount, m.currency)}</span>}</td>
+                      <td className="num">{qty(m.qty)}</td>
+                      <td className="num">{money(m.price, m.currency)}</td>
+                      <td className="num">{money(m.gross, m.currency)}</td>
+                      <td className="num">{m.commission ? money(m.commission, m.commissionCurrency) : '—'}</td>
+                      <td className={`num ${tone(m.gainEur)}`}>{m.gainEur === null ? '' : eur(m.gainEur, true)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </>
+      ) : (
+        <div className="card">
+          <h2>Interessi sul margine</h2>
+          {interest.length === 0 ? (
+            <p className="muted">Nessun interesse nel periodo. Gli importi arrivano dall'import IBKR o si inseriscono nel sito attuale.</p>
+          ) : (
+            <ul className="plain-list">
+              {interest.map(r => (
+                <li key={r.id ?? `${r.period}-${r.currency}`}>
+                  <span>{new Date(r.period + '-15').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}</span>
+                  <b className="neg">{money(-Math.abs(r.amount), r.currency)}</b>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="muted small">Il calcolo automatico per posizione, con il tasso IBKR giornaliero, arriverà con la gestione del margine.</p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function MovementItem({ m }: { m: Movement }) {
+  return (
+    <li className="card mov-item">
+      <div className="mov-head">
+        <b>{m.symbol}</b>
+        <span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>
+        <span className="muted mov-date">{fmtDate(m.date)}</span>
+      </div>
+      <div className="mov-body">
+        <span>{qty(m.qty)} × {money(m.price, m.currency)} = {money(m.gross, m.currency)}</span>
+        {m.gainEur !== null && <b className={tone(m.gainEur)}>{eur(m.gainEur, true)}</b>}
+      </div>
+      {(m.commission > 0 || m.marginAmount > 0) && (
+        <div className="muted small">
+          {m.commission > 0 && <>Commissioni {money(m.commission, m.commissionCurrency)}</>}
+          {m.marginAmount > 0 && <> · a margine {money(m.marginAmount, m.currency)}</>}
+        </div>
+      )}
+    </li>
+  )
+}

@@ -201,3 +201,48 @@ select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .fiscal-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .fiscal-lines li:last-child { border-bottom: none; }
 .fiscal-lines .num { display: grid; justify-items: end; align-content: start; gap: 2px; }
+
+/* ── Movimenti ───────────────────────────────────── */
+.small-pill { min-height: 32px; padding: 0 12px; font-size: .85rem; }
+.filters { display: flex; gap: 8px; }
+.filters input { flex: 1; min-height: 36px; }
+.mov-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mov-item { gap: 4px; padding: 12px 14px; }
+.mov-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mov-date { margin-left: auto; font-size: .85rem; }
+.mov-body { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.kind { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: .75rem; font-weight: 650; background: var(--surface-2); color: var(--muted); }
+.kind-buy, .kind-transfer_in { color: var(--pos); }
+.kind-sell, .kind-transfer_out { color: var(--neg); }
+.kind-short_sell, .kind-buy_to_cover { color: var(--primary); }
+/* Otto colonne stanno comode solo da 1200px: prima, schede (mai scorrimento laterale). */
+@media (min-width: 900px) { .mov-table.pos-table { display: none; } }
+@media (min-width: 1200px) { .mov-list { display: none; } .mov-table.pos-table { display: table; } }
+html, body { overflow-x: hidden; }
+.content { min-width: 0; }
+
+/* ── Note ────────────────────────────────────────── */
+.row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+textarea {
+  width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font: inherit; resize: vertical;
+}
+.note-form { gap: 14px; }
+.form-row { display: grid; gap: 12px; }
+@media (min-width: 600px) { .form-row { grid-template-columns: 1fr 1fr; } }
+.form-actions { display: flex; gap: 8px; }
+.notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.note { gap: 6px; align-content: start; }
+.note-done { opacity: .55; }
+.note-done h2 { text-decoration: line-through; }
+.note-head { display: flex; align-items: center; gap: 8px; }
+.note-date { margin-left: auto; }
+.note-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-tickers { display: flex; flex-wrap: wrap; gap: 4px; }
+.note-tickers .badge { margin-left: 0; }
+.note-actions { display: flex; gap: 16px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--border); font-size: .9rem; }
+.note-actions .linklike { font-weight: 600; color: var(--primary); }
+.note-actions .linklike.neg { color: var(--neg); }
+.note-kind-mossa { color: var(--primary); }
+.note-kind-monitora { color: #b7791f; }
+.note-kind-evento { color: var(--pos); }
