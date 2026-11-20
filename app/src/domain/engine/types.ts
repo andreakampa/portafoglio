@@ -7,6 +7,7 @@ export type TaxRegime = 'amministrato' | 'dichiarativo'
 export type CostMethod =
   | 'average' // costo medio ponderato (regime amministrato)
   | 'lifo' // ultimo entrato primo uscito (regime dichiarativo, presunzione di legge)
+  | 'fifo' // primo entrato primo uscito: non è un metodo fiscale italiano, serve per confrontarsi con IBKR
 
 export type TxType = 'buy' | 'sell' | 'transfer' | 'short_sell' | 'buy_to_cover'
 

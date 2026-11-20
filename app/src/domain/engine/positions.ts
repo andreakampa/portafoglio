@@ -82,6 +82,11 @@ function consume(
         const lot = lots[i]!
         if (lot.qty > EPS) take(lot, Math.min(lot.qty, left))
       }
+    } else if (method === 'fifo') {
+      for (const lot of lots) {
+        if (left <= EPS) break
+        if (lot.qty > EPS) take(lot, Math.min(lot.qty, left))
+      }
     } else {
       // Costo medio ponderato = consumo proporzionale da tutti i lotti aperti.
       const open = lots.reduce((s, l) => s + l.qty, 0)

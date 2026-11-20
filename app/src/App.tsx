@@ -4,6 +4,8 @@ import { useAuth } from './auth/context'
 import { LoginScreen } from './auth/LoginScreen'
 import { AppShell } from './layout/AppShell'
 import { Fiscal } from './pages/Fiscal'
+import { Movements } from './pages/Movements'
+import { Notes } from './pages/Notes'
 import { Overview } from './pages/Overview'
 import { Placeholder } from './pages/Placeholder'
 import { Positions } from './pages/Positions'
@@ -16,9 +18,9 @@ const router = createHashRouter([
     children: [
       { index: true, element: <Overview /> },
       { path: 'posizioni', element: <Positions /> },
-      { path: 'movimenti', element: <Placeholder title="Movimenti" what="Compravendite, dividendi e interessi, con prezzo di negoziazione e filtri." /> },
+      { path: 'movimenti', element: <Movements /> },
       { path: 'fiscale', element: <Fiscal /> },
-      { path: 'note', element: <Placeholder title="Note" what="Idee, prossime mosse, titoli da seguire e date delle trimestrali." /> },
+      { path: 'note', element: <Notes /> },
       { path: 'impostazioni', element: <Settings /> },
       { path: '*', element: <Placeholder title="Pagina non trovata" what="Questo indirizzo non esiste." /> },
     ],

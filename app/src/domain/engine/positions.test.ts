@@ -197,3 +197,20 @@ describe('dati non coerenti', () => {
     expect(p.issues).toEqual([])
   })
 })
+
+describe('FIFO (solo per confronto con i broker)', () => {
+  it('vende prima il lotto più vecchio', () => {
+    const p = computePosition(
+      asset('EUR', [
+        { date: '2026-01-10', type: 'buy', qty: 10, price: 100 },
+        { date: '2026-02-10', type: 'buy', qty: 10, price: 120 },
+        { date: '2026-03-10', type: 'sell', qty: 15, price: 130 },
+      ]),
+      'fifo',
+      noFx,
+    )
+    // 10 a 100 + 5 a 120 = 1600 → 1950 − 1600 = 350
+    expect(p.realized[0]!.gainEur).toBeCloseTo(350, 8)
+    expect(p.costEur).toBeCloseTo(600, 8)
+  })
+})
