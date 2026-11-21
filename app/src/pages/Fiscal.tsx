@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { DividendsCard } from '../components/DividendsCard'
 import { Issues } from '../components/Issues'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
@@ -38,6 +39,10 @@ export function Fiscal() {
         <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={c.select} />
         <p className="muted small">{regimeNote}</p>
       </header>
+
+      {c.result.regime === 'dichiarativo' && (
+        <Link to="/fiscale/dichiarazione" className="btn btn-primary fiscal-link">Prospetto per la dichiarazione (RT, RM, RW)</Link>
+      )}
 
       <div className="pills" role="tablist" aria-label="Anno">
         {years.map(y => (

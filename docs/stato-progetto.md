@@ -74,7 +74,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 
 ## Stato al 21/11/2026 (fine sessione) — da dove ripartire
 **Pubblicato su `main` e online** (v2 su `/portafoglio/v2/`): margine, scheda Cassa (Movimenti), dividendi e "Imposte stimate" nel Fiscale, PAC automatico, opzioni.
-**PR aperta:** questa (strumento opzioni + stato). Su `main` il resto è tutto unito; ultima verifica: 170 test verdi.
+**PR aperte:** strumento opzioni + stato (#20) e prospetto per la dichiarazione (branch `dichiarazione`). Su `main` il resto è tutto unito; ultima verifica: 170 test verdi.
 
 - **Dividendi (Fiscale):** per anno lordo, ritenute, 26% e netto. IBKR = dati veri dei movimenti di cassa (da gennaio 2026); gli altri portafogli = stima Yahoo
   (quantità prima dello stacco × importo; ritenuta 15% sui titoli USA). Dichiarativo: 26% sul lordo **senza credito per la ritenuta estera** (scelta prudente di Andrea).
@@ -86,12 +86,21 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - **Opzioni:** vedi punto 1 qui sotto. Call BMEA nei dati IBKR; Worker ripubblicato.
 
 ## Da fare, in ordine di priorità
-1. **Dichiarazione dei redditi (730 / Redditi PF) — richiesta principale di Andrea, da progettare con lui.** Obiettivo: aiutarlo a fine anno a compilare i quadri giusti, come lo strumento TIR di Paolo Coletti.
-   - **Quadro RT** (plus/minus da dichiarativo, LIFO, minus pregresse) e **RM** (dividendi esteri, 26%), **RW** (monitoraggio e IVAFE), prospetto per cambi.
-   - **Cambi:** confronto sistematico con i cambi storici Banca d'Italia (il motore li usa già; manca il rapporto di confronto con i dati di IBKR).
-   - **Dati:** il prospetto fiscale/rendiconto IBKR di fine anno (Andrea lo invierà quando sarà pronto) e, per Mediolanum e Trade Republic, le certificazioni fiscali (amministrati: il lavoro è della banca).
-   - Prima di scrivere codice chiedere ad Andrea: output voluto (PDF/tabella per quadro/righe da copiare), anno fiscale di riferimento, valore al 31/12 per IVAFE/RW (serve il prezzo a fine anno), credito per ritenute estere (punto controverso).
-   - Punto incerto da risolvere con un commercialista: credito per le ritenute estere sui dividendi in dichiarativo.
+1. **Dichiarazione dei redditi (fatto il prospetto, 21/11/2026, PR `dichiarazione`):** Fiscale → "Prospetto per la dichiarazione (RT, RM, RW)"
+   (`#/fiscale/dichiarazione`, solo portafogli dichiarativi). Motore in `app/src/domain/engine/taxReturn.ts` (13 test), dati in `data/useTaxReturn.ts`.
+   Righi e colonne presi dalle istruzioni ufficiali Redditi PF 2026 (Fascicolo 2); nel 730 gli stessi dati vanno nei quadri T, M, W.
+   - **RT sezione II-A:** RT11 corrispettivi e costi, RT52, RT13/RT71 minus pregresse (le più vecchie prima), RT72-RT74, RT102 minus da riportare. Titoli di Stato al 48,08%,
+     plus di ETF/fondi spostate nel quadro RM (lettera B), crypto solo segnalate (sezione V-A non compilata).
+   - **RM31:** un rigo per tipo e Stato: H dividendi, B ETF/fondi esteri, C prestito titoli (SYEP), G interessi; 26% sul lordo, nessun credito per la ritenuta estera.
+     Stato dall'ISIN (tabella codici in `countries.ts`); interessi e SYEP con lo Stato del broker (Irlanda, `BROKER_ISO`).
+   - **RW:** rigo unico codice 20 (deposito titoli, aggregazione ammessa dalle istruzioni) + prospetto per titolo da conservare; periodi di possesso col LIFO, valore iniziale/finale
+     a prezzo di mercato (chiusura Yahoo al 31/12), **cambio medio mensile Banca d'Italia** (`lib/fxMonthly.ts`), giorni pesati, IVAFE 2‰ pro rata. Conto corrente: IVAFE 34,20 € solo
+     se la giacenza media supera 5.000 € (la giacenza vera va letta sul rendiconto IBKR; oggi il saldo è a debito).
+   - **Cambi:** di base Banca d'Italia del giorno; interruttore "Cambi IBKR" e confronto delle due versioni movimento per movimento.
+   - Anno in corso = bozza (prezzi e cambi di oggi); dal 1/1 si aggiorna da solo coi valori al 31/12. Pulsanti "Copia tutto" e "Stampa / PDF".
+   - Prova sugli emulatori con la copia dei dati del 21/11 (2026, cambi BdI): plus netta 4.675 €, imposta RT 1.216 €, RM 30 €, IVAFE ~64 €.
+   - **Da fare a inizio 2027:** confrontare i totali con il rendiconto annuale IBKR (Andrea lo invierà), verificare righi/colonne sulle istruzioni 2027 appena escono,
+     decidere col commercialista i punti incerti (credito ritenute estere, cambio BdI o IBKR, giacenza media del conto). Mediolanum e Trade Republic: amministrati, servono solo le loro certificazioni.
 2. **Sincronizzazione IBKR — resta:** azioni "premio versamento" (maturano dal 2027); assegnazione/esercizio di opzioni (vanno "da controllare", si registrano a mano);
    dopo il primo addebito mensile di interessi (inizio dicembre) controllare l'avviso della Panoramica per i movimenti di cassa. Totale in euro dei movimenti di cassa non ancora mostrato.
    **Opzioni (fatto):** titolo di tipo `option`, ticker Yahoo OCC (es. `BMEA280121C00001500`), quantità = contratti × 100, prezzo = premio per azione: il motore non cambia (26%).

@@ -258,3 +258,24 @@ textarea {
 .before-after li { display: grid; gap: 2px; justify-content: stretch; }
 
 .margin-day { display: block; margin-top: 2px; }
+
+/* Prospetto per la dichiarazione */
+.tax-return details { margin-top: 8px; }
+.tax-return details > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.tax-return h3 { margin: 14px 0 4px; font-size: 1rem; }
+.tax-where { font-variant-numeric: tabular-nums; }
+.tax-value {
+  font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right;
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; cursor: pointer; max-width: 60%;
+}
+.tax-value:hover { border-color: var(--primary); }
+.warn-text { color: var(--neg); }
+.tax-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.fiscal-link { justify-self: start; }
+@media print {
+  .sidenav, .tabbar, .banner, .tax-actions, .tax-return .pills { display: none !important; }
+  .tax-return details { display: block; }
+  .tax-return details > *:not(summary) { display: block; }
+  .card { break-inside: avoid; box-shadow: none; }
+}
