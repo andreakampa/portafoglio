@@ -11,6 +11,6 @@
   "triggers": { "crons": ["0 6 * * *"] },
   "vars": {
     "DB_URL": "https://calcolo-pmc-default-rtdb.europe-west1.firebasedatabase.app",
-    "DRY_RUN": "1"
+    "DRY_RUN": "0"
   }
 }
