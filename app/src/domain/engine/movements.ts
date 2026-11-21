@@ -111,3 +111,59 @@ export function marginInterest(p: RawPortfolio & { marginInterest?: MarginIntere
     .map(r => ({ ...r, amount: num(r.amount), currency: (r.currency || 'EUR').toUpperCase() }))
     .sort((a, b) => b.period.localeCompare(a.period))
 }
+
+export type CashKind = 'dividend' | 'pil' | 'withholding' | 'margin-interest' | 'credit-interest' | 'lending' | 'fee'
+
+export const CASH_LABEL: Record<CashKind, string> = {
+  dividend: 'Dividendo',
+  pil: 'Pagamento sostitutivo',
+  withholding: 'Ritenuta',
+  'margin-interest': 'Interesse di margine',
+  'credit-interest': 'Interesse attivo',
+  lending: 'Prestito titoli',
+  fee: 'Commissione',
+}
+
+export interface CashflowItem {
+  id: string
+  date: string
+  kind: CashKind
+  symbol: string
+  currency: string
+  amount: number
+  description: string
+}
+
+export interface CashTotal {
+  kind: CashKind
+  currency: string
+  amount: number
+}
+
+/** Movimenti di cassa (dividendi, ritenute, interessi...) nel periodo [from, to), dal più recente. Importi con segno, nella valuta originale. */
+export function cashflowsIn(
+  p: { cashflows?: Partial<CashflowItem>[] },
+  from: string,
+  to: string,
+): { items: CashflowItem[]; totals: CashTotal[] } {
+  const items = (p.cashflows ?? [])
+    .filter(r => r && r.date && r.kind && r.date >= from && r.date < to)
+    .map((r, i) => ({
+      id: r.id ?? `${r.date}-${i}`,
+      date: r.date as string,
+      kind: r.kind as CashKind,
+      symbol: r.symbol ?? '',
+      currency: (r.currency || 'EUR').toUpperCase(),
+      amount: num(r.amount),
+      description: r.description ?? '',
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date))
+  const sums = new Map<string, CashTotal>()
+  for (const it of items) {
+    const k = `${it.kind}|${it.currency}`
+    const t = sums.get(k) ?? { kind: it.kind, currency: it.currency, amount: 0 }
+    t.amount += it.amount
+    sums.set(k, t)
+  }
+  return { items, totals: [...sums.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.currency.localeCompare(b.currency)) }
+}

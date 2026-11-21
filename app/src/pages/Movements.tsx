@@ -4,7 +4,7 @@ import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { marginOnDate, type MarginOnDate, type MarginPortfolio } from '../domain/engine/margin'
-import { buildMovements, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
+import { buildMovements, CASH_LABEL, cashflowsIn, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
 
 const TODAY = new Date().toISOString().slice(0, 10)
@@ -19,7 +19,7 @@ const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-
 
 export function Movements() {
   const c = useComputedPortfolio()
-  const [tab, setTab] = useState<'trades' | 'interest'>('trades')
+  const [tab, setTab] = useState<'trades' | 'interest' | 'cash'>('trades')
   const [period, setPeriod] = useState<Period>('ytd')
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
@@ -61,6 +61,8 @@ export function Movements() {
   const marginAt = (m: Movement) => (m.kind === 'buy' ? marginOnDate(c.portfolio as MarginPortfolio, m.date) : null)
   const interest = marginInterest(c.portfolio).filter(r => `${r.period}-01` >= from.slice(0, 8) + '01' && `${r.period}-01` < to)
 
+  const cash = cashflowsIn(c.portfolio as { cashflows?: [] }, from, to)
+
   const periods: { key: Period; label: string }[] = [
     { key: '1m', label: '1 mese' },
     { key: '3m', label: '3 mesi' },
@@ -88,6 +90,7 @@ export function Movements() {
       <div className="pills" role="tablist" aria-label="Sezione">
         <button type="button" role="tab" aria-selected={tab === 'trades'} className={`pill ${tab === 'trades' ? 'active' : ''}`} onClick={() => setTab('trades')}>Operazioni</button>
         <button type="button" role="tab" aria-selected={tab === 'interest'} className={`pill ${tab === 'interest' ? 'active' : ''}`} onClick={() => setTab('interest')}>Interessi margine</button>
+        <button type="button" role="tab" aria-selected={tab === 'cash'} className={`pill ${tab === 'cash' ? 'active' : ''}`} onClick={() => setTab('cash')}>Cassa</button>
       </div>
 
       <div className="pills" role="tablist" aria-label="Periodo">
@@ -145,6 +148,33 @@ export function Movements() {
             </>
           )}
         </>
+      ) : tab === 'cash' ? (
+        <div className="card">
+          <h2>Dividendi, interessi e commissioni</h2>
+          {cash.items.length === 0 ? (
+            <p className="muted">Nessun movimento di cassa nel periodo. Arrivano dalla sincronizzazione IBKR.</p>
+          ) : (
+            <>
+              <ul className="plain-list">
+                {cash.totals.map(t => (
+                  <li key={t.kind + t.currency}>
+                    <span>{CASH_LABEL[t.kind] ?? t.kind} · totale</span>
+                    <b className={tone(t.amount)}>{money(t.amount, t.currency)}</b>
+                  </li>
+                ))}
+              </ul>
+              <ul className="plain-list">
+                {cash.items.map(r => (
+                  <li key={r.id} title={r.description}>
+                    <span>{fmtDate(r.date)} · {CASH_LABEL[r.kind] ?? r.kind}{r.symbol ? ` · ${r.symbol}` : ''}</span>
+                    <b className={tone(r.amount)}>{money(r.amount, r.currency)}</b>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="muted small">Importi nella valuta originale. L'uso nel calcolo fiscale dei dividendi non è ancora attivo.</p>
+        </div>
       ) : (
         <div className="card">
           <h2>Interessi sul margine</h2>
