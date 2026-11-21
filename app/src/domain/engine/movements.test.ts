@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildMovements, marginInterest, periodRange } from './movements.ts'
+import { buildMovements, cashflowsIn, marginInterest, periodRange } from './movements.ts'
 import { computePortfolio, type RawPortfolio } from './portfolio.ts'
 
 const p: RawPortfolio = {
@@ -51,5 +51,25 @@ describe('interessi di margine', () => {
   it('ordinati dal più recente, con importi numerici', () => {
     const rows = marginInterest({ marginInterest: [{ period: '2026-09', currency: 'usd', amount: '3.5' as unknown as number }, { period: '2026-10', currency: 'EUR', amount: 2 }] })
     expect(rows.map(r => [r.period, r.currency, r.amount])).toEqual([['2026-10', 'EUR', 2], ['2026-09', 'USD', 3.5]])
+  })
+})
+
+describe('cashflowsIn', () => {
+  const flows = [
+    { id: '1', date: '2026-03-01', kind: 'dividend', symbol: 'AAA', currency: 'USD', amount: 10 },
+    { id: '2', date: '2026-03-01', kind: 'withholding', symbol: 'AAA', currency: 'USD', amount: -3 },
+    { id: '3', date: '2026-04-05', kind: 'dividend', symbol: 'BBB', currency: 'USD', amount: 5 },
+    { id: '4', date: '2025-12-31', kind: 'fee', symbol: '', currency: 'EUR', amount: -1 },
+  ] as const
+  it('filtra il periodo, ordina e somma per tipo e valuta', () => {
+    const r = cashflowsIn({ cashflows: [...flows] }, '2026-01-01', '2027-01-01')
+    expect(r.items.map(i => i.id)).toEqual(['3', '1', '2'])
+    expect(r.totals).toEqual([
+      { kind: 'dividend', currency: 'USD', amount: 15 },
+      { kind: 'withholding', currency: 'USD', amount: -3 },
+    ])
+  })
+  it('senza movimenti di cassa torna vuoto', () => {
+    expect(cashflowsIn({}, '0000-01-01', '9999-01-01')).toEqual({ items: [], totals: [] })
   })
 })
