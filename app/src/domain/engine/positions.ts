@@ -40,6 +40,22 @@ export interface PositionResult {
   issues: Issue[]
 }
 
+/** Parte di costo che accompagna un titolo trasferito: data e costo dell'acquisto originale. */
+export interface TransferPiece {
+  date: string
+  qty: number
+  costNative: number
+  costEur: number
+}
+
+/** Collegamenti con gli altri portafogli, forniti da `computeAllPortfolios`. */
+export interface TransferHooks {
+  /** Costo con cui arriva un titolo in entrata (da uscita collegata dal `transferId`); undefined = non noto. */
+  incoming?: (tx: RawTx, currency: string) => TransferPiece[] | undefined
+  /** Registra quali lotti sono usciti con un trasferimento in uscita. */
+  outgoing?: (tx: RawTx, pieces: TransferPiece[]) => void
+}
+
 const byDate = (a: RawTx, b: RawTx) => a.date.localeCompare(b.date)
 
 /** Consuma `qty` dai lotti secondo il metodo; restituisce il costo consumato. */
@@ -49,13 +65,15 @@ function consume(
   method: CostMethod,
   tx: RawTx,
   issues: Issue[],
-): { costNative: number; costEur: number; consumed: number } {
+): { costNative: number; costEur: number; consumed: number; pieces: TransferPiece[] } {
   let costNative = 0
   let costEur = 0
   let left = qty
+  const pieces: TransferPiece[] = []
 
   const take = (lot: Lot, q: number) => {
     const share = q / lot.qty
+    pieces.push({ date: lot.date, qty: q, costNative: lot.costNative * share, costEur: lot.costEur * share })
     costNative += lot.costNative * share
     costEur += lot.costEur * share
     lot.costNative -= lot.costNative * share
@@ -107,7 +125,7 @@ function consume(
     })
   }
   for (let i = lots.length - 1; i >= 0; i--) if (lots[i]!.qty <= EPS) lots.splice(i, 1)
-  return { costNative, costEur, consumed }
+  return { costNative, costEur, consumed, pieces }
 }
 
 function lotIdFactory() {
@@ -124,7 +142,7 @@ function lotIdFactory() {
  * Long e short sono indipendenti: lo short ha i suoi lotti (incasso della vendita allo scoperto)
  * che si chiudono con buy_to_cover; il risultato è incasso − costo di riacquisto.
  */
-export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLookup): PositionResult {
+export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLookup, hooks: TransferHooks = {}): PositionResult {
   const currency = (asset.valuta || 'EUR').toUpperCase()
   const issues: Issue[] = []
   const longLots: Lot[] = []
@@ -157,11 +175,23 @@ export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLooku
 
       case 'transfer':
         if (tx.sourcePortfolioId) {
-          // In entrata: arriva al prezzo di carico del portafoglio di origine, senza commissioni.
-          longLots.push({ id: longId(tx.date), date: tx.date, qty: a.qty, costNative: a.grossNative, costEur: a.grossEur })
+          // In entrata: porta con sé i lotti usciti dal portafoglio di origine, col loro costo e la loro data
+          // di acquisto (il cambio storico resta quello degli acquisti, non quello del giorno del trasferimento).
+          const pieces = tx.transferId ? hooks.incoming?.(tx, currency) : undefined
+          const total = pieces?.reduce((s, p) => s + p.qty, 0) ?? 0
+          if (pieces && Math.abs(total - a.qty) <= EPS) {
+            for (const p of pieces) longLots.push({ id: longId(p.date), date: p.date, qty: p.qty, costNative: p.costNative, costEur: p.costEur })
+            // LIFO per data di acquisto: i lotti arrivati vanno al loro posto, non in fondo.
+            longLots.sort((x, y) => x.date.localeCompare(y.date))
+          } else {
+            // Senza uscita collegata: prezzo di carico indicato sul movimento, al cambio della data del trasferimento.
+            if (tx.transferId) issues.push({ txId: tx.id, date: tx.date, code: 'trasferimento-non-collegato', message: 'Entrata senza uscita corrispondente (o quantità diversa): costo al cambio del giorno' })
+            longLots.push({ id: longId(tx.date), date: tx.date, qty: a.qty, costNative: a.grossNative, costEur: a.grossEur })
+          }
         } else {
           // In uscita: esce al costo, nessun risultato realizzato.
-          consume(longLots, a.qty, method, tx, issues)
+          const c = consume(longLots, a.qty, method, tx, issues)
+          if (tx.transferId) hooks.outgoing?.(tx, c.pieces)
         }
         break
 
