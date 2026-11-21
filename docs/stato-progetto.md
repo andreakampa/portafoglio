@@ -99,6 +99,12 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    - **Cambi:** di base Banca d'Italia del giorno; interruttore "Cambi IBKR" e confronto delle due versioni movimento per movimento.
    - Anno in corso = bozza (prezzi e cambi di oggi); dal 1/1 si aggiorna da solo coi valori al 31/12. Pulsanti "Copia tutto" e "Stampa / PDF".
    - Prova sugli emulatori con la copia dei dati del 21/11 (2026, cambi BdI): plus netta 4.675 €, imposta RT 1.216 €, RM 30 €, IVAFE ~64 €.
+   - **Importa rendiconto IBKR (fatto, PR `importa-rendiconto`):** nel prospetto, tasto "Importa rendiconto (CSV)" (rendiconto di attività in italiano).
+     Lettore e confronto in `app/src/domain/ibkr/statement.ts` (6 test): operazioni per titolo e giorno, dividendi/ritenute/interessi attivi/SYEP per valuta,
+     posizioni a fine periodo (opzioni: simbolo IBKR → ticker OCC). Salva su Firebase in `users/{uid}/taxStatements/{pid}/{anno}` solo i prezzi di fine periodo
+     e l'esito del confronto (fuori da `portfolio_state`, così la sincronizzazione non lo cancella). Se il rendiconto arriva al 31/12, i suoi prezzi di chiusura
+     valgono per il quadro RW al posto di Yahoo. Prova col rendiconto 1/1–20/11/2026: 120 operazioni e tutti i movimenti di cassa coincidono;
+     unica differenza **3,6168 azioni IBKR** (premio sui versamenti) nel conto ma non nell'app: da decidere come registrarle (trattamento fiscale da verificare).
    - **Da fare a inizio 2027:** confrontare i totali con il rendiconto annuale IBKR (Andrea lo invierà), verificare righi/colonne sulle istruzioni 2027 appena escono,
      decidere col commercialista i punti incerti (credito ritenute estere, cambio BdI o IBKR, giacenza media del conto). Mediolanum e Trade Republic: amministrati, servono solo le loro certificazioni.
 2. **Sincronizzazione IBKR — resta:** azioni "premio versamento" (maturano dal 2027); assegnazione/esercizio di opzioni (vanno "da controllare", si registrano a mano);

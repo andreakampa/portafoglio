@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Kpi } from '../components/PortfolioPicker'
+import { StatementImport } from '../components/StatementImport'
 import { useTaxReturn, type RateMode, type TaxReturnData } from '../data/useTaxReturn'
 import { RM_LETTERS, toEuro } from '../domain/engine/taxReturn'
 import { eur, money, qty } from '../lib/format'
@@ -137,6 +138,8 @@ export function TaxReturn() {
         <button type="button" role="tab" aria-selected={mode === 'bdi'} className={`pill ${mode === 'bdi' ? 'active' : ''}`} onClick={() => setMode('bdi')}>Cambi Banca d’Italia</button>
         <button type="button" role="tab" aria-selected={mode === 'ibkr'} className={`pill ${mode === 'ibkr' ? 'active' : ''}`} onClick={() => setMode('ibkr')}>Cambi IBKR</button>
       </div>
+
+      <StatementImport pid={s.selectedId} year={s.year} portfolio={s.portfolio} statement={s.statement} closesUsed={d?.closesFromStatement ?? null} />
 
       {!d ? (
         <div className="card skeleton" style={{ height: 240 }} aria-busy="true" />
