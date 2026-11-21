@@ -95,7 +95,7 @@ Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di
 1. **Sincronizzazione IBKR: resta da fare** (il resto è fatto, vedi sopra):
    - **Opzioni (in PR):** una call è un titolo di tipo `option` con ticker Yahoo OCC (es. `BMEA280121C00001500`), quantità = contratti × 100 e prezzo = premio per azione:
      così quantità × prezzo è il controvalore e il motore non cambia (26% come gli altri strumenti). La sincronizzazione importa acquisti/vendite; scadenza senza valore = vendita a prezzo 0;
-     assegnazione/esercizio vanno "da controllare" (toccano anche il sottostante). Il Worker `ibkr-sync` va ripubblicato per usarlo. Da applicare ai dati veri: acquisto del 26/08 (`tools/storico-ibkr.mjs`).
+     assegnazione/esercizio vanno "da controllare" (toccano anche il sottostante). Il Worker `ibkr-sync` va ripubblicato per usarlo. **Applicato (21/11/2026, backup `.backup/database-20261121-162408.json`):** call BMEA 21JAN28 1.5 nel portafoglio IBKR (100 quote a 1 $, acquisto del 26/08) con `tools/opzioni-ibkr-storico.mjs`; Worker `ibkr-sync` ripubblicato.
    - **Azioni "premio versamento"** IBKR: maturano dal 2027.
    - **Mostrati nella v2** (Movimenti → scheda "Cassa": elenco e totali per tipo e valuta del periodo). Resta da fare
      usarli nel fiscale (dividendi: vedi regole-fiscali.md) e il totale in euro.
