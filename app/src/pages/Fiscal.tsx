@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DividendsCard } from '../components/DividendsCard'
 import { Issues } from '../components/Issues'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
@@ -105,6 +106,16 @@ export function Fiscal() {
           </ul>
         )}
       </div>
+
+      <DividendsCard
+        portfolio={c.portfolio}
+        fx={c.fx}
+        regime={c.result.regime}
+        year={year}
+        currentYear={currentYear}
+        gainsTaxEur={tax}
+        valueEur={Math.max(0, c.totals.investedEur + c.totals.unrealizedEur)}
+      />
 
       <div className="card">
         <h2>{kind === 'ivafe' ? 'IVAFE' : 'Imposta di bollo'} {currentYear}</h2>
