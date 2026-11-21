@@ -10,6 +10,7 @@ import { Overview } from './pages/Overview'
 import { Placeholder } from './pages/Placeholder'
 import { Positions } from './pages/Positions'
 import { Settings } from './pages/Settings'
+import { Simulator } from './pages/Simulator'
 
 // Hash router: su GitHub Pages ogni indirizzo funziona anche ricaricando la pagina.
 const router = createHashRouter([
@@ -19,6 +20,7 @@ const router = createHashRouter([
       { index: true, element: <Overview /> },
       { path: 'posizioni', element: <Positions /> },
       { path: 'movimenti', element: <Movements /> },
+      { path: 'simulatore', element: <Simulator /> },
       { path: 'fiscale', element: <Fiscal /> },
       { path: 'note', element: <Notes /> },
       { path: 'impostazioni', element: <Settings /> },
