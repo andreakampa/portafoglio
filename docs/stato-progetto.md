@@ -29,29 +29,28 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - **IBKR**
   - Portafoglio riconciliato con il rendiconto 2026 (9 correzioni applicate, ISIN aggiunti).
   - **Sincronizzazione automatica attiva** (Worker `ibkr-sync`, ogni giorno alle 06:00 UTC), senza doppioni; i casi dubbi finiscono "da controllare".
+  - **Avviso nella Panoramica della v2:** esito dell'ultima sincronizzazione (importate, da controllare, non gestite) ed eventuale errore.
 - **Dati corretti su richiesta di Andrea:** tolta la minus MBB doppia su IBKR, MCHT.MI segnato come ETF.
 
 ## Da fare, in ordine di priorità
-1. **Avviso della sincronizzazione nella v2:** leggere `users/{uid}/ibkr_sync` e mostrare "N operazioni importate,
-   M da controllare", con l'elenco ed eventuali errori (`lastError`).
-2. **Costo fiscale dei trasferimenti tra portafogli:** oggi il costo in EUR dei titoli trasferiti da Mediolanum a
+1. **Costo fiscale dei trasferimenti tra portafogli:** oggi il costo in EUR dei titoli trasferiti da Mediolanum a
    IBKR (AMZN, GOOGL, INTC, MSFT, PLUG, AMD…) usa il cambio del giorno del trasferimento. Deve restare quello
    degli acquisti originali. Collegare entrata e uscita tramite `transferId` nel motore (`portfolio.ts`) e
    calcolare tutti i portafogli insieme.
-3. **Sincronizzazione IBKR completa:** dividendi e ritenute, interessi di margine (sezione `InterestAccruals`),
+2. **Sincronizzazione IBKR completa:** dividendi e ritenute, interessi di margine (sezione `InterestAccruals`),
    interessi da prestito titoli (programma di ottimizzazione del rendimento), opzioni (la call BMEA 21JAN28 1.5 è
    segnalata ma non gestita). Le azioni IBKR "premio versamento" maturano dal 2027.
-4. **Inserire e modificare movimenti nella v2**, per poter dismettere il sito vecchio: acquisto, vendita, short,
+3. **Inserire e modificare movimenti nella v2**, per poter dismettere il sito vecchio: acquisto, vendita, short,
    trasferimento, PAC.
-5. **Simulatore acquisto/vendita** nella v2: nuovo PMC, costi, tasse con le minus disponibili. Più il carrello.
-6. **Margine:** quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione con il tasso IBKR
+4. **Simulatore acquisto/vendita** nella v2: nuovo PMC, costi, tasse con le minus disponibili. Più il carrello.
+5. **Margine:** quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione con il tasso IBKR
    (dal report Flex), sub-totale in alto.
-7. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100,
+6. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100,
    S&P 500, VIX, VXN) con lancetta del VIX che avverte vicino a 25.
-8. **Watchlist** importate da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push).
-9. **Fase 3, grafica definitiva** della v2 (oggi è provvisoria).
-10. **Multiutente:** gestione degli inviti dentro la v2 (oggi solo nel sito vecchio), primo accesso guidato.
-11. **Assistente AI (Gemini)** nella v2, poi dismissione del sito vecchio.
+7. **Watchlist** importate da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push).
+8. **Fase 3, grafica definitiva** della v2 (oggi è provvisoria).
+9. **Multiutente:** gestione degli inviti dentro la v2 (oggi solo nel sito vecchio), primo accesso guidato.
+10. **Assistente AI (Gemini)** nella v2, poi dismissione del sito vecchio.
 
 ## Da chiedere o verificare con Andrea
 - I prospetti di Mediolanum e Trade Republic (plus, minus, cassetto) per confrontarli con il motore.
