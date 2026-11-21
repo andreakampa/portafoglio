@@ -51,10 +51,16 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - **Il margine è il saldo di cassa negativo per valuta**: ogni vendita lo riduce, a prescindere da cosa si vende. Niente "quota a margine che segue il titolo".
 - **Pezzo 1 (fatto, in PR):** `flex.ts` legge `CashReportCurrency`, `InterestAccruals` e `TierInterestDetail`; la sincronizzazione salva nel portafoglio
   `marginStatus` (foto: saldo per valuta, totale in €, maturato, ultimo tasso) e `marginDaily` (una riga per giorno e valuta a debito, senza doppioni).
-- **Pezzo 2 (da fare):** riquadro in Panoramica con soli tre numeri: margine usato (saldo reale, per valuta e totale in €), **leva** (es. 1,22x = valore
-  posizioni / patrimonio netto) e **interessi pagati** (addebitati nell'anno + maturato, costo giornaliero/mensile col tasso attuale).
-- **Pezzo 3 (ridimensionato):** niente quota stimata per titolo, né MAX sul `marginAmount`. Andrea vuole solo segnalare quanto margine ha, la leva e quanto ci paga.
-  Eventuale avviso quando la leva supera una soglia. Il campo `marginAmount` dei movimenti resta com'è.
+- **Pezzo 2 (fatto, in PR):** riquadro **Margine** in Panoramica e Posizioni (`MarginCard`, motore in `domain/engine/margin.ts`): margine usato (saldo reale IBKR,
+  per valuta e totale in €), **leva** = esposizione lorda (long + |short|) / patrimonio netto, interessi pagati nell'anno + maturati, costo stimato al giorno e al mese
+  (tasso attuale, 360 giorni; 365 per GBP/CAD/AUD…). Compare solo per i portafogli con `marginStatus`.
+- **Avviso leva:** campo "Leva massima" nel riquadro (salvata su questo dispositivo, `localStorage`); avviso giallo sopra il 90% della soglia, rosso sopra la soglia.
+  Da fare, se serve: soglia sincronizzata tra dispositivi (oggi no), notifica push.
+- **Saldo a margine su ogni acquisto (fatto):** nei Movimenti, sotto ogni acquisto, "conto a margine: X USD" dal giorno (o dall'ultimo giorno noto entro 5) in `marginDaily`.
+  Lo storico parte da quando la sincronizzazione ha cominciato a salvarlo (dal 18/11/2026): prima non si mostra nulla. Per riempire l'anno servirebbe un report Flex
+  con intervallo di date (cambio della Flex Query sul portale IBKR, da fare a mano) e un import una tantum: da proporre ad Andrea.
+- **Nota tecnica:** Firebase scarta i `null`: i campi opzionali salvati (es. `ratePct`) possono mancare, vanno letti con `== null`.
+- **Non si fa più:** quota a margine stimata per titolo e tasto MAX (decisione di Andrea). Il campo `marginAmount` dei movimenti resta com'è.
 
 ## Prossimo passo (vecchio, superato dalle decisioni qui sopra): gestione del margine (punto 4 qui sotto)
 Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di partenza:

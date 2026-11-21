@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Issues } from '../components/Issues'
+import { MarginCard } from '../components/MarginCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import type { PositionRow } from '../domain/engine/valuation'
@@ -49,6 +50,8 @@ export function Positions() {
         <Kpi label={`Realizzato ${currentYear}`} value={eur(realizedYear, true)} className={tone(realizedYear)} hint="lordo, prima delle tasse" />
       </div>
       {t.missingPrices > 0 && <p className="muted small">{t.missingPrices} titoli senza prezzo aggiornato: esclusi dai totali.</p>}
+
+      <MarginCard c={c} />
 
       <Issues result={c.result} portfolio={c.portfolio} />
 

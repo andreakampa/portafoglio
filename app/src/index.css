@@ -256,3 +256,5 @@ textarea {
 .form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .before-after li { display: grid; gap: 2px; justify-content: stretch; }
+
+.margin-day { display: block; margin-top: 2px; }

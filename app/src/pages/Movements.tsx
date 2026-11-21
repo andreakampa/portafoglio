@@ -3,6 +3,7 @@ import { MovementForm, TransferFormCard } from '../components/MovementForms'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
+import { marginOnDate, type MarginOnDate, type MarginPortfolio } from '../domain/engine/margin'
 import { buildMovements, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
 
@@ -57,6 +58,7 @@ export function Movements() {
         <button type="button" className="linklike neg" onClick={() => void remove(m)}>Elimina</button>
       </span>
     ) : null
+  const marginAt = (m: Movement) => (m.kind === 'buy' ? marginOnDate(c.portfolio as MarginPortfolio, m.date) : null)
   const interest = marginInterest(c.portfolio).filter(r => `${r.period}-01` >= from.slice(0, 8) + '01' && `${r.period}-01` < to)
 
   const periods: { key: Period; label: string }[] = [
@@ -115,7 +117,7 @@ export function Movements() {
           ) : (
             <>
               <ul className="mov-list">
-                {list.map(m => <MovementItem key={m.key} m={m} actions={actions(m)} />)}
+                {list.map(m => <MovementItem key={m.key} m={m} actions={actions(m)} margin={marginAt(m)} />)}
               </ul>
               <table className="pos-table mov-table">
                 <thead>
@@ -129,7 +131,7 @@ export function Movements() {
                     <tr key={m.key}>
                       <td>{fmtDate(m.date)}</td>
                       <td><b>{m.symbol}</b></td>
-                      <td><span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>{m.marginAmount > 0 && <span className="badge" title="Finanziato a margine">margine {money(m.marginAmount, m.currency)}</span>}</td>
+                      <td><span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>{m.marginAmount > 0 && <span className="badge" title="Finanziato a margine">margine {money(m.marginAmount, m.currency)}</span>}<MarginDayNote margin={marginAt(m)} /></td>
                       <td className="num">{qty(m.qty)}</td>
                       <td className="num">{money(m.price, m.currency)}</td>
                       <td className="num">{money(m.gross, m.currency)}</td>
@@ -165,7 +167,16 @@ export function Movements() {
   )
 }
 
-function MovementItem({ m, actions }: { m: Movement; actions: React.ReactNode }) {
+/** Margine in uso nel giorno dell'acquisto (dallo storico giornaliero IBKR). */
+function MarginDayNote({ margin }: { margin: MarginOnDate | null }) {
+  if (!margin) return null
+  const text = margin.debts.length
+    ? `conto a margine: ${margin.debts.map(d => money(-d.principal, d.currency)).join(' + ')}`
+    : 'conto senza margine'
+  return <span className="muted small margin-day" title={`Dato IBKR del ${margin.date}`}>{text}</span>
+}
+
+function MovementItem({ m, actions, margin }: { m: Movement; actions: React.ReactNode; margin: MarginOnDate | null }) {
   return (
     <li className="card mov-item">
       <div className="mov-head">
@@ -179,6 +190,7 @@ function MovementItem({ m, actions }: { m: Movement; actions: React.ReactNode })
         {m.gainEur !== null && <b className={tone(m.gainEur)}>{eur(m.gainEur, true)}</b>}
       </div>
       {actions}
+      <MarginDayNote margin={margin} />
       {(m.commission > 0 || m.marginAmount > 0) && (
         <div className="muted small">
           {m.commission > 0 && <>Commissioni {money(m.commission, m.commissionCurrency)}</>}

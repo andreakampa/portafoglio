@@ -1,9 +1,12 @@
 import { IbkrSyncNotice } from '../components/IbkrSyncNotice'
+import { MarginCard } from '../components/MarginCard'
+import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioState } from '../data/usePortfolioState'
 import { summarizePortfolios } from '../domain/portfolioState'
 
 export function Overview() {
   const state = usePortfolioState()
+  const c = useComputedPortfolio()
 
   return (
     <section className="page">
@@ -17,6 +20,7 @@ export function Overview() {
         <div className="card error">Non riesco a leggere i dati: {state.message}</div>
       )}
       <IbkrSyncNotice />
+      {c.status === 'ready' && <MarginCard c={c} />}
       {state.status === 'ready' && <PortfolioList data={state.data} />}
 
       <a className="btn btn-ghost" href="/portafoglio/">
