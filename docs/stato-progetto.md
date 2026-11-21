@@ -93,7 +93,9 @@ Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di
 
 ## Da fare, in ordine di priorità
 1. **Sincronizzazione IBKR: resta da fare** (il resto è fatto, vedi sopra):
-   - **Opzioni:** la call BMEA 21JAN28 1.5 è segnalata ma non gestita (serve un tipo di movimento "opzione").
+   - **Opzioni (in PR):** una call è un titolo di tipo `option` con ticker Yahoo OCC (es. `BMEA280121C00001500`), quantità = contratti × 100 e prezzo = premio per azione:
+     così quantità × prezzo è il controvalore e il motore non cambia (26% come gli altri strumenti). La sincronizzazione importa acquisti/vendite; scadenza senza valore = vendita a prezzo 0;
+     assegnazione/esercizio vanno "da controllare" (toccano anche il sottostante). Il Worker `ibkr-sync` va ripubblicato per usarlo. Da applicare ai dati veri: acquisto del 26/08 (`tools/storico-ibkr.mjs`).
    - **Azioni "premio versamento"** IBKR: maturano dal 2027.
    - **Mostrati nella v2** (Movimenti → scheda "Cassa": elenco e totali per tipo e valuta del periodo). Resta da fare
      usarli nel fiscale (dividendi: vedi regole-fiscali.md) e il totale in euro.

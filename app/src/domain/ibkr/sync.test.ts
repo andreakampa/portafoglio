@@ -13,7 +13,8 @@ const XML = report(
   trade({ symbol: 'NVDA', isin: 'US2', tradeDate: '20261112', buySell: 'SELL', openCloseIndicator: 'O', quantity: '-5', tradePrice: '165.42', ibCommission: '-0.37', ibOrderID: '2', tradeID: 'c' }),
   trade({ symbol: 'NVDA', isin: 'US2', tradeDate: '20261116', buySell: 'BUY', openCloseIndicator: 'C', quantity: '15', tradePrice: '156.1', ibCommission: '-0.35', ibOrderID: '3', tradeID: 'd' }),
   trade({ symbol: 'RACEm', isin: 'IT1', currency: 'EUR', fxRateToBase: '1', listingExchange: 'BVME', tradeDate: '20261118', buySell: 'SELL', openCloseIndicator: 'C', quantity: '-2', tradePrice: '370', ibCommission: '-3', ibCommissionCurrency: 'EUR', ibOrderID: '4', tradeID: 'e' }),
-  trade({ symbol: 'BMEA 28C', assetCategory: 'OPT', tradeDate: '20261117', buySell: 'BUY', quantity: '1', tradePrice: '1', ibOrderID: '5', tradeID: 'f' }),
+  trade({ symbol: 'BMEA  280121C00001500', description: 'BMEA 21JAN28 1.5 C', multiplier: '100', assetCategory: 'OPT', tradeDate: '20261117', buySell: 'BUY', openCloseIndicator: 'O', quantity: '2', tradePrice: '1.2', ibCommission: '-0.28', ibOrderID: '5', tradeID: 'f' }),
+  trade({ symbol: 'EUR.USD', assetCategory: 'CASH', tradeDate: '20261117', buySell: 'BUY', quantity: '1000', tradePrice: '1.1', ibOrderID: '6', tradeID: 'g' }),
 )
 
 describe('report Flex', () => {
@@ -30,9 +31,15 @@ describe('report Flex', () => {
     expect(r.orders.filter(o => o.symbol === 'NVDA').map(o => o.type)).toEqual(['short_sell', 'buy_to_cover'])
   })
 
-  it('le opzioni non si importano ma vengono segnalate', () => {
-    expect(r.orders.some(o => o.symbol.startsWith('BMEA'))).toBe(false)
-    expect(r.skipped).toEqual([{ symbol: 'BMEA 28C', category: 'OPT', date: '2026-11-17' }])
+  it('le opzioni: quantità = contratti × moltiplicatore, prezzo = premio per azione, simbolo nel formato Yahoo', () => {
+    const o = r.orders.find(x => x.assetCategory === 'OPT')!
+    expect(o).toMatchObject({ symbol: 'BMEA280121C00001500', description: 'BMEA 21JAN28 1.5 C', type: 'buy', qty: 200, price: 1.2 })
+    expect(o.qty * o.price).toBeCloseTo(240, 8) // 2 contratti × 100 × 1,20 $
+  })
+
+  it('i prodotti non gestiti (forex…) si segnalano soltanto', () => {
+    expect(r.orders.some(o => o.symbol.startsWith('EUR.'))).toBe(false)
+    expect(r.skipped).toEqual([{ symbol: 'EUR.USD', category: 'CASH', date: '2026-11-17' }])
     expect([r.from, r.to]).toEqual(['2026-11-01', '2026-11-20'])
   })
 
@@ -66,7 +73,7 @@ describe('sincronizzazione', () => {
     expect(a.nv!.transactions![0]).toMatchObject({ id: 'm1', externalId: '2@2026-11-12', price: 165.42, commission: 0.37 })
     expect(Object.values(a).find(x => x.ticker === 'ANT')).toMatchObject({ valuta: 'USD', isin: 'US1' })
     expect(a.rc!.transactions!.map(t => t.type)).toEqual(['buy', 'sell'])
-    expect(r.added).toHaveLength(3) // ANT, NVDA ricopertura, RACE vendita
+    expect(r.added).toHaveLength(4) // ANT, NVDA ricopertura, RACE vendita, opzione BMEA acquisto
     expect(r.review).toEqual([])
     expect(r.changed).toBe(true)
   })
@@ -246,5 +253,40 @@ describe('stesso ISIN su mercati e valute diverse', () => {
     expect(r.linked).toHaveLength(1)
     expect(r.portfolio.assets!.ahla!.transactions![0]).toMatchObject({ externalId: '9@2026-06-11', commission: 1.2 })
     expect(r.portfolio.assets!.baba!.transactions).toHaveLength(1)
+  })
+})
+
+describe('opzioni nella sincronizzazione', () => {
+  const idGen = () => 'n' + Math.random().toString(36).slice(2, 8)
+  const opt = (a: Record<string, string>) =>
+    trade({ symbol: 'BMEA  280121C00001500', description: 'BMEA 21JAN28 1.5 C', multiplier: '100', assetCategory: 'OPT', quantity: '1', ibOrderID: '9', tradeID: 'z', ...a })
+
+  it('crea il titolo opzione e ci registra l’acquisto', () => {
+    const res = applyFlexOrders({ assets: {} }, parseFlex(report(opt({ tradeDate: '20260826', buySell: 'BUY', openCloseIndicator: 'O', tradePrice: '1', ibCommission: '-0.14' }))).orders, idGen)
+    const a = Object.values(res.portfolio.assets!)[0]!
+    expect(a).toMatchObject({ nome: 'BMEA 21JAN28 1.5 C', ticker: 'BMEA280121C00001500', tipoAsset: 'option', valuta: 'USD' })
+    expect(a.transactions).toHaveLength(1)
+    expect(a.transactions![0]).toMatchObject({ type: 'buy', qty: 100, price: 1, commission: 0.14 })
+  })
+
+  it('scadenza senza valore: vendita a prezzo zero (la minus si realizza)', () => {
+    const orders = parseFlex(report(opt({ tradeDate: '20280121', buySell: 'SELL', openCloseIndicator: 'C', tradePrice: '0', ibCommission: '0', notes: 'Ep', ibOrderID: '10' }))).orders
+    expect(orders[0]).toMatchObject({ type: 'sell', special: 'expired', price: 0 })
+    const res = applyFlexOrders({ assets: {} }, orders, idGen)
+    expect(Object.values(res.portfolio.assets!)[0]!.transactions![0]).toMatchObject({ type: 'sell', qty: 100, price: 0 })
+  })
+
+  it('assegnazione o esercizio vanno a mano: nessun movimento, segnalati', () => {
+    const orders = parseFlex(report(opt({ tradeDate: '20280121', buySell: 'SELL', openCloseIndicator: 'C', tradePrice: '0', notes: 'A', ibOrderID: '11' }))).orders
+    const res = applyFlexOrders({ assets: {} }, orders, idGen)
+    expect(res.added).toEqual([])
+    expect(res.review[0]).toContain('assegnata')
+  })
+
+  it('un secondo acquisto va sullo stesso titolo, senza crearne un altro', () => {
+    const first = applyFlexOrders({ assets: {} }, parseFlex(report(opt({ tradeDate: '20260826', buySell: 'BUY', openCloseIndicator: 'O', tradePrice: '1' }))).orders, idGen)
+    const second = applyFlexOrders(first.portfolio, parseFlex(report(opt({ tradeDate: '20260901', buySell: 'BUY', openCloseIndicator: 'O', tradePrice: '0.9', ibOrderID: '12' }))).orders, idGen)
+    expect(Object.keys(second.portfolio.assets!)).toHaveLength(1)
+    expect(Object.values(second.portfolio.assets!)[0]!.transactions).toHaveLength(2)
   })
 })

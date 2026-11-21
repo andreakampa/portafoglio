@@ -17,6 +17,12 @@ export interface FlexOrder {
   commissionCurrency: string
   /** Unità di valuta del titolo per 1 EUR (inverso di fxRateToBase), se la base del conto è EUR. */
   exchangeRate: number | null
+  /** Azione o opzione. Per le opzioni `qty` = contratti × moltiplicatore e `price` = premio per azione (così quantità × prezzo è il controvalore). */
+  assetCategory: 'STK' | 'OPT'
+  /** Descrizione IBKR, es. `BMEA 21JAN28 1.5 C` (serve a dare un nome alle opzioni). */
+  description: string
+  /** Opzione scaduta senza valore, assegnata o esercitata (dal campo `notes`). */
+  special?: 'expired' | 'assigned' | 'exercised'
 }
 
 export type FlexCashKind = 'dividend' | 'pil' | 'withholding' | 'margin-interest' | 'credit-interest' | 'lending' | 'fee'
@@ -132,17 +138,20 @@ export function parseFlex(xml: string): FlexReport {
     const date = iso(t.tradeDate)
     if (!date) continue
     if (t.levelOfDetail && t.levelOfDetail !== 'EXECUTION') continue
-    if (t.assetCategory !== 'STK') {
+    if (t.assetCategory !== 'STK' && t.assetCategory !== 'OPT') {
       skipped.push({ symbol: t.symbol ?? '', category: t.assetCategory ?? '', date })
       continue
     }
     // Più esecuzioni dello stesso ordine nello stesso giorno = un solo movimento.
+    const isOpt = t.assetCategory === 'OPT'
+    const multiplier = isOpt ? n(t.multiplier) || 100 : 1
     const key = `${t.ibOrderID || t.tradeID}@${date}`
     let o = orders.get(key)
     if (!o) {
       const fx = n(t.fxRateToBase)
       o = {
-        externalId: key, date, symbol: t.symbol ?? '', isin: t.isin ?? '',
+        externalId: key, date, symbol: isOpt ? (t.symbol ?? '').replace(/\s+/g, '') : (t.symbol ?? ''), isin: t.isin ?? '',
+        assetCategory: isOpt ? 'OPT' : 'STK', description: t.description ?? '',
         currency: (t.currency || 'USD').toUpperCase(), listingExchange: t.listingExchange ?? '',
         qty: 0, notional: 0, commission: 0,
         commissionCurrency: (t.ibCommissionCurrency || t.currency || 'USD').toUpperCase(),
@@ -154,7 +163,9 @@ export function parseFlex(xml: string): FlexReport {
     const oc = (t.openCloseIndicator ?? '').split(';')
     o.opens ||= oc.includes('O')
     o.closes ||= oc.includes('C')
-    const qty = Math.abs(n(t.quantity))
+    const notes = (t.notes ?? '').split(';')
+    if (isOpt) o.special = notes.includes('Ep') ? 'expired' : notes.includes('A') ? 'assigned' : notes.includes('Ex') ? 'exercised' : o.special
+    const qty = Math.abs(n(t.quantity)) * multiplier
     o.qty += qty
     o.notional += qty * n(t.tradePrice)
     o.commission += Math.abs(n(t.ibCommission))
