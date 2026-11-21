@@ -14,6 +14,9 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   - Login, registrazione con invito, PWA che si aggiorna da sola.
   - **Posizioni:** valore, PMC e risultato, con schede su telefono e tabella su PC.
   - **Fiscale:** plus e minus per anno, minus disponibili con scadenza, bollo e IVAFE stimati.
+  - **Inserimento e modifica dei movimenti** (Movimenti → "+ Nuovo movimento"): acquisto, vendita, short, chiusura short,
+    rata PAC, titolo nuovo, modifica ed eliminazione; **trasferimento** tra portafogli con `transferId` che lega uscita e entrata.
+    Ogni scrittura è una transazione Firebase sul titolo (non si perde nulla se scrive anche la sincronizzazione IBKR). Provato sugli emulatori.
   - **Movimenti:** prezzo di negoziazione, filtri per periodo e tipo, short, margine e interessi.
   - **Note:** idee, prossime mosse, titoli da monitorare ed eventi con data, sincronizzate tra dispositivi.
 - **Nuovo motore** (`app/src/domain/engine/`, 70 test). Applica le regole di [regole-fiscali.md](regole-fiscali.md):
@@ -47,8 +50,9 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    - **Mostrare nella v2** dividendi, ritenute, interessi attivi e prestito titoli (oggi sono solo salvati in `cashflows`)
      e usarli nel fiscale (dividendi: vedi regole-fiscali.md).
    - Dopo il primo addebito mensile di interessi (inizio dicembre) controllare nell'avviso della Panoramica che i movimenti di cassa arrivino.
-3. **Inserire e modificare movimenti nella v2**, per poter dismettere il sito vecchio: acquisto, vendita, short,
-   trasferimento, PAC.
+3. **Movimenti nella v2: resta da fare** il PAC automatico (oggi si inserisce la singola rata, segnata "PAC"),
+   la modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono dalla v2) e la scelta dei lotti da vendere.
+   Dopo che Andrea l'ha usata a mano per qualche giorno si può dismettere il sito vecchio per l'inserimento.
 4. **Simulatore acquisto/vendita** nella v2: nuovo PMC, costi, tasse con le minus disponibili. Più il carrello.
 5. **Margine:** quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione con il tasso IBKR
    (dal report Flex), sub-totale in alto.

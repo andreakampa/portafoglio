@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
+import { MovementForm, TransferFormCard } from '../components/MovementForms'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
+import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { buildMovements, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
@@ -20,6 +22,9 @@ export function Movements() {
   const [period, setPeriod] = useState<Period>('ytd')
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
+  const [form, setForm] = useState<'new' | 'transfer' | Movement | null>(null)
+  const edit = usePortfolioEdit()
+  const [delError, setDelError] = useState('')
 
   const all = useMemo(() => (c.status === 'ready' ? buildMovements(c.portfolio, c.result) : []), [c])
 
@@ -33,6 +38,25 @@ export function Movements() {
   const q = search.trim().toUpperCase()
   const list = all.filter(m => m.date >= from && m.date < to && kinds.includes(m.kind) && (!q || m.symbol.toUpperCase().includes(q)))
   const gain = list.reduce((s, m) => s + (m.gainEur ?? 0), 0)
+  const editable = (m: Movement) => m.kind === 'buy' || m.kind === 'sell' || m.kind === 'short_sell' || m.kind === 'buy_to_cover'
+  const remove = async (m: Movement) => {
+    const warn = m.fromBroker ? ' (È un movimento importato da IBKR: la sincronizzazione potrebbe riportarlo.)' : ''
+    if (!confirm(`Eliminare ${KIND_LABEL[m.kind].toLowerCase()} di ${m.symbol} del ${fmtDate(m.date)}?${warn}`)) return
+    setDelError('')
+    const t = c.portfolio.assets?.[m.assetId]?.transactions?.[m.index]
+    try {
+      await edit.remove(c.selectedId, m.assetId, { id: m.txId, index: m.index, date: t?.date ?? m.date, type: String(t?.type ?? m.kind) })
+    } catch (e) {
+      setDelError(e instanceof Error ? e.message : 'Eliminazione non riuscita.')
+    }
+  }
+  const actions = (m: Movement) =>
+    editable(m) ? (
+      <span className="note-actions">
+        <button type="button" className="linklike" onClick={() => { setForm(m); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Modifica</button>
+        <button type="button" className="linklike neg" onClick={() => void remove(m)}>Elimina</button>
+      </span>
+    ) : null
   const interest = marginInterest(c.portfolio).filter(r => `${r.period}-01` >= from.slice(0, 8) + '01' && `${r.period}-01` < to)
 
   const periods: { key: Period; label: string }[] = [
@@ -49,6 +73,15 @@ export function Movements() {
         <h1>Movimenti</h1>
         <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={c.select} />
       </header>
+      <div className="form-actions">
+        <button type="button" className="btn btn-primary" onClick={() => setForm('new')}>+ Nuovo movimento</button>
+        <button type="button" className="btn btn-ghost" onClick={() => setForm('transfer')}>Trasferisci titolo</button>
+      </div>
+      {form === 'transfer' && <TransferFormCard c={c} onClose={() => setForm(null)} />}
+      {form && form !== 'transfer' && (
+        <MovementForm key={form === 'new' ? 'new' : form.key} c={c} editing={form === 'new' ? undefined : form} onClose={() => setForm(null)} />
+      )}
+      {delError && <div className="card error" role="alert">{delError}</div>}
 
       <div className="pills" role="tablist" aria-label="Sezione">
         <button type="button" role="tab" aria-selected={tab === 'trades'} className={`pill ${tab === 'trades' ? 'active' : ''}`} onClick={() => setTab('trades')}>Operazioni</button>
@@ -82,13 +115,13 @@ export function Movements() {
           ) : (
             <>
               <ul className="mov-list">
-                {list.map(m => <MovementItem key={m.key} m={m} />)}
+                {list.map(m => <MovementItem key={m.key} m={m} actions={actions(m)} />)}
               </ul>
               <table className="pos-table mov-table">
                 <thead>
                   <tr>
                     <th>Data</th><th>Titolo</th><th>Tipo</th><th className="num">Quantità</th><th className="num">Prezzo</th>
-                    <th className="num">Controvalore</th><th className="num">Commissioni</th><th className="num">Plus/minus</th>
+                    <th className="num">Controvalore</th><th className="num">Commissioni</th><th className="num">Plus/minus</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -102,6 +135,7 @@ export function Movements() {
                       <td className="num">{money(m.gross, m.currency)}</td>
                       <td className="num">{m.commission ? money(m.commission, m.commissionCurrency) : '—'}</td>
                       <td className={`num ${tone(m.gainEur)}`}>{m.gainEur === null ? '' : eur(m.gainEur, true)}</td>
+                      <td>{actions(m)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -131,18 +165,20 @@ export function Movements() {
   )
 }
 
-function MovementItem({ m }: { m: Movement }) {
+function MovementItem({ m, actions }: { m: Movement; actions: React.ReactNode }) {
   return (
     <li className="card mov-item">
       <div className="mov-head">
         <b>{m.symbol}</b>
         <span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>
         <span className="muted mov-date">{fmtDate(m.date)}</span>
+        {m.pac && <span className="badge">PAC</span>}
       </div>
       <div className="mov-body">
         <span>{qty(m.qty)} × {money(m.price, m.currency)} = {money(m.gross, m.currency)}</span>
         {m.gainEur !== null && <b className={tone(m.gainEur)}>{eur(m.gainEur, true)}</b>}
       </div>
+      {actions}
       {(m.commission > 0 || m.marginAmount > 0) && (
         <div className="muted small">
           {m.commission > 0 && <>Commissioni {money(m.commission, m.commissionCurrency)}</>}

@@ -30,6 +30,12 @@ export interface Movement {
   marginAmount: number
   /** Plus/minus in EUR, solo per vendite e chiusure di short. */
   gainEur: number | null
+  /** Posizione del movimento nei dati, per modificarlo o eliminarlo. */
+  txId?: string
+  index: number
+  /** Importato da IBKR (ha un id dell'ordine): una modifica o eliminazione va fatta con cautela. */
+  fromBroker: boolean
+  pac: boolean
 }
 
 /** Tutti i movimenti di un portafoglio, dal più recente, con il risultato delle chiusure. */
@@ -62,6 +68,10 @@ export function buildMovements(p: RawPortfolio, result: PortfolioResult): Moveme
         commissionCurrency: (t.commissionCurrency || 'EUR').toUpperCase(),
         marginAmount: num(t.marginAmount),
         gainEur: ev ? ev.gainEur : null,
+        txId: t.id,
+        index: i,
+        fromBroker: !!t.externalId,
+        pac: t.source === 'pac',
       })
     })
   }

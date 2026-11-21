@@ -27,6 +27,8 @@ export interface RawTx {
   commissionCurrency?: string
   /** Unità di valuta del titolo per 1 EUR, alla data del movimento (es. 1.08 USD). */
   exchangeRate?: number | string
+  /** Lega tra loro l'uscita e l'entrata dello stesso trasferimento tra portafogli. */
+  transferId?: string
   /** Trasferimento in uscita verso questo portafoglio. */
   destPortfolioId?: string
   /** Trasferimento in entrata da questo portafoglio. */
