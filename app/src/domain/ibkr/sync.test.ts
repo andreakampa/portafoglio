@@ -1,0 +1,103 @@
+import { describe, expect, it } from 'vitest'
+import { parseFlex, yahooTicker } from './flex'
+import { applyFlexOrders, type SyncPortfolio } from './sync'
+
+const trade = (a: Record<string, string>) =>
+  `<Trade ${Object.entries({ assetCategory: 'STK', currency: 'USD', fxRateToBase: '0.8', levelOfDetail: 'EXECUTION', listingExchange: 'NASDAQ', ibCommissionCurrency: 'USD', ...a }).map(([k, v]) => `${k}="${v}"`).join(' ')} />`
+const report = (...trades: string[]) =>
+  `<FlexQueryResponse><FlexStatements><FlexStatement fromDate="20261101" toDate="20261120"><AccountInformation currency="EUR" /><Trades>${trades.join('')}</Trades></FlexStatement></FlexStatements></FlexQueryResponse>`
+
+const XML = report(
+  trade({ symbol: 'ANT', isin: 'US1', tradeDate: '20261119', buySell: 'BUY', openCloseIndicator: 'O', quantity: '3', tradePrice: '100', ibCommission: '-0.2', ibOrderID: '1', tradeID: 'a' }),
+  trade({ symbol: 'ANT', isin: 'US1', tradeDate: '20261119', buySell: 'BUY', openCloseIndicator: 'O', quantity: '2', tradePrice: '110', ibCommission: '-0.1', ibOrderID: '1', tradeID: 'b' }),
+  trade({ symbol: 'NVDA', isin: 'US2', tradeDate: '20261112', buySell: 'SELL', openCloseIndicator: 'O', quantity: '-5', tradePrice: '165.42', ibCommission: '-0.37', ibOrderID: '2', tradeID: 'c' }),
+  trade({ symbol: 'NVDA', isin: 'US2', tradeDate: '20261116', buySell: 'BUY', openCloseIndicator: 'C', quantity: '15', tradePrice: '156.1', ibCommission: '-0.35', ibOrderID: '3', tradeID: 'd' }),
+  trade({ symbol: 'RACEm', isin: 'IT1', currency: 'EUR', fxRateToBase: '1', listingExchange: 'BVME', tradeDate: '20261118', buySell: 'SELL', openCloseIndicator: 'C', quantity: '-2', tradePrice: '370', ibCommission: '-3', ibCommissionCurrency: 'EUR', ibOrderID: '4', tradeID: 'e' }),
+  trade({ symbol: 'BMEA 28C', assetCategory: 'OPT', tradeDate: '20261117', buySell: 'BUY', quantity: '1', tradePrice: '1', ibOrderID: '5', tradeID: 'f' }),
+)
+
+describe('report Flex', () => {
+  const r = parseFlex(XML)
+
+  it('unisce le esecuzioni dello stesso ordine con prezzo medio e commissioni sommate', () => {
+    const ant = r.orders.find(o => o.symbol === 'ANT')!
+    expect(ant).toMatchObject({ externalId: '1@2026-11-19', type: 'buy', qty: 5, commission: 0.30000000000000004 })
+    expect(ant.price).toBeCloseTo(104, 8)
+    expect(ant.exchangeRate).toBeCloseTo(1.25, 8)
+  })
+
+  it('distingue apertura e chiusura di short', () => {
+    expect(r.orders.filter(o => o.symbol === 'NVDA').map(o => o.type)).toEqual(['short_sell', 'buy_to_cover'])
+  })
+
+  it('le opzioni non si importano ma vengono segnalate', () => {
+    expect(r.orders.some(o => o.symbol.startsWith('BMEA'))).toBe(false)
+    expect(r.skipped).toEqual([{ symbol: 'BMEA 28C', category: 'OPT', date: '2026-11-17' }])
+    expect([r.from, r.to]).toEqual(['2026-11-01', '2026-11-20'])
+  })
+
+  it('rifiuta un file che non è un report Flex', () => {
+    expect(() => parseFlex('<html/>')).toThrow()
+  })
+
+  it('ticker Yahoo dal mercato IBKR', () => {
+    expect(yahooTicker('RACEm', 'BVME')).toBe('RACE.MI')
+    expect(yahooTicker('PNG', 'VENTURE')).toBe('PNG.V')
+    expect(yahooTicker('NVDA', 'NASDAQ')).toBe('NVDA')
+    expect(yahooTicker('XYZ', 'BOH')).toBeNull()
+  })
+})
+
+describe('sincronizzazione', () => {
+  let n = 0
+  const id = () => `id${++n}`
+  const orders = parseFlex(XML).orders
+  const base = (): SyncPortfolio => ({
+    assets: {
+      nv: { ticker: 'NVDA', isin: '', valuta: 'USD', transactions: [{ id: 'm1', date: '2026-11-12', type: 'short_sell', qty: 5, price: 165.4 }] },
+      rc: { ticker: 'RACE.MI', isin: 'IT1', valuta: 'EUR', transactions: [{ date: '2026-01-02', type: 'buy', qty: 2, price: 300, externalId: 'vecchio' }] },
+    },
+  })
+
+  it('crea i titoli nuovi, collega i manuali certi, aggiunge il resto', () => {
+    const r = applyFlexOrders(base(), orders, id)
+    const a = r.portfolio.assets!
+    expect(r.linked).toHaveLength(1) // NVDA short del 12/11 inserito a mano
+    expect(a.nv!.transactions![0]).toMatchObject({ id: 'm1', externalId: '2@2026-11-12', price: 165.42, commission: 0.37 })
+    expect(Object.values(a).find(x => x.ticker === 'ANT')).toMatchObject({ valuta: 'USD', isin: 'US1' })
+    expect(a.rc!.transactions!.map(t => t.type)).toEqual(['buy', 'sell'])
+    expect(r.added).toHaveLength(3) // ANT, NVDA ricopertura, RACE vendita
+    expect(r.review).toEqual([])
+    expect(r.changed).toBe(true)
+  })
+
+  it('rieseguito sullo stesso report non cambia nulla (nessun doppione)', () => {
+    const first = applyFlexOrders(base(), orders, id)
+    const again = applyFlexOrders(first.portfolio, orders, id)
+    expect(again.changed).toBe(false)
+    expect(again.added).toEqual([])
+  })
+
+  it('nel dubbio segnala invece di scrivere', () => {
+    const p = base()
+    p.assets!.nv!.transactions![0]!.type = 'buy_to_cover' // inserito con il tipo sbagliato
+    const r = applyFlexOrders(p, orders, id)
+    expect(r.review.some(s => s.includes('NVDA short_sell'))).toBe(true)
+    expect(r.portfolio.assets!.nv!.transactions!.filter(t => t.type === 'short_sell')).toHaveLength(0)
+  })
+
+  it('stesso giorno e tipo ma quantità diversa: da controllare, niente doppione', () => {
+    const p = base()
+    p.assets!.nv!.transactions!.push({ date: '2026-11-16', type: 'buy_to_cover', qty: 5, price: 156.1 })
+    const r = applyFlexOrders(p, orders, id)
+    expect(r.review.some(s => s.includes('NVDA buy_to_cover 15'))).toBe(true)
+    expect(r.portfolio.assets!.nv!.transactions!.filter(t => t.type === 'buy_to_cover')).toHaveLength(1)
+  })
+
+  it('non modifica il portafoglio di partenza', () => {
+    const p = base()
+    const snapshot = JSON.stringify(p)
+    applyFlexOrders(p, orders, id)
+    expect(JSON.stringify(p)).toBe(snapshot)
+  })
+})

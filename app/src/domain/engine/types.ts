@@ -33,6 +33,9 @@ export interface RawTx {
   sourcePortfolioId?: string
   lotAllocation?: LotAllocation[]
   marginAmount?: number
+  /** Id dell'ordine IBKR (`ordine@data`) per i movimenti importati: evita i doppioni. */
+  externalId?: string
+  source?: string
 }
 
 export type AssetType = 'stock' | 'etf' | 'fondo' | 'bond' | 'crypto' | string
