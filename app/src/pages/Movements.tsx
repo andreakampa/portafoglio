@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { MovementForm, TransferFormCard } from '../components/MovementForms'
+import { PacPlansCard } from '../components/PacPlansCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
@@ -86,6 +87,7 @@ export function Movements() {
         <MovementForm key={form === 'new' ? 'new' : form.key} c={c} editing={form === 'new' ? undefined : form} onClose={() => setForm(null)} />
       )}
       {delError && <div className="card error" role="alert">{delError}</div>}
+      <PacPlansCard c={c} />
 
       <div className="pills" role="tablist" aria-label="Sezione">
         <button type="button" role="tab" aria-selected={tab === 'trades'} className={`pill ${tab === 'trades' ? 'active' : ''}`} onClick={() => setTab('trades')}>Operazioni</button>
@@ -134,7 +136,7 @@ export function Movements() {
                     <tr key={m.key}>
                       <td>{fmtDate(m.date)}</td>
                       <td><b>{m.symbol}</b></td>
-                      <td><span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>{m.marginAmount > 0 && <span className="badge" title="Finanziato a margine">margine {money(m.marginAmount, m.currency)}</span>}<MarginDayNote margin={marginAt(m)} /></td>
+                      <td><span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>{m.estimated && <span className="badge" title="Prezzo di chiusura di borsa: modifica il movimento per inserire quello vero">da confermare</span>}{m.marginAmount > 0 && <span className="badge" title="Finanziato a margine">margine {money(m.marginAmount, m.currency)}</span>}<MarginDayNote margin={marginAt(m)} /></td>
                       <td className="num">{qty(m.qty)}</td>
                       <td className="num">{money(m.price, m.currency)}</td>
                       <td className="num">{money(m.gross, m.currency)}</td>
@@ -214,6 +216,7 @@ function MovementItem({ m, actions, margin }: { m: Movement; actions: React.Reac
         <span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>
         <span className="muted mov-date">{fmtDate(m.date)}</span>
         {m.pac && <span className="badge">PAC</span>}
+        {m.estimated && <span className="badge" title="Prezzo di chiusura di borsa: modifica il movimento per inserire quello vero">da confermare</span>}
       </div>
       <div className="mov-body">
         <span>{qty(m.qty)} × {money(m.price, m.currency)} = {money(m.gross, m.currency)}</span>

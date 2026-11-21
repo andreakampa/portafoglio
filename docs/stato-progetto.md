@@ -98,8 +98,12 @@ Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di
    - **Mostrati nella v2** (Movimenti → scheda "Cassa": elenco e totali per tipo e valuta del periodo). Resta da fare
      usarli nel fiscale (dividendi: vedi regole-fiscali.md) e il totale in euro.
    - Dopo il primo addebito mensile di interessi (inizio dicembre) controllare nell'avviso della Panoramica che i movimenti di cassa arrivino.
-2. **Movimenti nella v2: resta da fare** il PAC automatico (oggi si inserisce la singola rata, segnata "PAC"),
-   la modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono dalla v2) e la scelta dei lotti da vendere.
+2. **PAC automatico (fatto, in PR):** in Movimenti la scheda "Piani PAC" (titolo in euro, importo, giorni del mese o giorno della settimana, data di inizio;
+   salvati in `users/{uid}/settings/pacPlans`, fuori dai portafogli). All'apertura dell'app `PacRunner` crea le rate maturate fino a ieri al prezzo di chiusura Yahoo
+   del primo giorno di borsa dalla data prevista, con `priceEstimated: true` (badge "da confermare", sparisce salvando la modifica con il prezzo vero). Niente doppioni:
+   chiave `pacKey` e rate PAC inserite a mano entro 3 giorni dalla data prevista. Provato sugli emulatori. **Da fare da Andrea:** creare i due piani Trade Republic
+   (MCHT.MI 25 € il 2 e il 16; VALL.AS 50 € il 2 e il 16; inizio dal 2026-11-17).
+   **Movimenti nella v2: resta da fare** la modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono dalla v2) e la scelta dei lotti da vendere.
    Dopo che Andrea l'ha usata a mano per qualche giorno si può dismettere il sito vecchio per l'inserimento.
 3. **Simulatore: resta da fare** "Registra come movimenti" (trasforma il carrello in operazioni vere), l'imposta di bollo/IVAFE
    nella stima e la simulazione di dividendi.

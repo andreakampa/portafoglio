@@ -36,6 +36,8 @@ export interface Movement {
   /** Importato da IBKR (ha un id dell'ordine): una modifica o eliminazione va fatta con cautela. */
   fromBroker: boolean
   pac: boolean
+  /** Prezzo preso dalla chiusura di borsa: da confermare con l'esecuzione vera. */
+  estimated: boolean
 }
 
 /** Tutti i movimenti di un portafoglio, dal più recente, con il risultato delle chiusure. */
@@ -72,6 +74,7 @@ export function buildMovements(p: RawPortfolio, result: PortfolioResult): Moveme
         index: i,
         fromBroker: !!t.externalId,
         pac: t.source === 'pac',
+        estimated: !!t.priceEstimated,
       })
     })
   }
