@@ -125,6 +125,7 @@ export const ASSET_TYPES = [
   { key: 'fondo', label: 'Fondo' },
   { key: 'bond', label: 'Titolo di Stato / obbligazione' },
   { key: 'crypto', label: 'Crypto' },
+  { key: 'option', label: 'Opzione (quantità = contratti × 100, prezzo = premio per azione)' },
 ]
 
 export function validateNewAsset(f: NewAssetForm): string | null {

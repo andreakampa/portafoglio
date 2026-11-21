@@ -106,15 +106,22 @@ export function applyFlexOrders(
       continue
     }
 
+    if (o.special === 'assigned' || o.special === 'exercised') {
+      res.review.push(`${label(o)}: opzione ${o.special === 'assigned' ? 'assegnata' : 'esercitata'}, tocca anche il titolo sottostante: va registrata a mano`)
+      continue
+    }
+
     let hit = findAsset(o)
     if (!hit) {
-      const ticker = yahooTicker(o.symbol, o.listingExchange)
+      const isOpt = o.assetCategory === 'OPT'
+      const ticker = isOpt ? o.symbol : yahooTicker(o.symbol, o.listingExchange)
       if (!ticker) {
         res.review.push(`${label(o)}: titolo nuovo su un mercato non riconosciuto (${o.listingExchange})`)
         continue
       }
       const id = 'ID' + newId()
-      assets[id] = { nome: ticker, ticker, isin: o.isin, valuta: o.currency, tipoAsset: 'stock', commDefault: 0, transactions: [] }
+      // Opzione: quantità = contratti × 100 e prezzo = premio per azione, ticker nel formato Yahoo (es. BMEA280121C00001500).
+      assets[id] = { nome: isOpt && o.description ? o.description : ticker, ticker, isin: o.isin, valuta: o.currency, tipoAsset: isOpt ? 'option' : 'stock', commDefault: 0, transactions: [] }
       hit = [id, assets[id]!]
     }
     const [, asset] = hit
