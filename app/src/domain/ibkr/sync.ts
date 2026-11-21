@@ -4,10 +4,38 @@
 // il collegamento è certo (stesso titolo, giorno, tipo e quantità, prezzo entro l'1%).
 
 import type { RawAsset, RawTx } from '../engine/types.ts'
-import { yahooTicker, type FlexOrder } from './flex.ts'
+import { yahooTicker, type FlexCash, type FlexOrder } from './flex.ts'
 
 export interface SyncPortfolio {
   assets?: Record<string, RawAsset & { isin?: string; commDefault?: number }>
+  /** Interessi di margine mensili (stesso formato del sito attuale). `parts` = costo di ogni addebito IBKR. */
+  marginInterest?: MarginRow[]
+  /** Dividendi, ritenute, interessi attivi, prestito titoli e commissioni del conto. Importo con segno. */
+  cashflows?: CashflowRow[]
+}
+
+export interface MarginRow {
+  id?: string
+  period: string
+  currency: string
+  amount: number
+  source?: string
+  externalId?: string
+  parts?: Record<string, number>
+}
+
+export interface CashflowRow {
+  id: string
+  externalId: string
+  source: 'ibkr'
+  date: string
+  kind: FlexCash['kind']
+  symbol: string
+  isin: string
+  currency: string
+  amount: number
+  exchangeRate?: number
+  description: string
 }
 
 export interface SyncResult {
@@ -18,6 +46,8 @@ export interface SyncResult {
   linked: string[]
   review: string[]
   skipped: string[]
+  /** Movimenti di cassa importati (dividendi, interessi…). */
+  cashAdded: string[]
 }
 
 type Tx = RawTx & { externalId?: string; source?: string }
@@ -30,10 +60,11 @@ export function applyFlexOrders(
   input: SyncPortfolio,
   orders: FlexOrder[],
   newId: () => string,
+  cash: FlexCash[] = [],
 ): SyncResult {
   const portfolio: SyncPortfolio = structuredClone(input)
   const assets = (portfolio.assets ??= {})
-  const res: SyncResult = { portfolio, changed: false, added: [], linked: [], review: [], skipped: [] }
+  const res: SyncResult = { portfolio, changed: false, added: [], linked: [], review: [], skipped: [], cashAdded: [] }
 
   const already = new Set<string>()
   for (const a of Object.values(assets)) for (const t of (a.transactions ?? []) as Tx[]) if (t.externalId) already.add(t.externalId)
@@ -89,5 +120,60 @@ export function applyFlexOrders(
     res.added.push(label(o))
     res.changed = true
   }
+  applyCash(portfolio, cash, newId, res)
   return res
+}
+
+const round = (x: number, d = 4) => Math.round(x * 10 ** d) / 10 ** d
+const cashLabel = (c: FlexCash) => `${c.date} ${c.kind} ${c.symbol ? c.symbol + ' ' : ''}${round(c.amount, 2)} ${c.currency}`
+
+/** Interessi di margine e altri movimenti di cassa. Idempotente: ogni addebito IBKR ha un id e si importa una sola volta. */
+function applyCash(portfolio: SyncPortfolio, cash: FlexCash[], newId: () => string, res: SyncResult) {
+  const hadFlows = !!portfolio.cashflows
+  const flows = portfolio.cashflows ?? []
+  const seen = new Set(flows.map(r => r.externalId))
+  for (const r of portfolio.marginInterest ?? []) for (const k of Object.keys(r.parts ?? {})) seen.add(k)
+
+  for (const c of cash) {
+    if (seen.has(c.externalId)) continue
+
+    if (c.kind === 'margin-interest') {
+      if (!c.period) {
+        res.review.push(`${cashLabel(c)}: interesse di margine senza mese nella descrizione (${c.description})`)
+        continue
+      }
+      const rows = (portfolio.marginInterest ??= [])
+      const key = `MI:${c.period}:${c.currency}`
+      const cost = round(-c.amount) // costo positivo; uno storno diventa negativo
+      let row = rows.find(r => r.externalId === key)
+      if (!row) {
+        const manual = rows.find(r => !r.externalId && r.period === c.period && (r.currency || 'EUR').toUpperCase() === c.currency)
+        if (manual && Math.abs(+manual.amount - cost) > 0.01) {
+          res.review.push(`${cashLabel(c)}: nel mese c'è già un interesse inserito a mano di ${manual.amount} ${c.currency}`)
+          continue
+        }
+        row = manual ?? { id: 'MI' + newId(), period: c.period, currency: c.currency, amount: 0 }
+        if (!manual) rows.push(row)
+        Object.assign(row, { source: 'ibkr', externalId: key, parts: {} })
+      }
+      row.parts = { ...row.parts, [c.externalId]: cost }
+      row.amount = round(Object.values(row.parts).reduce((a, b) => a + b, 0), 2)
+      seen.add(c.externalId)
+      res.cashAdded.push(cashLabel(c))
+      res.changed = true
+      continue
+    }
+
+    flows.push({
+      id: 'CF' + newId(), externalId: c.externalId, source: 'ibkr', date: c.date, kind: c.kind, symbol: c.symbol, isin: c.isin,
+      currency: c.currency, amount: round(c.amount), ...(c.exchangeRate ? { exchangeRate: c.exchangeRate } : {}), description: c.description,
+    })
+    seen.add(c.externalId)
+    res.cashAdded.push(cashLabel(c))
+    res.changed = true
+  }
+  if (flows.length > 0 || hadFlows) {
+    flows.sort((a, b) => a.date.localeCompare(b.date))
+    portfolio.cashflows = flows
+  }
 }

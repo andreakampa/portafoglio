@@ -29,6 +29,10 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - **IBKR**
   - Portafoglio riconciliato con il rendiconto 2026 (9 correzioni applicate, ISIN aggiunti).
   - **Sincronizzazione automatica attiva** (Worker `ibkr-sync`, ogni giorno alle 06:00 UTC), senza doppioni; i casi dubbi finiscono "da controllare".
+  - **Movimenti di cassa** (dal report Flex, senza doppioni): dividendi, ritenute, pagamenti sostitutivi, interessi attivi,
+    prestito titoli (SYEP) e commissioni vanno in `cashflows` del portafoglio, con importo con segno e cambio; gli interessi di
+    margine vanno in `marginInterest` (una riga per mese e valuta, somma dei singoli addebiti, stesso formato del sito vecchio).
+    Tipi sconosciuti finiscono "da controllare". Provato solo con test: il report del 20/11 non conteneva movimenti di cassa.
   - **Avviso nella Panoramica della v2:** esito dell'ultima sincronizzazione (importate, da controllare, non gestite) ed eventuale errore.
 - **Dati corretti su richiesta di Andrea:** tolta la minus MBB doppia su IBKR, MCHT.MI segnato come ETF.
 
@@ -37,9 +41,12 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    IBKR (AMZN, GOOGL, INTC, MSFT, PLUG, AMD…) usa il cambio del giorno del trasferimento. Deve restare quello
    degli acquisti originali. Collegare entrata e uscita tramite `transferId` nel motore (`portfolio.ts`) e
    calcolare tutti i portafogli insieme.
-2. **Sincronizzazione IBKR completa:** dividendi e ritenute, interessi di margine (sezione `InterestAccruals`),
-   interessi da prestito titoli (programma di ottimizzazione del rendimento), opzioni (la call BMEA 21JAN28 1.5 è
-   segnalata ma non gestita). Le azioni IBKR "premio versamento" maturano dal 2027.
+2. **Sincronizzazione IBKR: resta da fare** (il resto è fatto, vedi sopra):
+   - **Opzioni:** la call BMEA 21JAN28 1.5 è segnalata ma non gestita (serve un tipo di movimento "opzione").
+   - **Azioni "premio versamento"** IBKR: maturano dal 2027.
+   - **Mostrare nella v2** dividendi, ritenute, interessi attivi e prestito titoli (oggi sono solo salvati in `cashflows`)
+     e usarli nel fiscale (dividendi: vedi regole-fiscali.md).
+   - Dopo il primo addebito mensile di interessi (inizio dicembre) controllare nell'avviso della Panoramica che i movimenti di cassa arrivino.
 3. **Inserire e modificare movimenti nella v2**, per poter dismettere il sito vecchio: acquisto, vendita, short,
    trasferimento, PAC.
 4. **Simulatore acquisto/vendita** nella v2: nuovo PMC, costi, tasse con le minus disponibili. Più il carrello.
