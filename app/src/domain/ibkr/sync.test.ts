@@ -167,3 +167,84 @@ describe('movimenti di cassa', () => {
     expect(diff.portfolio.marginInterest!.find(m => m.currency === 'USD')!.amount).toBe(99)
   })
 })
+
+describe('margine dal report Flex', () => {
+  const tier = (a: Record<string, string>) =>
+    `<TierInterestDetail ${Object.entries({ interestType: 'Debit Interest', reportDate: '2026-11-19', valueDate: '20261118', ...a }).map(([k, v]) => `${k}="${v}"`).join(' ')} />`
+  const marginXml = (extra = '') =>
+    `<FlexQueryResponse><FlexStatements><FlexStatement fromDate="20261119" toDate="20261119"><AccountInformation currency="EUR" />` +
+    `<CashReport><CashReportCurrency currency="BASE_SUMMARY" levelOfDetail="BaseCurrency" toDate="20261119" endingCash="-9747.599" />` +
+    `<CashReportCurrency currency="USD" levelOfDetail="Currency" toDate="20261119" endingCash="-10212.3817" />` +
+    `<CashReportCurrency currency="EUR" levelOfDetail="Currency" toDate="20261119" endingCash="250.5" /></CashReport>` +
+    `<InterestAccruals><InterestAccrualsCurrency currency="BASE_SUMMARY" toDate="20261119" endingAccrualBalance="-47.18" />` +
+    `<InterestAccrualsCurrency currency="USD" toDate="20261119" endingAccrualBalance="-49.66" /></InterestAccruals>` +
+    `<TierInterestDetails>${tier({ currency: 'USD', tierBreak: 'I', totalPrincipal: '-10171.68', rate: '5.38', totalInterest: '-1.52' })}${extra}</TierInterestDetails>` +
+    `</FlexStatement></FlexQueryResponse>`
+
+  it('legge saldo per valuta, totale in euro, maturato e tasso del giorno', () => {
+    const m = parseFlex(marginXml()).margin
+    expect(m.date).toBe('2026-11-19')
+    expect(m.baseCash).toBe(-9747.6)
+    expect(m.balances).toEqual([
+      { currency: 'EUR', endingCash: 250.5, accrued: 0 },
+      { currency: 'USD', endingCash: -10212.38, accrued: -49.66 },
+    ])
+    expect(m.days).toEqual([{ date: '2026-11-18', currency: 'USD', principal: -10171.68, ratePct: 5.38, interest: -1.52 }])
+  })
+
+  it('somma i gradini di tasso dello stesso giorno con tasso medio pesato', () => {
+    const m = parseFlex(marginXml(tier({ currency: 'USD', tierBreak: 'II', totalPrincipal: '-30000', rate: '4.38', totalInterest: '-3.6' }))).margin
+    expect(m.days).toHaveLength(1)
+    expect(m.days[0]).toMatchObject({ principal: -40171.68, interest: -5.12 })
+    expect(m.days[0]!.ratePct).toBeCloseTo((5.38 * 10171.68 + 4.38 * 30000) / 40171.68, 3)
+  })
+
+  it('salva foto e giorni senza doppioni e con il tasso solo sulle valute a debito', () => {
+    const margin = parseFlex(marginXml()).margin
+    const first = applyFlexOrders({ assets: {} }, [], () => 'x', [], margin)
+    expect(first.changed).toBe(true)
+    expect(first.portfolio.marginStatus).toMatchObject({ date: '2026-11-19', baseCash: -9747.6 })
+    expect(first.portfolio.marginStatus!.balances.map(b => [b.currency, b.ratePct])).toEqual([['EUR', null], ['USD', 5.38]])
+    expect(first.portfolio.marginDaily).toHaveLength(1)
+
+    const again = applyFlexOrders(first.portfolio, [], () => 'y', [], margin)
+    expect(again.changed).toBe(false)
+  })
+
+  it('un report più vecchio non sostituisce la foto più recente', () => {
+    const margin = parseFlex(marginXml()).margin
+    const first = applyFlexOrders({ assets: {} }, [], () => 'x', [], margin)
+    const older = { ...margin, date: '2026-11-10', baseCash: -1, days: [] }
+    const r = applyFlexOrders(first.portfolio, [], () => 'y', [], older)
+    expect(r.changed).toBe(false)
+    expect(r.portfolio.marginStatus!.date).toBe('2026-11-19')
+  })
+})
+
+describe('copertura dello storico del margine', () => {
+  const xml = `<FlexQueryResponse><FlexStatements><FlexStatement fromDate="20260101" toDate="20261119"><AccountInformation currency="EUR" /><CashReport><CashReportCurrency currency="USD" levelOfDetail="Currency" toDate="20261119" endingCash="-100" /></CashReport></FlexStatement></FlexStatements></FlexQueryResponse>`
+  it('ricorda il primo giorno coperto e non lo sposta con report più recenti', () => {
+    const m = parseFlex(xml).margin
+    const first = applyFlexOrders({ assets: {} }, [], () => 'x', [], m)
+    expect(first.portfolio.marginHistoryFrom).toBe('2026-01-01')
+    const later = applyFlexOrders(first.portfolio, [], () => 'y', [], { ...m, from: '2026-11-19', date: '2026-11-20' })
+    expect(later.portfolio.marginHistoryFrom).toBe('2026-01-01')
+  })
+})
+
+describe('stesso ISIN su mercati e valute diverse', () => {
+  it('assegna l’ordine al titolo con la stessa valuta (Alibaba: BABA in USD, AHLA in EUR)', () => {
+    const xml = report(trade({ symbol: 'AHLA', isin: 'US01609W1027', currency: 'EUR', fxRateToBase: '1', listingExchange: 'IBIS', ibCommissionCurrency: 'EUR', tradeDate: '20260611', buySell: 'SELL', openCloseIndicator: 'C', quantity: '-10', tradePrice: '96', ibCommission: '-1.2', ibOrderID: '9', tradeID: 'z' }))
+    const p: SyncPortfolio = {
+      assets: {
+        baba: { ticker: 'BABA', isin: 'US01609W1027', valuta: 'USD', transactions: [{ id: 'b1', date: '2026-05-07', type: 'buy', qty: 10, price: 143 }] },
+        ahla: { ticker: 'AHLA.DE', isin: 'US01609W1027', valuta: 'EUR', transactions: [{ id: 'a1', date: '2026-06-11', type: 'sell', qty: 10, price: 96 }] },
+      },
+    }
+    const r = applyFlexOrders(p, parseFlex(xml).orders, () => 'n')
+    expect(r.added).toHaveLength(0)
+    expect(r.linked).toHaveLength(1)
+    expect(r.portfolio.assets!.ahla!.transactions![0]).toMatchObject({ externalId: '9@2026-06-11', commission: 1.2 })
+    expect(r.portfolio.assets!.baba!.transactions).toHaveLength(1)
+  })
+})

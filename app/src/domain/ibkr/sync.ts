@@ -4,7 +4,7 @@
 // il collegamento è certo (stesso titolo, giorno, tipo e quantità, prezzo entro l'1%).
 
 import type { RawAsset, RawTx } from '../engine/types.ts'
-import { yahooTicker, type FlexCash, type FlexOrder } from './flex.ts'
+import { yahooTicker, type FlexCash, type FlexMargin, type FlexOrder } from './flex.ts'
 
 export interface SyncPortfolio {
   assets?: Record<string, RawAsset & { isin?: string; commDefault?: number }>
@@ -12,6 +12,27 @@ export interface SyncPortfolio {
   marginInterest?: MarginRow[]
   /** Dividendi, ritenute, interessi attivi, prestito titoli e commissioni del conto. Importo con segno. */
   cashflows?: CashflowRow[]
+  /** Foto del margine all'ultimo report: saldo di cassa per valuta (negativo = margine usato), maturato, ultimo tasso. */
+  marginStatus?: MarginStatus
+  /** Una riga per giorno e valuta a debito: capitale, tasso e interesse del giorno. */
+  marginDaily?: MarginDayRow[]
+  /** Primo giorno coperto dallo storico del margine: da qui i giorni senza righe sono senza debito. */
+  marginHistoryFrom?: string
+}
+
+export interface MarginStatus {
+  date: string
+  baseCurrency: string
+  baseCash: number | null
+  balances: { currency: string; endingCash: number; accrued: number; ratePct: number | null }[]
+}
+
+export interface MarginDayRow {
+  date: string
+  currency: string
+  principal: number
+  ratePct: number
+  interest: number
 }
 
 export interface MarginRow {
@@ -61,6 +82,7 @@ export function applyFlexOrders(
   orders: FlexOrder[],
   newId: () => string,
   cash: FlexCash[] = [],
+  margin: FlexMargin | null = null,
 ): SyncResult {
   const portfolio: SyncPortfolio = structuredClone(input)
   const assets = (portfolio.assets ??= {})
@@ -69,9 +91,13 @@ export function applyFlexOrders(
   const already = new Set<string>()
   for (const a of Object.values(assets)) for (const t of (a.transactions ?? []) as Tx[]) if (t.externalId) already.add(t.externalId)
 
+  // Lo stesso ISIN può stare su più mercati e valute (Alibaba: BABA in USD a New York, AHLA in EUR a Francoforte):
+  // si cerca prima ISIN e valuta insieme, poi ticker e valuta, e solo per ultimo il solo ISIN.
+  const cur = (a: RawAsset) => (a.valuta || 'EUR').toUpperCase()
   const findAsset = (o: FlexOrder) =>
-    Object.entries(assets).find(([, a]) => o.isin && a.isin === o.isin) ??
-    Object.entries(assets).find(([, a]) => base(a.ticker || a.nome || '') === base(o.symbol) && (a.valuta || 'EUR').toUpperCase() === o.currency)
+    Object.entries(assets).find(([, a]) => o.isin && a.isin === o.isin && cur(a) === o.currency) ??
+    Object.entries(assets).find(([, a]) => base(a.ticker || a.nome || '') === base(o.symbol) && cur(a) === o.currency) ??
+    Object.entries(assets).find(([, a]) => o.isin && a.isin === o.isin)
 
   for (const o of orders) {
     if (already.has(o.externalId)) continue
@@ -121,6 +147,7 @@ export function applyFlexOrders(
     res.changed = true
   }
   applyCash(portfolio, cash, newId, res)
+  if (margin) applyMargin(portfolio, margin, res)
   return res
 }
 
@@ -175,5 +202,39 @@ function applyCash(portfolio: SyncPortfolio, cash: FlexCash[], newId: () => stri
   if (flows.length > 0 || hadFlows) {
     flows.sort((a, b) => a.date.localeCompare(b.date))
     portfolio.cashflows = flows
+  }
+}
+
+/** Saldo di cassa, maturato e tassi. Idempotente: il giorno già salvato non si tocca, la foto si aggiorna solo con un report più recente. */
+function applyMargin(portfolio: SyncPortfolio, m: FlexMargin, res: SyncResult) {
+  if (m.date && m.balances.length > 0 && (!portfolio.marginStatus || portfolio.marginStatus.date <= m.date)) {
+    const lastRate = (cur: string) => [...m.days].reverse().find(d => d.currency === cur)?.ratePct ?? portfolio.marginStatus?.balances.find(b => b.currency === cur)?.ratePct ?? null
+    const next: MarginStatus = {
+      date: m.date,
+      baseCurrency: m.baseCurrency,
+      baseCash: m.baseCash,
+      balances: m.balances.map(b => ({ ...b, ratePct: b.endingCash < 0 ? lastRate(b.currency) : null })),
+    }
+    if (JSON.stringify(next) !== JSON.stringify(portfolio.marginStatus)) {
+      portfolio.marginStatus = next
+      res.changed = true
+    }
+  }
+  if (m.from && m.balances.length > 0 && (!portfolio.marginHistoryFrom || m.from < portfolio.marginHistoryFrom)) {
+    portfolio.marginHistoryFrom = m.from
+    res.changed = true
+  }
+  const rows = portfolio.marginDaily ?? []
+  const seen = new Set(rows.map(r => `${r.date}|${r.currency}`))
+  let added = false
+  for (const d of m.days) {
+    if (seen.has(`${d.date}|${d.currency}`)) continue
+    rows.push({ date: d.date, currency: d.currency, principal: d.principal, ratePct: d.ratePct, interest: d.interest })
+    added = true
+  }
+  if (added) {
+    rows.sort((a, b) => a.date.localeCompare(b.date) || a.currency.localeCompare(b.currency))
+    portfolio.marginDaily = rows
+    res.changed = true
   }
 }

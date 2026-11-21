@@ -108,7 +108,7 @@ export async function sync(env, { xml } = {}) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const { etag, data } = await db.getWithEtag(path)
     if (!data) throw new Error('Portafoglio IBKR non trovato su Firebase')
-    result = applyFlexOrders(data, report.orders, newId, report.cash)
+    result = applyFlexOrders(data, report.orders, newId, report.cash, report.margin)
     if (!result.changed || env.DRY_RUN === '1') break
     if (await db.putIfMatch(path, result.portfolio, etag)) break
     result = null // qualcuno ha salvato nel frattempo: si rilegge e si riprova

@@ -47,7 +47,29 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   - **Avviso nella Panoramica della v2:** esito dell'ultima sincronizzazione (importate, da controllare, non gestite) ed eventuale errore.
 - **Dati corretti su richiesta di Andrea:** tolta la minus MBB doppia su IBKR, MCHT.MI segnato come ETF.
 
-## Prossimo passo: gestione del margine (punto 4 qui sotto)
+## Margine: decisioni di Andrea (21/11/2026) e avanzamento
+- **Il margine è il saldo di cassa negativo per valuta**: ogni vendita lo riduce, a prescindere da cosa si vende. Niente "quota a margine che segue il titolo".
+- **Pezzo 1 (fatto, in PR):** `flex.ts` legge `CashReportCurrency`, `InterestAccruals` e `TierInterestDetail`; la sincronizzazione salva nel portafoglio
+  `marginStatus` (foto: saldo per valuta, totale in €, maturato, ultimo tasso) e `marginDaily` (una riga per giorno e valuta a debito, senza doppioni).
+- **Pezzo 2 (fatto, in PR):** riquadro **Margine** in Panoramica e Posizioni (`MarginCard`, motore in `domain/engine/margin.ts`): margine usato (saldo reale IBKR,
+  per valuta e totale in €), **leva** = esposizione lorda (long + |short|) / patrimonio netto, interessi pagati nell'anno + maturati, costo stimato al giorno e al mese
+  (tasso attuale, 360 giorni; 365 per GBP/CAD/AUD…). Compare solo per i portafogli con `marginStatus`.
+- **Avviso leva:** campo "Leva massima" nel riquadro, **salvato su Firebase** (`users/{uid}/settings/maxLeverage`, uguale su tutti i dispositivi e in tempo reale);
+  avviso giallo sopra il 90% della soglia, rosso sopra la soglia. Da fare, se serve: notifica push.
+- **Saldo a margine su ogni acquisto (fatto):** nei Movimenti, sotto ogni acquisto, "conto a margine: X USD" oppure "conto senza margine". Dati da `marginDaily`;
+  `marginHistoryFrom` è il primo giorno coperto dai report (dove non ci sono righe di debito il conto era senza margine; prima non si mostra nulla).
+- **Storico dell'anno da IBKR:** il Flex Web Service accetta le date `fd`/`td` (max 365 giorni, l'ultimo giorno disponibile è l'ultimo lavorativo chiuso).
+  `node tools/scarica-flex.mjs 2026-01-01 2026-11-19` scarica il report in `.backup/`; `node --experimental-strip-types tools/storico-ibkr.mjs <file.xml> [--salva]`
+  lo applica a secco al portafoglio IBKR del backup e mostra cosa cambierebbe.
+  **Applicato ai dati veri il 21/11/2026** (backup `.backup/database-20261121-022825.json`): tutti i 112 ordini dell'anno ora hanno l'id IBKR
+  (72 collegati ai movimenti manuali, con prezzo, commissioni e cambio esatti; 40 già collegati dalla sincronizzazione), 27 movimenti di cassa in `cashflows`,
+  9 mesi in `marginInterest`, 184 giorni di debito in `marginDaily` (17/06–18/11), `marginHistoryFrom` = 2026-01-01. Movimenti: 120 prima e dopo.
+- **Bug corretto (21/11/2026):** la sincronizzazione sceglieva il titolo per ISIN senza guardare la valuta: AHLA (Alibaba a Francoforte, EUR) e BABA (NYSE, USD)
+  hanno lo stesso ISIN e una vendita AHLA veniva aggiunta a BABA. Ora si cerca ISIN + valuta, poi ticker + valuta, poi solo ISIN.
+- **Nota tecnica:** Firebase scarta i `null`: i campi opzionali salvati (es. `ratePct`) possono mancare, vanno letti con `== null`.
+- **Non si fa più:** quota a margine stimata per titolo e tasto MAX (decisione di Andrea). Il campo `marginAmount` dei movimenti resta com'è.
+
+## Prossimo passo (vecchio, superato dalle decisioni qui sopra): gestione del margine (punto 4 qui sotto)
 Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di partenza:
 - **Cosa c'è già.** Sui movimenti di acquisto il campo `marginAmount` (quota finanziata a margine, stesso formato del sito vecchio:
   si inserisce nella modifica del movimento, solo per gli acquisti). Il portafoglio ha `marginInterest`: righe mensili
