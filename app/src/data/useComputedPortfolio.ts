@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { computePortfolio, type PortfolioResult, type RawPortfolio } from '../domain/engine/portfolio.ts'
+import { computeAllPortfolios, type PortfolioResult, type RawPortfolio } from '../domain/engine/portfolio.ts'
 import { totals, valuePositions, type PortfolioTotals, type PositionRow, type QuoteLike, symbolOf } from '../domain/engine/valuation.ts'
 import { loadFx } from '../lib/fxRates.ts'
 import { cachedQuotes, loadLatestFx, loadQuotes } from '../lib/prices.ts'
@@ -29,9 +29,9 @@ export type Computed =
     }
 
 /** Date (e valute) per cui servono i cambi storici: movimenti di titoli non in EUR o commissioni in valuta. */
-function fxDates(p: RawPortfolio): string[] {
+function fxDates(ps: RawPortfolio[]): string[] {
   const dates: string[] = []
-  for (const a of Object.values(p.assets ?? {})) {
+  for (const a of ps.flatMap(p => Object.values(p.assets ?? {}))) {
     const nonEur = (a.valuta || 'EUR').toUpperCase() !== 'EUR'
     for (const t of a.transactions ?? []) {
       if (nonEur || (t.commissionCurrency && t.commissionCurrency.toUpperCase() !== 'EUR')) dates.push(t.date)
@@ -56,18 +56,21 @@ export function useComputedPortfolio(): Computed {
   const portfolio = selectedId ? portfolios[selectedId] : undefined
 
   // 1. Cambi storici → motore (si ricalcola a ogni modifica dei dati, anche da un altro dispositivo).
-  const [result, setResult] = useState<PortfolioResult | null>(null)
+  // Tutti i portafogli insieme: un titolo trasferito porta con sé il costo dell'acquisto originale.
+  const [results, setResults] = useState<Record<string, PortfolioResult> | null>(null)
   const [fxError, setFxError] = useState<string | null>(null)
   useEffect(() => {
     if (!portfolio) return
     let alive = true
-    loadFx(fxDates(portfolio))
-      .then(fx => alive && (setResult(computePortfolio(portfolio, fx)), setFxError(null)))
+    loadFx(fxDates(Object.values(portfolios)))
+      .then(fx => alive && (setResults(computeAllPortfolios(portfolios, fx)), setFxError(null)))
       .catch(e => alive && setFxError(String(e)))
     return () => {
       alive = false
     }
-  }, [portfolio])
+  }, [portfolio, portfolios])
+
+  const result = selectedId && results ? results[selectedId] ?? null : null
 
   // 2. Prezzi: subito quelli in cache, poi aggiornati.
   const symbols = useMemo(

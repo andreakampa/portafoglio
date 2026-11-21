@@ -14,6 +14,11 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   - Login, registrazione con invito, PWA che si aggiorna da sola.
   - **Posizioni:** valore, PMC e risultato, con schede su telefono e tabella su PC.
   - **Fiscale:** plus e minus per anno, minus disponibili con scadenza, bollo e IVAFE stimati.
+  - **Costo fiscale dei trasferimenti:** `computeAllPortfolios` calcola tutti i portafogli insieme; un titolo trasferito
+    (stesso `transferId`) porta con sé i lotti, il costo e le date degli acquisti originali, non il cambio del giorno del trasferimento.
+    Sui dati reali il costo dei titoli trasferiti verso IBKR sale un po' e le plus realizzate cambiano di poco
+    (confronto in `.backup/confronto-trasferimenti.md`, non pubblicato, creato da `tools/confronto-trasferimenti.mjs`). Entrate senza uscita collegata (o con quantità diversa) ricadono sul vecchio calcolo con avviso.
+    Limite: giri A→B→A ricadono sul calcolo semplice.
   - **Inserimento e modifica dei movimenti** (Movimenti → "+ Nuovo movimento"): acquisto, vendita, short, chiusura short,
     rata PAC, titolo nuovo, modifica ed eliminazione; **trasferimento** tra portafogli con `transferId` che lega uscita e entrata.
     Ogni scrittura è una transazione Firebase sul titolo (non si perde nulla se scrive anche la sincronizzazione IBKR). Provato sugli emulatori.
@@ -40,28 +45,24 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - **Dati corretti su richiesta di Andrea:** tolta la minus MBB doppia su IBKR, MCHT.MI segnato come ETF.
 
 ## Da fare, in ordine di priorità
-1. **Costo fiscale dei trasferimenti tra portafogli:** oggi il costo in EUR dei titoli trasferiti da Mediolanum a
-   IBKR (AMZN, GOOGL, INTC, MSFT, PLUG, AMD…) usa il cambio del giorno del trasferimento. Deve restare quello
-   degli acquisti originali. Collegare entrata e uscita tramite `transferId` nel motore (`portfolio.ts`) e
-   calcolare tutti i portafogli insieme.
-2. **Sincronizzazione IBKR: resta da fare** (il resto è fatto, vedi sopra):
+1. **Sincronizzazione IBKR: resta da fare** (il resto è fatto, vedi sopra):
    - **Opzioni:** la call BMEA 21JAN28 1.5 è segnalata ma non gestita (serve un tipo di movimento "opzione").
    - **Azioni "premio versamento"** IBKR: maturano dal 2027.
    - **Mostrare nella v2** dividendi, ritenute, interessi attivi e prestito titoli (oggi sono solo salvati in `cashflows`)
      e usarli nel fiscale (dividendi: vedi regole-fiscali.md).
    - Dopo il primo addebito mensile di interessi (inizio dicembre) controllare nell'avviso della Panoramica che i movimenti di cassa arrivino.
-3. **Movimenti nella v2: resta da fare** il PAC automatico (oggi si inserisce la singola rata, segnata "PAC"),
+2. **Movimenti nella v2: resta da fare** il PAC automatico (oggi si inserisce la singola rata, segnata "PAC"),
    la modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono dalla v2) e la scelta dei lotti da vendere.
    Dopo che Andrea l'ha usata a mano per qualche giorno si può dismettere il sito vecchio per l'inserimento.
-4. **Simulatore acquisto/vendita** nella v2: nuovo PMC, costi, tasse con le minus disponibili. Più il carrello.
-5. **Margine:** quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione con il tasso IBKR
+3. **Simulatore acquisto/vendita** nella v2: nuovo PMC, costi, tasse con le minus disponibili. Più il carrello.
+4. **Margine:** quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione con il tasso IBKR
    (dal report Flex), sub-totale in alto.
-6. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100,
+5. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100,
    S&P 500, VIX, VXN) con lancetta del VIX che avverte vicino a 25.
-7. **Watchlist** importate da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push).
-8. **Fase 3, grafica definitiva** della v2 (oggi è provvisoria).
-9. **Multiutente:** gestione degli inviti dentro la v2 (oggi solo nel sito vecchio), primo accesso guidato.
-10. **Assistente AI (Gemini)** nella v2, poi dismissione del sito vecchio.
+6. **Watchlist** importate da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push).
+7. **Fase 3, grafica definitiva** della v2 (oggi è provvisoria).
+8. **Multiutente:** gestione degli inviti dentro la v2 (oggi solo nel sito vecchio), primo accesso guidato.
+9. **Assistente AI (Gemini)** nella v2, poi dismissione del sito vecchio.
 
 ## Da chiedere o verificare con Andrea
 - I prospetti di Mediolanum e Trade Republic (plus, minus, cassetto) per confrontarli con il motore.
@@ -69,6 +70,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - Cancellare dalla cartella Download la chiave `calcolo-pmc-firebase-adminsdk-*.json` (è già su Cloudflare).
 
 ## Strumenti utili (`tools/`)
+- `confronto-trasferimenti.mjs`: costo dei titoli trasferiti, prima e dopo il collegamento dei trasferimenti.
 - `confronto-motori.mjs`: vecchio motore contro nuovo, sull'ultimo backup.
 - `scarica-flex.mjs` + `confronto-ibkr.mjs`: confronto con il report Flex.
 - `riconcilia-ibkr-csv.mjs <rendiconto.csv>`: confronto dei movimenti con il rendiconto attività IBKR.
