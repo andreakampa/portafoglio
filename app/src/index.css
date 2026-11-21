@@ -246,3 +246,11 @@ textarea {
 .note-kind-mossa { color: var(--primary); }
 .note-kind-monitora { color: #b7791f; }
 .note-kind-evento { color: var(--pos); }
+
+/* Maschere dei movimenti */
+.new-asset { border: 1px dashed var(--border); border-radius: 10px; padding: 12px; display: grid; gap: 10px; margin: 0; }
+.inline-pair { display: flex; gap: 6px; }
+.inline-pair input { flex: 1; min-width: 0; }
+.check { display: flex; align-items: center; gap: 8px; }
+.check input { width: auto; }
+.form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
