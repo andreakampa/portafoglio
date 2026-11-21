@@ -86,7 +86,7 @@ input {
 }
 .tabbar {
   position: fixed; inset: auto 0 0 0; z-index: 10;
-  display: grid; grid-template-columns: repeat(6, 1fr);
+  display: grid; grid-template-columns: repeat(7, 1fr);
   height: calc(var(--nav-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
   background: var(--surface); border-top: 1px solid var(--border);
 }
@@ -254,3 +254,5 @@ textarea {
 .check { display: flex; align-items: center; gap: 8px; }
 .check input { width: auto; }
 .form-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.before-after li { display: grid; gap: 2px; justify-content: stretch; }

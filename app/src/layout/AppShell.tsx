@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from 'react-router'
 import { usingEmulator } from '../lib/firebase'
-import { IconHome, IconMovements, IconNotes, IconPositions, IconSettings, IconTax } from './icons'
+import { IconHome, IconMovements, IconNotes, IconPositions, IconSettings, IconSimulator, IconTax } from './icons'
 
 const NAV = [
   { to: '/', label: 'Panoramica', icon: IconHome, end: true },
   { to: '/posizioni', label: 'Posizioni', icon: IconPositions },
   { to: '/movimenti', label: 'Movimenti', icon: IconMovements },
+  { to: '/simulatore', label: 'Simulatore', icon: IconSimulator },
   { to: '/fiscale', label: 'Fiscale', icon: IconTax },
   { to: '/note', label: 'Note', icon: IconNotes },
   { to: '/impostazioni', label: 'Impostazioni', icon: IconSettings },

@@ -17,6 +17,9 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   - **Inserimento e modifica dei movimenti** (Movimenti → "+ Nuovo movimento"): acquisto, vendita, short, chiusura short,
     rata PAC, titolo nuovo, modifica ed eliminazione; **trasferimento** tra portafogli con `transferId` che lega uscita e entrata.
     Ogni scrittura è una transazione Firebase sul titolo (non si perde nulla se scrive anche la sincronizzazione IBKR). Provato sugli emulatori.
+  - **Simulatore** (menu Simulatore): carrello di acquisti, vendite e short; mostra nuovo PMC, plus/minus, imposta stimata
+    (costo medio o LIFO secondo il regime, minus del cassetto usate, in dichiarativo anche il risparmio sulle plus già
+    realizzate nell'anno), cassa netta, tasto MAX. Rifà il calcolo col motore vero su una copia del portafoglio: non salva nulla.
   - **Movimenti:** prezzo di negoziazione, filtri per periodo e tipo, short, margine e interessi.
   - **Note:** idee, prossime mosse, titoli da monitorare ed eventi con data, sincronizzate tra dispositivi.
 - **Nuovo motore** (`app/src/domain/engine/`, 70 test). Applica le regole di [regole-fiscali.md](regole-fiscali.md):
@@ -53,7 +56,8 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 3. **Movimenti nella v2: resta da fare** il PAC automatico (oggi si inserisce la singola rata, segnata "PAC"),
    la modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono dalla v2) e la scelta dei lotti da vendere.
    Dopo che Andrea l'ha usata a mano per qualche giorno si può dismettere il sito vecchio per l'inserimento.
-4. **Simulatore acquisto/vendita** nella v2: nuovo PMC, costi, tasse con le minus disponibili. Più il carrello.
+4. **Simulatore: resta da fare** "Registra come movimenti" (trasforma il carrello in operazioni vere), l'imposta di bollo/IVAFE
+   nella stima e la simulazione di dividendi.
 5. **Margine:** quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione con il tasso IBKR
    (dal report Flex), sub-totale in alto.
 6. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100,

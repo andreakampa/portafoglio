@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { computePortfolio, type PortfolioResult, type RawPortfolio } from '../domain/engine/portfolio.ts'
+import type { FxLookup } from '../domain/engine/types.ts'
 import { totals, valuePositions, type PortfolioTotals, type PositionRow, type QuoteLike, symbolOf } from '../domain/engine/valuation.ts'
 import { loadFx } from '../lib/fxRates.ts'
 import { cachedQuotes, loadLatestFx, loadQuotes } from '../lib/prices.ts'
@@ -26,6 +27,9 @@ export type Computed =
       rows: PositionRow[]
       totals: PortfolioTotals
       pricesLoading: boolean
+      /** Cambi storici e più recenti: servono al simulatore. */
+      fx: FxLookup
+      latestFx: Record<string, number>
     }
 
 /** Date (e valute) per cui servono i cambi storici: movimenti di titoli non in EUR o commissioni in valuta. */
@@ -57,12 +61,13 @@ export function useComputedPortfolio(): Computed {
 
   // 1. Cambi storici → motore (si ricalcola a ogni modifica dei dati, anche da un altro dispositivo).
   const [result, setResult] = useState<PortfolioResult | null>(null)
+  const [fx, setFx] = useState<FxLookup | null>(null)
   const [fxError, setFxError] = useState<string | null>(null)
   useEffect(() => {
     if (!portfolio) return
     let alive = true
     loadFx(fxDates(portfolio))
-      .then(fx => alive && (setResult(computePortfolio(portfolio, fx)), setFxError(null)))
+      .then(fx => alive && (setResult(computePortfolio(portfolio, fx)), setFx(() => fx), setFxError(null)))
       .catch(e => alive && setFxError(String(e)))
     return () => {
       alive = false
@@ -102,6 +107,6 @@ export function useComputedPortfolio(): Computed {
   if (state.status === 'error') return { status: 'error', message: state.message }
   if (fxError) return { status: 'error', message: `Cambi storici non disponibili: ${fxError}` }
   if (!portfolio || !selectedId) return { status: 'empty' }
-  if (!result) return { status: 'loading' }
-  return { status: 'ready', options, selectedId, select, portfolio, result, rows, totals: totals(rows), pricesLoading }
+  if (!result || !fx) return { status: 'loading' }
+  return { status: 'ready', options, selectedId, select, portfolio, result, rows, totals: totals(rows), pricesLoading, fx, latestFx }
 }
