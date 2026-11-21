@@ -101,3 +101,69 @@ describe('sincronizzazione', () => {
     expect(JSON.stringify(p)).toBe(snapshot)
   })
 })
+
+const cashXml = (...rows: Record<string, string>[]) =>
+  `<FlexQueryResponse><FlexStatements><FlexStatement fromDate="20261101" toDate="20261120"><AccountInformation currency="EUR" /><CashTransactions>${rows
+    .map(r => `<CashTransaction ${Object.entries({ currency: 'USD', fxRateToBase: '0.8', levelOfDetail: 'DETAIL', ...r }).map(([k, v]) => `${k}="${v}"`).join(' ')} />`)
+    .join('')}</CashTransactions></FlexStatement></FlexStatements></FlexQueryResponse>`
+
+describe('movimenti di cassa', () => {
+  let n = 0
+  const id = () => `cid${++n}`
+  const xml = cashXml(
+    { type: 'Dividends', transactionID: '1', dateTime: '20261110;202000', symbol: 'IBM', isin: 'US4592001014', amount: '25.35', description: 'IBM(US4592001014) CASH DIVIDEND USD 1.69 PER SHARE' },
+    { type: 'Withholding Tax', transactionID: '2', dateTime: '20261110;202000', symbol: 'IBM', amount: '-3.8', description: 'IBM(US4592001014) CASH DIVIDEND - US TAX' },
+    { type: 'Broker Interest Paid', transactionID: '3', dateTime: '20261103;202000', amount: '-40', description: 'USD DEBIT INT FOR OCT-2026' },
+    { type: 'Broker Interest Paid', transactionID: '4', dateTime: '20261103;202000', amount: '-1.5', currency: 'EUR', description: 'EUR DEBIT INT FOR OCT-2026' },
+    { type: 'Broker Interest Received', transactionID: '5', dateTime: '20261103;202000', amount: '2.1', description: 'USD SYEP INTEREST FOR OCT-2026' },
+    { type: 'Broker Interest Received', transactionID: '6', dateTime: '20261103;202000', amount: '0.3', description: 'USD CREDIT INT FOR OCT-2026' },
+    { type: 'Deposits/Withdrawals', transactionID: '7', dateTime: '20261104;202000', amount: '1000', description: 'versamento' },
+    { type: 'Qualcosa Di Nuovo', transactionID: '8', dateTime: '20261104;202000', amount: '1', description: 'boh' },
+  )
+  const r = parseFlex(xml)
+
+  it('riconosce i tipi e ignora i versamenti', () => {
+    expect(r.cash.map(c => c.kind).sort()).toEqual(['credit-interest', 'dividend', 'lending', 'margin-interest', 'margin-interest', 'withholding'])
+    expect(r.unknownCash).toEqual({ 'Qualcosa Di Nuovo': 1 })
+    expect(r.cash.find(c => c.externalId === 'C3')).toMatchObject({ period: '2026-10', currency: 'USD', amount: -40 })
+  })
+
+  it('salva dividendi e ritenute con importo con segno e cambio', () => {
+    const res = applyFlexOrders({ assets: {} }, [], id, r.cash)
+    const flows = res.portfolio.cashflows!
+    expect(flows.map(f => f.kind).sort()).toEqual(['credit-interest', 'dividend', 'lending', 'withholding'])
+    expect(flows.find(f => f.kind === 'withholding')).toMatchObject({ amount: -3.8, symbol: 'IBM', exchangeRate: 1.25, externalId: 'C2' })
+  })
+
+  it('interessi di margine: una riga per mese e valuta, con il costo positivo', () => {
+    const res = applyFlexOrders({ assets: {} }, [], id, r.cash)
+    expect(res.portfolio.marginInterest!.map(m => [m.period, m.currency, m.amount]).sort()).toEqual([['2026-10', 'EUR', 1.5], ['2026-10', 'USD', 40]])
+  })
+
+  it('una seconda esecuzione non cambia nulla', () => {
+    const first = applyFlexOrders({ assets: {} }, [], id, r.cash)
+    const second = applyFlexOrders(first.portfolio, [], id, r.cash)
+    expect(second.changed).toBe(false)
+    expect(second.cashAdded).toEqual([])
+    expect(second.portfolio).toEqual(first.portfolio)
+  })
+
+  it('un addebito di margine arrivato un altro giorno si somma e uno storno lo riduce', () => {
+    const first = applyFlexOrders({ assets: {} }, [], id, r.cash)
+    const later = parseFlex(cashXml(
+      { type: 'Broker Interest Paid', transactionID: '9', dateTime: '20261105;202000', amount: '-5', description: 'USD DEBIT INT FOR OCT-2026' },
+      { type: 'Broker Interest Paid', transactionID: '10', dateTime: '20261106;202000', amount: '2', description: 'USD DEBIT INT FOR OCT-2026' },
+    ))
+    const res = applyFlexOrders(first.portfolio, [], id, later.cash)
+    expect(res.portfolio.marginInterest!.find(m => m.currency === 'USD')!.amount).toBe(43)
+  })
+
+  it('interesse già inserito a mano e uguale: si collega; diverso: da controllare', () => {
+    const same = applyFlexOrders({ marginInterest: [{ period: '2026-10', currency: 'USD', amount: 40 }] }, [], id, r.cash)
+    expect(same.portfolio.marginInterest).toHaveLength(2)
+    expect(same.portfolio.marginInterest!.find(m => m.currency === 'USD')).toMatchObject({ amount: 40, externalId: 'MI:2026-10:USD', source: 'ibkr' })
+    const diff = applyFlexOrders({ marginInterest: [{ period: '2026-10', currency: 'USD', amount: 99 }] }, [], id, r.cash)
+    expect(diff.review.some(s => s.includes('inserito a mano'))).toBe(true)
+    expect(diff.portfolio.marginInterest!.find(m => m.currency === 'USD')!.amount).toBe(99)
+  })
+})

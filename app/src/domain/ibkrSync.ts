@@ -7,6 +7,8 @@ export interface SyncStatus {
   reportTo?: string
   added: string[]
   linked: string[]
+  /** Dividendi, interessi e altri movimenti di cassa importati. */
+  cashAdded: string[]
   review: string[]
   skipped: string[]
   /** Ultimo errore (resta finché una sincronizzazione non riesce di nuovo). */
@@ -27,6 +29,7 @@ export function syncStatusFromDb(raw: unknown): SyncStatus | null {
     reportTo: typeof r.reportTo === 'string' ? r.reportTo : undefined,
     added: strings(r.added),
     linked: strings(r.linked),
+    cashAdded: strings(r.cashAdded),
     review: strings(r.review),
     skipped: strings(r.skipped),
     lastError: err && typeof err.message === 'string' ? { at: typeof err.at === 'string' ? err.at : '', message: err.message } : undefined,
@@ -36,5 +39,6 @@ export function syncStatusFromDb(raw: unknown): SyncStatus | null {
 /** Riassunto in una riga: "3 operazioni importate, 1 da controllare". */
 export function syncHeadline(s: SyncStatus): string {
   const imp = s.added.length === 1 ? '1 operazione importata' : `${s.added.length} operazioni importate`
-  return `${imp}, ${s.review.length} da controllare`
+  const cash = s.cashAdded.length ? `, ${s.cashAdded.length} movimenti di cassa` : ''
+  return `${imp}${cash}, ${s.review.length} da controllare`
 }
