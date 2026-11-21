@@ -54,11 +54,14 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - **Pezzo 2 (fatto, in PR):** riquadro **Margine** in Panoramica e Posizioni (`MarginCard`, motore in `domain/engine/margin.ts`): margine usato (saldo reale IBKR,
   per valuta e totale in €), **leva** = esposizione lorda (long + |short|) / patrimonio netto, interessi pagati nell'anno + maturati, costo stimato al giorno e al mese
   (tasso attuale, 360 giorni; 365 per GBP/CAD/AUD…). Compare solo per i portafogli con `marginStatus`.
-- **Avviso leva:** campo "Leva massima" nel riquadro (salvata su questo dispositivo, `localStorage`); avviso giallo sopra il 90% della soglia, rosso sopra la soglia.
-  Da fare, se serve: soglia sincronizzata tra dispositivi (oggi no), notifica push.
-- **Saldo a margine su ogni acquisto (fatto):** nei Movimenti, sotto ogni acquisto, "conto a margine: X USD" dal giorno (o dall'ultimo giorno noto entro 5) in `marginDaily`.
-  Lo storico parte da quando la sincronizzazione ha cominciato a salvarlo (dal 18/11/2026): prima non si mostra nulla. Per riempire l'anno servirebbe un report Flex
-  con intervallo di date (cambio della Flex Query sul portale IBKR, da fare a mano) e un import una tantum: da proporre ad Andrea.
+- **Avviso leva:** campo "Leva massima" nel riquadro, **salvato su Firebase** (`users/{uid}/settings/maxLeverage`, uguale su tutti i dispositivi e in tempo reale);
+  avviso giallo sopra il 90% della soglia, rosso sopra la soglia. Da fare, se serve: notifica push.
+- **Saldo a margine su ogni acquisto (fatto):** nei Movimenti, sotto ogni acquisto, "conto a margine: X USD" oppure "conto senza margine". Dati da `marginDaily`;
+  `marginHistoryFrom` è il primo giorno coperto dai report (dove non ci sono righe di debito il conto era senza margine; prima non si mostra nulla).
+- **Storico dell'anno da IBKR:** il Flex Web Service accetta le date `fd`/`td` (max 365 giorni, l'ultimo giorno disponibile è l'ultimo lavorativo chiuso).
+  `node tools/scarica-flex.mjs 2026-01-01 2026-11-19` scarica il report in `.backup/`; `node --experimental-strip-types tools/storico-ibkr.mjs <file.xml> [--salva]`
+  lo applica a secco al portafoglio IBKR del backup e mostra cosa cambierebbe. Prova del 21/11/2026 (1/1–19/11): 112 ordini (110 collegati ai movimenti manuali,
+  2 nuovi: STLAP 31/8 e 19/10), 36 movimenti di cassa, 184 giorni di debito (dal 17/06 al 18/11). **Non ancora applicata ai dati veri** (serve backup e OK di Andrea).
 - **Nota tecnica:** Firebase scarta i `null`: i campi opzionali salvati (es. `ratePct`) possono mancare, vanno letti con `== null`.
 - **Non si fa più:** quota a margine stimata per titolo e tasto MAX (decisione di Andrea). Il campo `marginAmount` dei movimenti resta com'è.
 

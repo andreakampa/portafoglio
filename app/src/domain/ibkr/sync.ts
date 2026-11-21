@@ -16,6 +16,8 @@ export interface SyncPortfolio {
   marginStatus?: MarginStatus
   /** Una riga per giorno e valuta a debito: capitale, tasso e interesse del giorno. */
   marginDaily?: MarginDayRow[]
+  /** Primo giorno coperto dallo storico del margine: da qui i giorni senza righe sono senza debito. */
+  marginHistoryFrom?: string
 }
 
 export interface MarginStatus {
@@ -213,6 +215,10 @@ function applyMargin(portfolio: SyncPortfolio, m: FlexMargin, res: SyncResult) {
       portfolio.marginStatus = next
       res.changed = true
     }
+  }
+  if (m.from && m.balances.length > 0 && (!portfolio.marginHistoryFrom || m.from < portfolio.marginHistoryFrom)) {
+    portfolio.marginHistoryFrom = m.from
+    res.changed = true
   }
   const rows = portfolio.marginDaily ?? []
   const seen = new Set(rows.map(r => `${r.date}|${r.currency}`))

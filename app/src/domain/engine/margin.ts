@@ -9,6 +9,7 @@ import type { PositionRow } from './valuation.ts'
 export type MarginPortfolio = RawPortfolio & {
   marginStatus?: MarginStatus
   marginDaily?: MarginDayRow[]
+  marginHistoryFrom?: string
   marginInterest?: MarginInterestRow[]
 }
 
@@ -144,13 +145,13 @@ export interface MarginOnDate {
  * Prima che esistano righe (o se il giorno è troppo lontano) risponde null: non si inventa uno storico.
  */
 export function marginOnDate(p: MarginPortfolio, date: string): MarginOnDate | null {
-  const rows = p.marginDaily
-  if (!rows?.length) return null
-  const first = rows[0]!.date
-  if (date < first) return null
+  const rows = p.marginDaily ?? []
+  const from = p.marginHistoryFrom ?? rows[0]?.date
+  if (!from || date < from) return null
   let day: string | null = null
   for (const r of rows) if (r.date <= date && (day === null || r.date > day)) day = r.date
-  if (day === null || Date.parse(date) - Date.parse(day) > 5 * 86400000) return null
+  // Senza righe vicine, nel periodo coperto dal report il conto non aveva debito.
+  if (day === null || Date.parse(date) - Date.parse(day) > 5 * 86400000) return { date, debts: [] }
   const debts = rows.filter(r => r.date === day && r.principal < 0).map(r => ({ currency: r.currency, principal: r.principal, ratePct: r.ratePct }))
   return { date: day, debts }
 }

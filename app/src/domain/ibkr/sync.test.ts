@@ -220,3 +220,14 @@ describe('margine dal report Flex', () => {
     expect(r.portfolio.marginStatus!.date).toBe('2026-11-19')
   })
 })
+
+describe('copertura dello storico del margine', () => {
+  const xml = `<FlexQueryResponse><FlexStatements><FlexStatement fromDate="20260101" toDate="20261119"><AccountInformation currency="EUR" /><CashReport><CashReportCurrency currency="USD" levelOfDetail="Currency" toDate="20261119" endingCash="-100" /></CashReport></FlexStatement></FlexStatements></FlexQueryResponse>`
+  it('ricorda il primo giorno coperto e non lo sposta con report più recenti', () => {
+    const m = parseFlex(xml).margin
+    const first = applyFlexOrders({ assets: {} }, [], () => 'x', [], m)
+    expect(first.portfolio.marginHistoryFrom).toBe('2026-01-01')
+    const later = applyFlexOrders(first.portfolio, [], () => 'y', [], { ...m, from: '2026-11-19', date: '2026-11-20' })
+    expect(later.portfolio.marginHistoryFrom).toBe('2026-01-01')
+  })
+})

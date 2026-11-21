@@ -59,6 +59,8 @@ export interface FlexMarginDay {
 }
 
 export interface FlexMargin {
+  /** Periodo coperto dal report: da qui in poi i giorni senza debito sono davvero senza debito. */
+  from: string | null
   /** Data del report (fine periodo). */
   date: string | null
   baseCurrency: string
@@ -187,7 +189,7 @@ export function parseFlex(xml: string): FlexReport {
   }
   cash.sort((a, b) => a.date.localeCompare(b.date) || a.externalId.localeCompare(b.externalId))
 
-  const margin = parseMargin(xml, baseCurrency, iso(stmt.toDate))
+  const margin = parseMargin(xml, baseCurrency, iso(stmt.fromDate), iso(stmt.toDate))
 
   const result: FlexOrder[] = [...orders.values()].map(({ side, notional, opens, closes, ...o }) => ({
     ...o,
@@ -200,7 +202,7 @@ export function parseFlex(xml: string): FlexReport {
 
 const round = (x: number, d: number) => Math.round(x * 10 ** d) / 10 ** d
 
-function parseMargin(xml: string, baseCurrency: string, date: string | null): FlexMargin {
+function parseMargin(xml: string, baseCurrency: string, from: string | null, date: string | null): FlexMargin {
   const real = (c: string | undefined) => !!c && c !== 'BASE_SUMMARY'
   // Con più giorni nel report vale l'ultima riga di ogni valuta.
   const lastBy = (rows: Record<string, string>[], dateKey: string) => {
@@ -237,7 +239,7 @@ function parseMargin(xml: string, baseCurrency: string, date: string | null): Fl
   const days: FlexMarginDay[] = [...perDay.values()]
     .map(x => ({ date: x.date, currency: x.currency, principal: round(x.principal, 2), ratePct: x.principal ? round(x.weighted / Math.abs(x.principal), 4) : 0, interest: round(x.interest, 4) }))
     .sort((a, b) => a.date.localeCompare(b.date) || a.currency.localeCompare(b.currency))
-  return { date, baseCurrency, baseCash: base ? round(n(base.endingCash), 2) : null, balances, days }
+  return { from, date, baseCurrency, baseCash: base ? round(n(base.endingCash), 2) : null, balances, days }
 }
 
 /** Ticker Yahoo a partire da simbolo e mercato IBKR (RACEm su BVME → RACE.MI). null = mercato non riconosciuto. */

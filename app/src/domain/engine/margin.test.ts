@@ -98,9 +98,14 @@ describe('margine nel giorno di un acquisto', () => {
   it('usa l’ultimo giorno noto entro 5 giorni (weekend)', () => {
     expect(marginOnDate(q, '2026-11-21')!.date).toBe('2026-11-18')
   })
-  it('prima dello storico o troppo lontano non inventa niente', () => {
+  it('prima dello storico non inventa niente', () => {
     expect(marginOnDate(q, '2026-10-01')).toBeNull()
-    expect(marginOnDate(q, '2026-12-01')).toBeNull()
     expect(marginOnDate({}, '2026-11-18')).toBeNull()
+  })
+  it('dove il report copre il periodo ma non ci sono righe di debito, il conto era senza margine', () => {
+    const covered = { ...q, marginHistoryFrom: '2026-01-01' }
+    expect(marginOnDate(covered, '2026-03-10')).toEqual({ date: '2026-03-10', debts: [] })
+    expect(marginOnDate(covered, '2026-12-01')!.debts).toEqual([])
+    expect(marginOnDate(covered, '2025-12-31')).toBeNull()
   })
 })
