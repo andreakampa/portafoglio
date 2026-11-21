@@ -92,8 +92,8 @@ Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di
 1. **Sincronizzazione IBKR: resta da fare** (il resto è fatto, vedi sopra):
    - **Opzioni:** la call BMEA 21JAN28 1.5 è segnalata ma non gestita (serve un tipo di movimento "opzione").
    - **Azioni "premio versamento"** IBKR: maturano dal 2027.
-   - **Mostrare nella v2** dividendi, ritenute, interessi attivi e prestito titoli (oggi sono solo salvati in `cashflows`)
-     e usarli nel fiscale (dividendi: vedi regole-fiscali.md).
+   - **Mostrati nella v2** (Movimenti → scheda "Cassa": elenco e totali per tipo e valuta del periodo). Resta da fare
+     usarli nel fiscale (dividendi: vedi regole-fiscali.md) e il totale in euro.
    - Dopo il primo addebito mensile di interessi (inizio dicembre) controllare nell'avviso della Panoramica che i movimenti di cassa arrivino.
 2. **Movimenti nella v2: resta da fare** il PAC automatico (oggi si inserisce la singola rata, segnata "PAC"),
    la modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono dalla v2) e la scelta dei lotti da vendere.
