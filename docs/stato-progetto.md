@@ -45,6 +45,9 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     margine vanno in `marginInterest` (una riga per mese e valuta, somma dei singoli addebiti, stesso formato del sito vecchio).
     Tipi sconosciuti finiscono "da controllare". Provato solo con test: il report del 20/11 non conteneva movimenti di cassa.
   - **Avviso nella Panoramica della v2:** esito dell'ultima sincronizzazione (importate, da controllare, non gestite) ed eventuale errore.
+- **Dati Trade Republic sistemati (21/11/2026, backup `.backup/database-20261121-154936.json`):** MCHT.MI ora è ETF, date delle 12 rate allineate a quelle di esecuzione di Trade Republic,
+  8 rate mancanti aggiunte (prezzo = chiusura Yahoo, campo `priceEstimated: true`), nuovo titolo FTSE Global All-Cap (VALL.AS, ISIN IE000VAHT5T0) con 5 rate da 50 € (quella del 16/11 coi dati veri della fattura).
+  Strumento: `tools/pac-trade-republic-2026.mjs`. Trade Republic non ha API ufficiali: i PAC futuri vanno generati dalla v2 (punto 2 della lista, PAC automatico).
 - **Dati corretti su richiesta di Andrea:** tolta la minus MBB doppia su IBKR, MCHT.MI segnato come ETF.
 
 ## Margine: decisioni di Andrea (21/11/2026) e avanzamento
