@@ -57,6 +57,6 @@ export type FxLookup = (currency: string, date: string) => number | undefined
 export interface Issue {
   txId?: string
   date?: string
-  code: 'cambio-mancante' | 'vendita-oltre-quantita' | 'lotto-inesistente' | 'quantita-non-valida'
+  code: 'cambio-mancante' | 'vendita-oltre-quantita' | 'lotto-inesistente' | 'quantita-non-valida' | 'trasferimento-non-collegato'
   message: string
 }
