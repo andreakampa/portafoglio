@@ -47,7 +47,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   - **Avviso nella Panoramica della v2:** esito dell'ultima sincronizzazione (importate, da controllare, non gestite) ed eventuale errore.
 - **Dati Trade Republic sistemati (21/11/2026, backup `.backup/database-20261121-154936.json`):** MCHT.MI ora è ETF, date delle 12 rate allineate a quelle di esecuzione di Trade Republic,
   8 rate mancanti aggiunte (prezzo = chiusura Yahoo, campo `priceEstimated: true`), nuovo titolo FTSE Global All-Cap (VALL.AS, ISIN IE000VAHT5T0) con 5 rate da 50 € (quella del 16/11 coi dati veri della fattura).
-  Strumento: `tools/pac-trade-republic-2026.mjs`. Trade Republic non ha API ufficiali: i PAC futuri vanno generati dalla v2 (punto 2 della lista, PAC automatico).
+  Strumento: `tools/pac-trade-republic-2026.mjs`. Trade Republic non ha API ufficiali: i PAC futuri li genera la v2 (scheda "Piani PAC" in Movimenti).
 - **Dati corretti su richiesta di Andrea:** tolta la minus MBB doppia su IBKR, MCHT.MI segnato come ETF.
 
 ## Margine: decisioni di Andrea (21/11/2026) e avanzamento
@@ -72,60 +72,50 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - **Nota tecnica:** Firebase scarta i `null`: i campi opzionali salvati (es. `ratePct`) possono mancare, vanno letti con `== null`.
 - **Non si fa più:** quota a margine stimata per titolo e tasto MAX (decisione di Andrea). Il campo `marginAmount` dei movimenti resta com'è.
 
-## Prossimo passo (vecchio, superato dalle decisioni qui sopra): gestione del margine (punto 4 qui sotto)
-Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di partenza:
-- **Cosa c'è già.** Sui movimenti di acquisto il campo `marginAmount` (quota finanziata a margine, stesso formato del sito vecchio:
-  si inserisce nella modifica del movimento, solo per gli acquisti). Il portafoglio ha `marginInterest`: righe mensili
-  `{ id, period: 'YYYY-MM', currency, amount, source, externalId: 'MI:periodo:valuta', parts }`, riempite dalla sincronizzazione IBKR
-  (`app/src/domain/ibkr/sync.ts`, funzione `applyCash`) o a mano nel sito vecchio. La v2 le mostra in Movimenti → "Interessi margine"
-  (`app/src/domain/engine/movements.ts`, `marginInterest()`).
-- **Cosa manca (richieste di Andrea):**
-  1. Nella v2: inserire la quota a margine di un acquisto (maschera movimenti e simulatore), con tasto **MAX** = massimo finanziabile.
-  2. **Interessi giornalieri per posizione** col tasso IBKR: il report Flex ha la sezione `TierInterestDetail` (data, valuta, capitale
-     `totalPrincipal`, tasso `rate`, interesse `totalInterest`) e `InterestAccruals` (interessi maturati e non ancora addebitati).
-     Il sito vecchio le legge già in `js/modules/portfolio/ibkr-flex.js` (`interestDaily`, `accruals`); `app/src/domain/ibkr/flex.ts`
-     oggi non le legge. Va deciso come ripartire l'interesse tra le posizioni (in proporzione alla quota a margine di ciascuna).
-  3. **Sub-totale in alto** (interessi e margine usato) nella Panoramica o in Posizioni.
-- **Da chiarire con Andrea prima di scrivere codice:** come si ripartisce il margine tra posizioni quando cambia nel tempo (vendite
-  parziali), se la quota a margine deve ridursi con le vendite, e quale tasso usare per le proiezioni. Il margine IBKR vero è un
-  saldo di cassa negativo per valuta, non una quota per titolo: conviene capire se mostrare il saldo reale (dal Flex) accanto alla stima.
-- Il vecchio sito calcola il totale interessi in `js/modules/portfolio/render.js` (`renderKPI`, `totaleInteressiEur`).
+## Stato al 21/11/2026 (fine sessione) — da dove ripartire
+**Pubblicato su `main` e online** (v2 su `/portafoglio/v2/`): margine, scheda Cassa (Movimenti), dividendi e "Imposte stimate" nel Fiscale, PAC automatico, opzioni.
+**PR aperta:** questa (strumento opzioni + stato). Su `main` il resto è tutto unito; ultima verifica: 170 test verdi.
+
+- **Dividendi (Fiscale):** per anno lordo, ritenute, 26% e netto. IBKR = dati veri dei movimenti di cassa (da gennaio 2026); gli altri portafogli = stima Yahoo
+  (quantità prima dello stacco × importo; ritenuta 15% sui titoli USA). Dichiarativo: 26% sul lordo **senza credito per la ritenuta estera** (scelta prudente di Andrea).
+  Amministrato: 26% sul netto della ritenuta estera (confermato sugli accrediti Mediolanum di Meta e Microsoft: netto/lordo ≈ 0,63).
+- **Imposte stimate** (riquadro nel Fiscale): plus/minus + dividendi + bollo (amministrato) o IVAFE (+34,20 € conto estero, dichiarativo). Bollo/IVAFE sul valore di oggi, non al 31/12; anni passati non calcolati.
+- **Trade Republic:** dati sistemati (MCHT.MI ETF, date delle rate, rate mancanti, nuovo titolo FTSE Global All-Cap `VALL.AS`). Le 12 rate con prezzo di chiusura Yahoo hanno `priceEstimated`
+  e il badge "da confermare": Andrea può inserire il prezzo vero dalla fattura con "Modifica". Piani PAC già creati su Firebase (`settings/pacPlans`): MCHT.MI 25 € e VALL.AS 50 €, il 2 e il 16 del mese.
+  **Prima prova reale: la rata del 2 dicembre** (aprire l'app il 3/12 e controllare che compaiano con l'avviso).
+- **Opzioni:** vedi punto 1 qui sotto. Call BMEA nei dati IBKR; Worker ripubblicato.
 
 ## Da fare, in ordine di priorità
-1. **Sincronizzazione IBKR: resta da fare** (il resto è fatto, vedi sopra):
-   - **Opzioni (in PR):** una call è un titolo di tipo `option` con ticker Yahoo OCC (es. `BMEA280121C00001500`), quantità = contratti × 100 e prezzo = premio per azione:
-     così quantità × prezzo è il controvalore e il motore non cambia (26% come gli altri strumenti). La sincronizzazione importa acquisti/vendite; scadenza senza valore = vendita a prezzo 0;
-     assegnazione/esercizio vanno "da controllare" (toccano anche il sottostante). Il Worker `ibkr-sync` va ripubblicato per usarlo. Da applicare ai dati veri: acquisto del 26/08 (`tools/storico-ibkr.mjs`).
-   - **Azioni "premio versamento"** IBKR: maturano dal 2027.
-   - **Mostrati nella v2** (Movimenti → scheda "Cassa": elenco e totali per tipo e valuta del periodo). Resta da fare
-     usarli nel fiscale (dividendi: vedi regole-fiscali.md) e il totale in euro.
-   - Dopo il primo addebito mensile di interessi (inizio dicembre) controllare nell'avviso della Panoramica che i movimenti di cassa arrivino.
-2. **PAC automatico (fatto, in PR):** in Movimenti la scheda "Piani PAC" (titolo in euro, importo, giorni del mese o giorno della settimana, data di inizio;
-   salvati in `users/{uid}/settings/pacPlans`, fuori dai portafogli). All'apertura dell'app `PacRunner` crea le rate maturate fino a ieri al prezzo di chiusura Yahoo
-   del primo giorno di borsa dalla data prevista, con `priceEstimated: true` (badge "da confermare", sparisce salvando la modifica con il prezzo vero). Niente doppioni:
-   chiave `pacKey` e rate PAC inserite a mano entro 3 giorni dalla data prevista. Provato sugli emulatori. **Da fare da Andrea:** creare i due piani Trade Republic
-   (MCHT.MI 25 € il 2 e il 16; VALL.AS 50 € il 2 e il 16; inizio dal 2026-11-17).
-   **Movimenti nella v2: resta da fare** la modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono dalla v2) e la scelta dei lotti da vendere.
-   Dopo che Andrea l'ha usata a mano per qualche giorno si può dismettere il sito vecchio per l'inserimento.
-3. **Simulatore: resta da fare** "Registra come movimenti" (trasforma il carrello in operazioni vere), l'imposta di bollo/IVAFE
-   nella stima e la simulazione di dividendi.
-4. **Margine** (vedi "Prossimo passo" sopra): quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione
-   con il tasso IBKR (dal report Flex), sub-totale in alto.
-5. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100,
-   S&P 500, VIX, VXN) con lancetta del VIX che avverte vicino a 25.
-6. **Watchlist** importate da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push).
-7. **Fase 3, grafica definitiva** della v2 (oggi è provvisoria).
-8. **Multiutente:** gestione degli inviti dentro la v2 (oggi solo nel sito vecchio), primo accesso guidato.
+1. **Dichiarazione dei redditi (730 / Redditi PF) — richiesta principale di Andrea, da progettare con lui.** Obiettivo: aiutarlo a fine anno a compilare i quadri giusti, come lo strumento TIR di Paolo Coletti.
+   - **Quadro RT** (plus/minus da dichiarativo, LIFO, minus pregresse) e **RM** (dividendi esteri, 26%), **RW** (monitoraggio e IVAFE), prospetto per cambi.
+   - **Cambi:** confronto sistematico con i cambi storici Banca d'Italia (il motore li usa già; manca il rapporto di confronto con i dati di IBKR).
+   - **Dati:** il prospetto fiscale/rendiconto IBKR di fine anno (Andrea lo invierà quando sarà pronto) e, per Mediolanum e Trade Republic, le certificazioni fiscali (amministrati: il lavoro è della banca).
+   - Prima di scrivere codice chiedere ad Andrea: output voluto (PDF/tabella per quadro/righe da copiare), anno fiscale di riferimento, valore al 31/12 per IVAFE/RW (serve il prezzo a fine anno), credito per ritenute estere (punto controverso).
+   - Punto incerto da risolvere con un commercialista: credito per le ritenute estere sui dividendi in dichiarativo.
+2. **Sincronizzazione IBKR — resta:** azioni "premio versamento" (maturano dal 2027); assegnazione/esercizio di opzioni (vanno "da controllare", si registrano a mano);
+   dopo il primo addebito mensile di interessi (inizio dicembre) controllare l'avviso della Panoramica per i movimenti di cassa. Totale in euro dei movimenti di cassa non ancora mostrato.
+   **Opzioni (fatto):** titolo di tipo `option`, ticker Yahoo OCC (es. `BMEA280121C00001500`), quantità = contratti × 100, prezzo = premio per azione: il motore non cambia (26%).
+   Scadenza senza valore = vendita a 0. Applicato: call BMEA 21JAN28 1.5 (100 quote a 1 $, 26/08/2026) con `tools/opzioni-ibkr-storico.mjs`, backup `.backup/database-20261121-162408.json`; Worker `ibkr-sync` ripubblicato.
+3. **Movimenti nella v2:** modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono), scelta dei lotti da vendere. Dopo qualche giorno di uso si può dismettere il sito vecchio per l'inserimento.
+4. **Simulatore:** "Registra come movimenti", bollo/IVAFE nella stima, simulazione di dividendi.
+5. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100, S&P 500, VIX, VXN) con lancetta del VIX vicino a 25.
+6. **Watchlist** da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push). Eventuale notifica push per l'avviso di leva.
+7. **Fase 3, grafica definitiva** della v2 (oggi provvisoria).
+8. **Multiutente:** inviti dentro la v2 (oggi solo nel sito vecchio), primo accesso guidato.
 9. **Assistente AI (Gemini)** nella v2, poi dismissione del sito vecchio.
 
 ## Da chiedere o verificare con Andrea
+- Aggiornare la PWA sul telefono (chiuderla e riaprirla due volte) e controllare: scheda "Dividendi" nel Fiscale per ogni portafoglio (Mediolanum: Meta ≈ 0,58 €, Microsoft ≈ 3,45 € netti), scheda "Piani PAC".
 - Dopo qualche giorno di uso: i movimenti inseriti a mano nella v2 tornano con i numeri attesi? (verificato solo sugli emulatori)
 - I prospetti di Mediolanum e Trade Republic (plus, minus, cassetto) per confrontarli con il motore.
 - I punti fiscali incerti elencati in fondo a [regole-fiscali.md](regole-fiscali.md).
 - Cancellare dalla cartella Download la chiave `calcolo-pmc-firebase-adminsdk-*.json` (è già su Cloudflare).
+- Emulatori Firebase lasciati accesi da questa sessione (processi Java in background): si chiudono con il riavvio del PC.
 
 ## Strumenti utili (`tools/`)
 - `confronto-trasferimenti.mjs`: costo dei titoli trasferiti, prima e dopo il collegamento dei trasferimenti.
 - `confronto-motori.mjs`: vecchio motore contro nuovo, sull'ultimo backup.
 - `scarica-flex.mjs` + `confronto-ibkr.mjs`: confronto con il report Flex.
 - `riconcilia-ibkr-csv.mjs <rendiconto.csv>`: confronto dei movimenti con il rendiconto attività IBKR.
+- `pac-trade-republic-2026.mjs`: sistemazione una tantum dei PAC di Trade Republic (21/11/2026).
+- `opzioni-ibkr-storico.mjs`: aggiunge ai dati IBKR le opzioni del report Flex dell'anno.
