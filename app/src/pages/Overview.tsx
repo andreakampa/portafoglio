@@ -1,3 +1,4 @@
+import { IbkrSyncNotice } from '../components/IbkrSyncNotice'
 import { usePortfolioState } from '../data/usePortfolioState'
 import { summarizePortfolios } from '../domain/portfolioState'
 
@@ -15,6 +16,7 @@ export function Overview() {
       {state.status === 'error' && (
         <div className="card error">Non riesco a leggere i dati: {state.message}</div>
       )}
+      <IbkrSyncNotice />
       {state.status === 'ready' && <PortfolioList data={state.data} />}
 
       <a className="btn btn-ghost" href="/portafoglio/">
