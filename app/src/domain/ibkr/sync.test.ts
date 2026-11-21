@@ -231,3 +231,20 @@ describe('copertura dello storico del margine', () => {
     expect(later.portfolio.marginHistoryFrom).toBe('2026-01-01')
   })
 })
+
+describe('stesso ISIN su mercati e valute diverse', () => {
+  it('assegna l’ordine al titolo con la stessa valuta (Alibaba: BABA in USD, AHLA in EUR)', () => {
+    const xml = report(trade({ symbol: 'AHLA', isin: 'US01609W1027', currency: 'EUR', fxRateToBase: '1', listingExchange: 'IBIS', ibCommissionCurrency: 'EUR', tradeDate: '20260611', buySell: 'SELL', openCloseIndicator: 'C', quantity: '-10', tradePrice: '96', ibCommission: '-1.2', ibOrderID: '9', tradeID: 'z' }))
+    const p: SyncPortfolio = {
+      assets: {
+        baba: { ticker: 'BABA', isin: 'US01609W1027', valuta: 'USD', transactions: [{ id: 'b1', date: '2026-05-07', type: 'buy', qty: 10, price: 143 }] },
+        ahla: { ticker: 'AHLA.DE', isin: 'US01609W1027', valuta: 'EUR', transactions: [{ id: 'a1', date: '2026-06-11', type: 'sell', qty: 10, price: 96 }] },
+      },
+    }
+    const r = applyFlexOrders(p, parseFlex(xml).orders, () => 'n')
+    expect(r.added).toHaveLength(0)
+    expect(r.linked).toHaveLength(1)
+    expect(r.portfolio.assets!.ahla!.transactions![0]).toMatchObject({ externalId: '9@2026-06-11', commission: 1.2 })
+    expect(r.portfolio.assets!.baba!.transactions).toHaveLength(1)
+  })
+})

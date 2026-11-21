@@ -60,8 +60,12 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   `marginHistoryFrom` è il primo giorno coperto dai report (dove non ci sono righe di debito il conto era senza margine; prima non si mostra nulla).
 - **Storico dell'anno da IBKR:** il Flex Web Service accetta le date `fd`/`td` (max 365 giorni, l'ultimo giorno disponibile è l'ultimo lavorativo chiuso).
   `node tools/scarica-flex.mjs 2026-01-01 2026-11-19` scarica il report in `.backup/`; `node --experimental-strip-types tools/storico-ibkr.mjs <file.xml> [--salva]`
-  lo applica a secco al portafoglio IBKR del backup e mostra cosa cambierebbe. Prova del 21/11/2026 (1/1–19/11): 112 ordini (110 collegati ai movimenti manuali,
-  2 nuovi: STLAP 31/8 e 19/10), 36 movimenti di cassa, 184 giorni di debito (dal 17/06 al 18/11). **Non ancora applicata ai dati veri** (serve backup e OK di Andrea).
+  lo applica a secco al portafoglio IBKR del backup e mostra cosa cambierebbe.
+  **Applicato ai dati veri il 21/11/2026** (backup `.backup/database-20261121-022825.json`): tutti i 112 ordini dell'anno ora hanno l'id IBKR
+  (72 collegati ai movimenti manuali, con prezzo, commissioni e cambio esatti; 40 già collegati dalla sincronizzazione), 27 movimenti di cassa in `cashflows`,
+  9 mesi in `marginInterest`, 184 giorni di debito in `marginDaily` (17/06–18/11), `marginHistoryFrom` = 2026-01-01. Movimenti: 120 prima e dopo.
+- **Bug corretto (21/11/2026):** la sincronizzazione sceglieva il titolo per ISIN senza guardare la valuta: AHLA (Alibaba a Francoforte, EUR) e BABA (NYSE, USD)
+  hanno lo stesso ISIN e una vendita AHLA veniva aggiunta a BABA. Ora si cerca ISIN + valuta, poi ticker + valuta, poi solo ISIN.
 - **Nota tecnica:** Firebase scarta i `null`: i campi opzionali salvati (es. `ratePct`) possono mancare, vanno letti con `== null`.
 - **Non si fa più:** quota a margine stimata per titolo e tasto MAX (decisione di Andrea). Il campo `marginAmount` dei movimenti resta com'è.
 

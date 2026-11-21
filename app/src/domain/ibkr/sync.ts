@@ -91,9 +91,13 @@ export function applyFlexOrders(
   const already = new Set<string>()
   for (const a of Object.values(assets)) for (const t of (a.transactions ?? []) as Tx[]) if (t.externalId) already.add(t.externalId)
 
+  // Lo stesso ISIN può stare su più mercati e valute (Alibaba: BABA in USD a New York, AHLA in EUR a Francoforte):
+  // si cerca prima ISIN e valuta insieme, poi ticker e valuta, e solo per ultimo il solo ISIN.
+  const cur = (a: RawAsset) => (a.valuta || 'EUR').toUpperCase()
   const findAsset = (o: FlexOrder) =>
-    Object.entries(assets).find(([, a]) => o.isin && a.isin === o.isin) ??
-    Object.entries(assets).find(([, a]) => base(a.ticker || a.nome || '') === base(o.symbol) && (a.valuta || 'EUR').toUpperCase() === o.currency)
+    Object.entries(assets).find(([, a]) => o.isin && a.isin === o.isin && cur(a) === o.currency) ??
+    Object.entries(assets).find(([, a]) => base(a.ticker || a.nome || '') === base(o.symbol) && cur(a) === o.currency) ??
+    Object.entries(assets).find(([, a]) => o.isin && a.isin === o.isin)
 
   for (const o of orders) {
     if (already.has(o.externalId)) continue
