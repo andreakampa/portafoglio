@@ -14,6 +14,7 @@ import { loadMonthlyFx } from '../lib/fxMonthly.ts'
 import { loadCloses } from '../lib/priceHistory.ts'
 import { THIS_YEAR } from '../lib/format.ts'
 import { loadLatestFx, loadQuotes } from '../lib/prices.ts'
+import { useStoredStatement, type StoredStatement } from './taxStatements.ts'
 import { usePortfolioState } from './usePortfolioState.ts'
 
 /** Cambi per il prospetto: ufficiali Banca d'Italia del giorno, oppure quelli applicati da IBKR (salvati sui movimenti). */
@@ -36,13 +37,25 @@ export interface TaxReturnData {
   cashNowEur: number | null
   compare: FxCompareRow[]
   issues: (Issue & { assetId: string })[]
+  /** Titoli valutati al 31/12 col prezzo di chiusura del rendiconto IBKR importato. */
+  closesFromStatement: number
 }
 
 export type TaxReturnState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'empty' }
-  | { status: 'ready'; options: { id: string; name: string }[]; selectedId: string; years: number[]; data: TaxReturnData | null }
+  | {
+      status: 'ready'
+      options: { id: string; name: string }[]
+      selectedId: string
+      years: number[]
+      year: number
+      portfolio: RawPortfolio
+      /** Rendiconto IBKR importato per l'anno (undefined = in caricamento). */
+      statement: StoredStatement | null | undefined
+      data: TaxReturnData | null
+    }
 
 const flowsOf = (p: RawPortfolio | undefined): CashflowLike[] => Object.values(((p as { cashflows?: unknown })?.cashflows ?? {}) as Record<string, CashflowLike>)
 
@@ -89,11 +102,17 @@ export function useTaxReturn(pickedId: string | null, year: number | null, mode:
   }, [portfolio, thisYear])
   const y = year && years.includes(year) ? year : years[0]!
 
+  const statement = useStoredStatement(selectedId, y)
+  // Prezzi di chiusura al 31/12 dal rendiconto IBKR: hanno la precedenza su quelli di Yahoo (le istruzioni RW
+  // chiedono prima di tutto il valore del rendiconto dell'intermediario).
+  const statementCloses = statement && statement.to === `${y}-12-31` ? statement.closes : null
+  const closesKey = statementCloses ? JSON.stringify(statementCloses) : ''
+
   const [data, setData] = useState<{ key: string; value: TaxReturnData } | { key: string; error: string } | null>(null)
-  const key = `${selectedId}|${y}|${mode}`
+  const key = `${selectedId}|${y}|${mode}|${closesKey}`
 
   useEffect(() => {
-    if (!portfolio || !selectedId) return
+    if (!portfolio || !selectedId || statement === undefined) return
     let alive = true
     ;(async () => {
       // 1. Cambi giornalieri della Banca d'Italia per tutti i movimenti in valuta e i movimenti di cassa.
@@ -128,7 +147,7 @@ export function useTaxReturn(pickedId: string | null, year: number | null, mode:
       const other = quadri(mode === 'bdi' ? 'ibkr' : 'bdi')
 
       // 3. Quadro RW: prezzi di chiusura a cavallo d'anno e cambi medi mensili.
-      const provisional = y >= thisYear
+      const provisional = y >= thisYear && !statementCloses
       const assets = Object.entries(portfolio.assets ?? {}) as [string, RawAsset & { isin?: string }][]
       const needs = assets
         .map(([id, a]) => ({ id, a, symbol: symbolOf(a, id), pieces: holdingPieces(a.transactions ?? [], y, {}) }))
@@ -137,14 +156,17 @@ export function useTaxReturn(pickedId: string | null, year: number | null, mode:
       const quotes = provisional ? await loadQuotes(needs.map(n => n.symbol)) : {}
       const latestFx = await loadLatestFx()
       const prices = new Map<string, { startClose?: number; endClose?: number }>()
+      let closesFromStatement = 0
       await Promise.all(needs.map(async n => {
         const wantStart = n.pieces.some(p => p.startFromClose)
-        const wantEnd = n.pieces.some(p => p.endFromClose)
+        const fromStatement = statementCloses?.[n.id]
+        const wantEnd = n.pieces.some(p => p.endFromClose) && !fromStatement
         let closes: Record<string, number> = {}
         if (wantStart || (wantEnd && !provisional)) closes = await loadCloses(n.symbol, range).catch(() => ({}))
+        if (fromStatement) closesFromStatement++
         prices.set(n.id, {
           startClose: wantStart ? closeOnOrBefore(closes, `${y - 1}-12-31`) : undefined,
-          endClose: wantEnd ? (provisional ? quotes[n.symbol]?.price : closeOnOrBefore(closes, `${y}-12-31`)) : undefined,
+          endClose: fromStatement ?? (wantEnd ? (provisional ? quotes[n.symbol]?.price : closeOnOrBefore(closes, `${y}-12-31`)) : undefined),
         })
       }))
       const months = needs.flatMap(n => n.pieces.flatMap(p => [p.start.slice(0, 7), p.end.slice(0, 7)]))
@@ -159,18 +181,18 @@ export function useTaxReturn(pickedId: string | null, year: number | null, mode:
 
       const value: TaxReturnData = {
         year: y, provisional, rt: main.rt, rtOther: other.rt, rm: main.rm, rmOther: other.rm, rw, cashNowEur,
-        compare: compareRates(portfolio.assets ?? {}, y, fx), issues: main.issues,
+        compare: compareRates(portfolio.assets ?? {}, y, fx), issues: main.issues, closesFromStatement,
       }
       if (alive) setData({ key, value })
     })().catch(e => alive && setData({ key, error: String(e) }))
     return () => {
       alive = false
     }
-  }, [key, portfolio, portfolios, selectedId, y, mode, thisYear])
+  }, [key, portfolio, portfolios, selectedId, y, mode, thisYear, statement, statementCloses])
 
   if (state.status === 'loading') return { status: 'loading' }
   if (state.status === 'error') return { status: 'error', message: state.message }
-  if (!selectedId) return { status: 'empty' }
+  if (!selectedId || !portfolio) return { status: 'empty' }
   if (data && data.key === key && 'error' in data) return { status: 'error', message: data.error }
-  return { status: 'ready', options, selectedId, years, data: data && data.key === key && 'value' in data ? data.value : null }
+  return { status: 'ready', options, selectedId, years, year: y, portfolio, statement, data: data && data.key === key && 'value' in data ? data.value : null }
 }
