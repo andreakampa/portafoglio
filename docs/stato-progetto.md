@@ -27,7 +27,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     realizzate nell'anno), cassa netta, tasto MAX. Rifà il calcolo col motore vero su una copia del portafoglio: non salva nulla.
   - **Movimenti:** prezzo di negoziazione, filtri per periodo e tipo, short, margine e interessi.
   - **Note:** idee, prossime mosse, titoli da monitorare ed eventi con data, sincronizzate tra dispositivi.
-- **Nuovo motore** (`app/src/domain/engine/`, 70 test). Applica le regole di [regole-fiscali.md](regole-fiscali.md):
+- **Nuovo motore** (`app/src/domain/engine/`; 123 test in tutto il progetto). Applica le regole di [regole-fiscali.md](regole-fiscali.md):
   - costo medio in amministrato, LIFO in dichiarativo;
   - short inclusi nel cassetto;
   - cambi storici della Banca d'Italia, mai quello di oggi;
@@ -47,6 +47,25 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   - **Avviso nella Panoramica della v2:** esito dell'ultima sincronizzazione (importate, da controllare, non gestite) ed eventuale errore.
 - **Dati corretti su richiesta di Andrea:** tolta la minus MBB doppia su IBKR, MCHT.MI segnato come ETF.
 
+## Prossimo passo: gestione del margine (punto 4 qui sotto)
+Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di partenza:
+- **Cosa c'è già.** Sui movimenti di acquisto il campo `marginAmount` (quota finanziata a margine, stesso formato del sito vecchio:
+  si inserisce nella modifica del movimento, solo per gli acquisti). Il portafoglio ha `marginInterest`: righe mensili
+  `{ id, period: 'YYYY-MM', currency, amount, source, externalId: 'MI:periodo:valuta', parts }`, riempite dalla sincronizzazione IBKR
+  (`app/src/domain/ibkr/sync.ts`, funzione `applyCash`) o a mano nel sito vecchio. La v2 le mostra in Movimenti → "Interessi margine"
+  (`app/src/domain/engine/movements.ts`, `marginInterest()`).
+- **Cosa manca (richieste di Andrea):**
+  1. Nella v2: inserire la quota a margine di un acquisto (maschera movimenti e simulatore), con tasto **MAX** = massimo finanziabile.
+  2. **Interessi giornalieri per posizione** col tasso IBKR: il report Flex ha la sezione `TierInterestDetail` (data, valuta, capitale
+     `totalPrincipal`, tasso `rate`, interesse `totalInterest`) e `InterestAccruals` (interessi maturati e non ancora addebitati).
+     Il sito vecchio le legge già in `js/modules/portfolio/ibkr-flex.js` (`interestDaily`, `accruals`); `app/src/domain/ibkr/flex.ts`
+     oggi non le legge. Va deciso come ripartire l'interesse tra le posizioni (in proporzione alla quota a margine di ciascuna).
+  3. **Sub-totale in alto** (interessi e margine usato) nella Panoramica o in Posizioni.
+- **Da chiarire con Andrea prima di scrivere codice:** come si ripartisce il margine tra posizioni quando cambia nel tempo (vendite
+  parziali), se la quota a margine deve ridursi con le vendite, e quale tasso usare per le proiezioni. Il margine IBKR vero è un
+  saldo di cassa negativo per valuta, non una quota per titolo: conviene capire se mostrare il saldo reale (dal Flex) accanto alla stima.
+- Il vecchio sito calcola il totale interessi in `js/modules/portfolio/render.js` (`renderKPI`, `totaleInteressiEur`).
+
 ## Da fare, in ordine di priorità
 1. **Sincronizzazione IBKR: resta da fare** (il resto è fatto, vedi sopra):
    - **Opzioni:** la call BMEA 21JAN28 1.5 è segnalata ma non gestita (serve un tipo di movimento "opzione").
@@ -59,8 +78,8 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    Dopo che Andrea l'ha usata a mano per qualche giorno si può dismettere il sito vecchio per l'inserimento.
 3. **Simulatore: resta da fare** "Registra come movimenti" (trasforma il carrello in operazioni vere), l'imposta di bollo/IVAFE
    nella stima e la simulazione di dividendi.
-4. **Margine:** quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione con il tasso IBKR
-   (dal report Flex), sub-totale in alto.
+4. **Margine** (vedi "Prossimo passo" sopra): quota a margine per acquisto con tasto MAX, interessi giornalieri per posizione
+   con il tasso IBKR (dal report Flex), sub-totale in alto.
 5. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100,
    S&P 500, VIX, VXN) con lancetta del VIX che avverte vicino a 25.
 6. **Watchlist** importate da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push).
@@ -69,6 +88,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 9. **Assistente AI (Gemini)** nella v2, poi dismissione del sito vecchio.
 
 ## Da chiedere o verificare con Andrea
+- Dopo qualche giorno di uso: i movimenti inseriti a mano nella v2 tornano con i numeri attesi? (verificato solo sugli emulatori)
 - I prospetti di Mediolanum e Trade Republic (plus, minus, cassetto) per confrontarli con il motore.
 - I punti fiscali incerti elencati in fondo a [regole-fiscali.md](regole-fiscali.md).
 - Cancellare dalla cartella Download la chiave `calcolo-pmc-firebase-adminsdk-*.json` (è già su Cloudflare).
