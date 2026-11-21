@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router'
+import { PacRunner } from '../components/PacRunner'
 import { usingEmulator } from '../lib/firebase'
 import { IconHome, IconMovements, IconNotes, IconPositions, IconSettings, IconSimulator, IconTax } from './icons'
 
@@ -31,6 +32,7 @@ export function AppShell() {
 
       <main className="content">
         {usingEmulator && <div className="banner">Emulatore attivo: dati di prova</div>}
+        <PacRunner />
         <Outlet />
       </main>
 

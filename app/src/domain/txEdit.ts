@@ -63,6 +63,8 @@ export function buildTx(f: TxForm, newId: () => string, previous?: RawTx): RawTx
   }
   if (f.pac && f.type === 'buy') tx.source = 'pac'
   else if (tx.source === 'pac') delete tx.source
+  // Salvando la maschera l'utente conferma il prezzo: non è più una stima.
+  delete tx.priceEstimated
   // I cambi storici li mette il motore: un cambio rimasto da un vecchio inserimento non deve falsare il nuovo prezzo.
   if (previous && (previous.date !== f.date || +previous.price !== tx.price)) delete tx.exchangeRate
   return tx

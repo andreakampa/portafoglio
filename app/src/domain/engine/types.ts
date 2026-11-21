@@ -38,6 +38,12 @@ export interface RawTx {
   /** Id dell'ordine IBKR (`ordine@data`) per i movimenti importati: evita i doppioni. */
   externalId?: string
   source?: string
+  /** Rata creata dal piano PAC (`pac:idPiano:dataPrevista`): evita di generarla due volte. */
+  pacKey?: string
+  /** Prezzo preso dalla chiusura di borsa, non dall'esecuzione vera: da confermare con la fattura. */
+  priceEstimated?: boolean
+  /** Importo di una rata PAC, in euro. */
+  importoPac?: number
 }
 
 export type AssetType = 'stock' | 'etf' | 'fondo' | 'bond' | 'crypto' | string

@@ -2,6 +2,7 @@ import { ref, runTransaction, update } from 'firebase/database'
 import { useMemo } from 'react'
 import { useUser } from '../auth/context'
 import type { RawAsset, RawTx } from '../domain/engine/types'
+import { isRecorded } from '../domain/pac'
 import { addToList, buildTransferPair, findSameAsset, removeFromList, replaceInList, type TransferForm, type TxRef } from '../domain/txEdit'
 import { db } from '../lib/firebase'
 
@@ -35,6 +36,21 @@ export function usePortfolioEdit() {
           if (!base) return undefined
           return clean({ ...base, transactions: addToList(base.transactions, tx) })
         }),
+
+      /**
+       * Aggiunge la rata di un piano PAC solo se non c'è già (stessa chiave o rata a mano vicina): due dispositivi
+       * aperti insieme non la duplicano. Torna true se l'ha scritta.
+       */
+      addPacRate: async (pid: string, aid: string, tx: RawTx, planId: string, plannedDate: string) => {
+        let wrote = false
+        const r = await runTransaction(assetRef(pid, aid), cur => {
+          const a = cur as Asset | null
+          if (!a || isRecorded(a.transactions ?? [], planId, plannedDate)) return undefined
+          wrote = true
+          return clean({ ...a, transactions: addToList(a.transactions, tx) })
+        })
+        return r.committed && wrote
+      },
 
       save: (pid: string, aid: string, at: TxRef, tx: RawTx) =>
         change(pid, aid, cur => {
