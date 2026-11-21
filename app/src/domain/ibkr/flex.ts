@@ -38,12 +38,44 @@ export interface FlexCash {
   period: string | null
 }
 
+/** Saldo di cassa di una valuta a fine report: negativo = soldi presi a margine. */
+export interface FlexCashBalance {
+  currency: string
+  endingCash: number
+  /** Interessi maturati e non ancora addebitati (negativo = a debito). */
+  accrued: number
+}
+
+/** Interesse di un giorno su una valuta a debito (somma dei gradini di tasso). */
+export interface FlexMarginDay {
+  date: string // YYYY-MM-DD
+  currency: string
+  /** Capitale a debito (negativo). */
+  principal: number
+  /** Tasso annuo in %, media pesata sui gradini. */
+  ratePct: number
+  /** Interesse del giorno (negativo = costo). */
+  interest: number
+}
+
+export interface FlexMargin {
+  /** Data del report (fine periodo). */
+  date: string | null
+  baseCurrency: string
+  /** Saldo di cassa netto di tutte le valute, nella valuta base (riga BASE_SUMMARY). */
+  baseCash: number | null
+  balances: FlexCashBalance[]
+  days: FlexMarginDay[]
+}
+
 export interface FlexReport {
   from: string | null
   to: string | null
   baseCurrency: string
   orders: FlexOrder[]
   cash: FlexCash[]
+  /** Saldo di cassa (margine), interessi maturati e tassi giornalieri. */
+  margin: FlexMargin
   /** Tipi di movimento di cassa che non sappiamo gestire (nome → quanti). */
   unknownCash: Record<string, number>
   /** Operazioni non su azioni (opzioni, forex…): non importate, solo segnalate. */
@@ -155,13 +187,57 @@ export function parseFlex(xml: string): FlexReport {
   }
   cash.sort((a, b) => a.date.localeCompare(b.date) || a.externalId.localeCompare(b.externalId))
 
+  const margin = parseMargin(xml, baseCurrency, iso(stmt.toDate))
+
   const result: FlexOrder[] = [...orders.values()].map(({ side, notional, opens, closes, ...o }) => ({
     ...o,
     type: opens && closes ? 'misto' : side === 'BUY' ? (closes ? 'buy_to_cover' : 'buy') : opens ? 'short_sell' : 'sell',
     price: o.qty ? notional / o.qty : 0,
   }))
   result.sort((a, b) => a.date.localeCompare(b.date) || a.externalId.localeCompare(b.externalId))
-  return { from: iso(stmt.fromDate), to: iso(stmt.toDate), baseCurrency, orders: result, cash, unknownCash, skipped }
+  return { from: iso(stmt.fromDate), to: iso(stmt.toDate), baseCurrency, orders: result, cash, margin, unknownCash, skipped }
+}
+
+const round = (x: number, d: number) => Math.round(x * 10 ** d) / 10 ** d
+
+function parseMargin(xml: string, baseCurrency: string, date: string | null): FlexMargin {
+  const real = (c: string | undefined) => !!c && c !== 'BASE_SUMMARY'
+  // Con più giorni nel report vale l'ultima riga di ogni valuta.
+  const lastBy = (rows: Record<string, string>[], dateKey: string) => {
+    const m = new Map<string, Record<string, string>>()
+    for (const r of rows) {
+      const k = (r.currency ?? '').toUpperCase()
+      const prev = m.get(k)
+      if (!prev || (r[dateKey] ?? '') >= (prev[dateKey] ?? '')) m.set(k, r)
+    }
+    return m
+  }
+  const cashRows = tags(xml, 'CashReportCurrency').filter(r => !r.levelOfDetail || r.levelOfDetail === 'Currency' || r.levelOfDetail === 'BaseCurrency')
+  const accRows = tags(xml, 'InterestAccrualsCurrency')
+  const cash = lastBy(cashRows.filter(r => real(r.currency)), 'toDate')
+  const acc = lastBy(accRows.filter(r => real(r.currency)), 'toDate')
+  const base = lastBy(cashRows.filter(r => r.currency === 'BASE_SUMMARY'), 'toDate').get('BASE_SUMMARY')
+  const balances: FlexCashBalance[] = [...cash.entries()]
+    .map(([currency, r]) => ({ currency, endingCash: round(n(r.endingCash), 2), accrued: round(n(acc.get(currency)?.endingAccrualBalance), 2) }))
+    .sort((a, b) => a.currency.localeCompare(b.currency))
+
+  const perDay = new Map<string, { date: string; currency: string; principal: number; interest: number; weighted: number }>()
+  for (const r of tags(xml, 'TierInterestDetail')) {
+    const d = iso(r.valueDate) ?? iso(r.reportDate)
+    const currency = (r.currency ?? '').toUpperCase()
+    if (!d || !real(currency) || r.interestType !== 'Debit Interest') continue
+    const principal = n(r.totalPrincipal)
+    const key = `${d}|${currency}`
+    const x = perDay.get(key) ?? { date: d, currency, principal: 0, interest: 0, weighted: 0 }
+    x.principal += principal
+    x.interest += n(r.totalInterest)
+    x.weighted += n(r.rate) * Math.abs(principal)
+    perDay.set(key, x)
+  }
+  const days: FlexMarginDay[] = [...perDay.values()]
+    .map(x => ({ date: x.date, currency: x.currency, principal: round(x.principal, 2), ratePct: x.principal ? round(x.weighted / Math.abs(x.principal), 4) : 0, interest: round(x.interest, 4) }))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.currency.localeCompare(b.currency))
+  return { date, baseCurrency, baseCash: base ? round(n(base.endingCash), 2) : null, balances, days }
 }
 
 /** Ticker Yahoo a partire da simbolo e mercato IBKR (RACEm su BVME → RACE.MI). null = mercato non riconosciuto. */

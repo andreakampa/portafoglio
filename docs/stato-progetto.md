@@ -47,7 +47,16 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   - **Avviso nella Panoramica della v2:** esito dell'ultima sincronizzazione (importate, da controllare, non gestite) ed eventuale errore.
 - **Dati corretti su richiesta di Andrea:** tolta la minus MBB doppia su IBKR, MCHT.MI segnato come ETF.
 
-## Prossimo passo: gestione del margine (punto 4 qui sotto)
+## Margine: decisioni di Andrea (21/11/2026) e avanzamento
+- **Il margine è il saldo di cassa negativo per valuta**: ogni vendita lo riduce, a prescindere da cosa si vende. Niente "quota a margine che segue il titolo".
+- **Pezzo 1 (fatto, in PR):** `flex.ts` legge `CashReportCurrency`, `InterestAccruals` e `TierInterestDetail`; la sincronizzazione salva nel portafoglio
+  `marginStatus` (foto: saldo per valuta, totale in €, maturato, ultimo tasso) e `marginDaily` (una riga per giorno e valuta a debito, senza doppioni).
+- **Pezzo 2 (da fare):** riquadro in Panoramica con soli tre numeri: margine usato (saldo reale, per valuta e totale in €), **leva** (es. 1,22x = valore
+  posizioni / patrimonio netto) e **interessi pagati** (addebitati nell'anno + maturato, costo giornaliero/mensile col tasso attuale).
+- **Pezzo 3 (ridimensionato):** niente quota stimata per titolo, né MAX sul `marginAmount`. Andrea vuole solo segnalare quanto margine ha, la leva e quanto ci paga.
+  Eventuale avviso quando la leva supera una soglia. Il campo `marginAmount` dei movimenti resta com'è.
+
+## Prossimo passo (vecchio, superato dalle decisioni qui sopra): gestione del margine (punto 4 qui sotto)
 Andrea vuole farla in una chat nuova, con calma, perché è importante. Punto di partenza:
 - **Cosa c'è già.** Sui movimenti di acquisto il campo `marginAmount` (quota finanziata a margine, stesso formato del sito vecchio:
   si inserisce nella modifica del movimento, solo per gli acquisti). Il portafoglio ha `marginInterest`: righe mensili
