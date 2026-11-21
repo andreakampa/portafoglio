@@ -22,6 +22,8 @@ export interface DividendRow {
   date: string
   year: number
   symbol: string
+  /** ISIN del titolo, se il movimento di cassa lo riporta (IBKR). */
+  isin?: string
   currency: string
   grossEur: number
   /** Ritenuta estera (positiva = pagata). */
@@ -93,6 +95,7 @@ export interface CashflowLike {
   date?: string
   kind?: string
   symbol?: string
+  isin?: string
   currency?: string
   amount?: number | string
   exchangeRate?: number | string
@@ -117,9 +120,10 @@ export function dividendsFromCashflows(
     const eur = num(f.amount) / rate
     const key = `${f.symbol ?? ''}#${f.date}#${currency}`
     const row = byKey.get(key) ?? {
-      key, date: f.date, year: Number(f.date.slice(0, 4)), symbol: f.symbol ?? '', currency,
+      key, date: f.date, year: Number(f.date.slice(0, 4)), symbol: f.symbol ?? '', ...(f.isin ? { isin: f.isin } : {}), currency,
       grossEur: 0, withholdingEur: 0, taxEur: 0, netEur: 0, source: 'ibkr' as const,
     }
+    if (!row.isin && f.isin) row.isin = f.isin
     if (f.kind === 'withholding') row.withholdingEur -= eur
     else row.grossEur += eur
     byKey.set(key, row)

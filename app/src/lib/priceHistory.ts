@@ -16,8 +16,8 @@ export function parseCloses(json: YahooHistory): Record<string, number> {
   return out
 }
 
-/** Chiusure degli ultimi 2 anni di un titolo (Yahoo, via Worker). */
-export async function loadCloses(symbol: string): Promise<Record<string, number>> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2y`
+/** Chiusure giornaliere di un titolo (Yahoo, via Worker): di norma gli ultimi 2 anni. */
+export async function loadCloses(symbol: string, range: '2y' | '5y' | '10y' = '2y'): Promise<Record<string, number>> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=${range}`
   return parseCloses(await proxiedJson<YahooHistory>(url, 15000))
 }
