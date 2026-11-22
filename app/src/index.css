@@ -318,3 +318,8 @@ textarea {
 .status-pill.status-good { color: var(--pos); }
 .status-pill.status-warning { color: var(--text); border-color: var(--status-warning); }
 .status-pill.status-critical { color: var(--neg); }
+
+.regime-choice { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.regime-choice legend { font-weight: 600; margin-bottom: 4px; }
+.regime-choice .check { align-items: flex-start; }
+.onboarding-steps { padding-left: 20px; display: grid; gap: 6px; }

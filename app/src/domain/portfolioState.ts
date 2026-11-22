@@ -57,3 +57,11 @@ export function summarizePortfolios(state: PortfolioState | null | undefined): P
     })
     .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'it'))
 }
+
+/** Nuovo portafoglio vuoto, nello stesso formato del sito attuale. */
+export function newPortfolio(name: string, taxRegime: TaxRegime, id: string): Portfolio & { fiscal: { manualLosses: never[] } } {
+  return { id, name: name.trim() || 'Portafoglio', taxRegime, assets: {}, fiscal: { manualLosses: [] } }
+}
+
+/** Id del portafoglio come li crea il sito attuale (P + millisecondi). */
+export const newPortfolioId = (now = Date.now()) => `P${now}`
