@@ -7,10 +7,13 @@
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
-  // Ogni giorno alle 06:00 UTC (7:00 in Italia d'inverno, 8:00 d'estate).
-  "triggers": { "crons": ["0 6 * * *"] },
+  // Ogni giorno alle 06:00 UTC (7:00 in Italia d'inverno, 8:00 d'estate) la sincronizzazione IBKR;
+  // ogni 15 minuti il controllo delle soglie di prezzo delle watchlist (notifiche push).
+  "triggers": { "crons": ["0 6 * * *", "*/15 * * * *"] },
   "vars": {
     "DB_URL": "https://calcolo-pmc-default-rtdb.europe-west1.firebasedatabase.app",
-    "DRY_RUN": "0"
+    "DRY_RUN": "0",
+    // Chiave pubblica VAPID (la stessa di app/src/lib/push.ts); la privata è il secret VAPID_PRIVATE.
+    "VAPID_PUBLIC": "BNjED-esOVkRhnhej3hrnRpV6ZXwY2yElOtxmO0rNgTOO23w4pKB4LCHzB-XN5AfdxRzggl-CO7GfjTnRHmq8fY"
   }
 }

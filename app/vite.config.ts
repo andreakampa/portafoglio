@@ -40,6 +40,8 @@ export default defineConfig({
         // Solo i file del sito vanno in cache: dati e prezzi arrivano sempre dalla rete.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: `${BASE}index.html`,
+        // Gestione delle notifiche push (public/push-sw.js).
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

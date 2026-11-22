@@ -2,7 +2,7 @@ import { NavLink, Outlet } from 'react-router'
 import { BonusRunner } from '../components/BonusRunner'
 import { PacRunner } from '../components/PacRunner'
 import { usingEmulator } from '../lib/firebase'
-import { IconHome, IconMovements, IconNotes, IconPositions, IconSettings, IconSimulator, IconTax } from './icons'
+import { IconHome, IconMovements, IconNotes, IconPositions, IconSettings, IconSimulator, IconTax, IconWatch } from './icons'
 
 const NAV = [
   { to: '/', label: 'Panoramica', icon: IconHome, end: true },
@@ -11,6 +11,8 @@ const NAV = [
   { to: '/simulatore', label: 'Simulatore', icon: IconSimulator },
   { to: '/fiscale', label: 'Fiscale', icon: IconTax },
   { to: '/note', label: 'Note', icon: IconNotes },
+  // Sul telefono la barra in basso ha già 7 voci: la watchlist si apre dalla Panoramica.
+  { to: '/watchlist', label: 'Watchlist', icon: IconWatch, desktopOnly: true },
   { to: '/impostazioni', label: 'Impostazioni', icon: IconSettings },
 ] as const
 
@@ -39,7 +41,7 @@ export function AppShell() {
       </main>
 
       <nav className="tabbar" aria-label="Sezioni">
-        {NAV.map(({ to, label, icon: Icon, ...rest }) => (
+        {NAV.filter(n => !('desktopOnly' in n)).map(({ to, label, icon: Icon, ...rest }) => (
           <NavLink key={to} to={to} end={'end' in rest} className="tab">
             <Icon />
             <span>{label === 'Impostazioni' ? 'Altro' : label}</span>

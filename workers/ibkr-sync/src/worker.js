@@ -1,4 +1,5 @@
 // ibkr-sync — ogni mattina scarica il report Flex di IBKR e aggiorna il portafoglio su Firebase.
+// Ogni 15 minuti controlla anche le soglie di prezzo delle watchlist e manda le notifiche push.
 // Nessun indirizzo pubblico: parte solo dal cron di Cloudflare (vedi wrangler.jsonc).
 //
 // Secret (wrangler secret put …), mai nel repository:
@@ -7,10 +8,17 @@
 //   IBKR_QUERY_ID   id della Flex Query
 //   UID             utente Firebase proprietario del conto IBKR
 //   PORTFOLIO_ID    portafoglio IBKR dentro portfolio_state
+//   VAPID_PRIVATE   chiave privata VAPID per le notifiche push (la pubblica è in VAPID_PUBLIC)
 // Variabili: DB_URL; DRY_RUN = "1" per calcolare senza scrivere; EMULATOR = "1" per gli emulatori locali.
 
 import { parseFlex } from '../../../app/src/domain/ibkr/flex.ts'
 import { applyFlexOrders } from '../../../app/src/domain/ibkr/sync.ts'
+import { alertText, checkAlerts } from '../../../app/src/domain/watchlist.ts'
+import { parseYahoo } from '../../../app/src/lib/prices.ts'
+import { sendPush } from '../../../app/src/lib/webpush.ts'
+
+const ALERTS_CRON = '*/15 * * * *'
+const APP_URL = 'https://andreakampa.github.io/portafoglio/v2/'
 
 const IBKR = 'https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService'
 const RETRIABLE = new Set(['1001', '1004', '1005', '1019', '1021'])
@@ -88,6 +96,20 @@ function database(env, token) {
       if (!r.ok) throw new Error(`Scrittura ${path}: HTTP ${r.status}`)
       return true
     },
+    async get(path, query = '') {
+      const sep = ns ? '&' : '?'
+      const r = await fetch(`${base}/${path}.json${ns}${query ? sep + query : ''}`, { headers: auth })
+      if (!r.ok) throw new Error(`Lettura ${path}: HTTP ${r.status}`)
+      return r.json()
+    },
+    async patch(path, data) {
+      const r = await fetch(`${base}/${path}.json${ns}`, { method: 'PATCH', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+      if (!r.ok) throw new Error(`Scrittura ${path}: HTTP ${r.status}`)
+    },
+    async del(path) {
+      const r = await fetch(`${base}/${path}.json${ns}`, { method: 'DELETE', headers: auth })
+      if (!r.ok) throw new Error(`Cancellazione ${path}: HTTP ${r.status}`)
+    },
     async put(path, data) {
       const r = await fetch(`${base}/${path}.json${ns}`, { method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
       if (!r.ok) throw new Error(`Scrittura ${path}: HTTP ${r.status}`)
@@ -131,8 +153,55 @@ export async function sync(env, { xml } = {}) {
   return summary
 }
 
+// ── Avvisi di prezzo ─────────────────────────────────────────────────────────
+async function quote(symbol) {
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (portafoglio-alerts)' },
+  })
+  if (!r.ok) return undefined
+  return parseYahoo(await r.json())?.price
+}
+
+/** Controlla le soglie di tutte le watchlist e manda una notifica per ogni soglia raggiunta. */
+export async function runAlerts(env) {
+  const sa = env.EMULATOR === '1' ? null : JSON.parse(env.FIREBASE_SA)
+  const db = database(env, sa ? await accessToken(sa) : null)
+  const vapid = { publicKey: env.VAPID_PUBLIC, privateKey: env.VAPID_PRIVATE, subject: 'https://andreakampa.github.io/portafoglio/' }
+  const users = Object.keys((await db.get('users', 'shallow=true')) ?? {})
+  const report = { users: 0, checked: 0, hits: [], sent: 0, removed: 0 }
+  for (const uid of users) {
+    const raw = (await db.get(`users/${uid}/settings/watchlist`)) ?? {}
+    const items = Object.entries(raw).map(([id, it]) => ({ ...it, id })).filter(it => it.symbol && (it.above != null || it.below != null))
+    if (!items.length) continue
+    report.users++
+    const prices = {}
+    for (const sym of new Set(items.map(i => i.symbol))) prices[sym] = await quote(sym).catch(() => undefined)
+    report.checked += Object.keys(prices).length
+    const { hits, fired } = checkAlerts(items, prices)
+    if (Object.keys(fired).length) await db.patch(`users/${uid}/settings/watchlist`, Object.fromEntries(Object.entries(fired).map(([id, f]) => [`${id}/fired`, f])))
+    if (!hits.length) continue
+    report.hits.push(...hits.map(h => `${h.symbol} ${h.kind}`))
+    const subs = Object.entries((await db.get(`users/${uid}/settings/push`)) ?? {})
+    for (const h of hits) {
+      for (const [sid, sub] of subs) {
+        if (!sub?.endpoint || !vapid.privateKey) continue
+        const status = await sendPush(sub, { title: 'Avviso di prezzo', body: alertText(h), tag: `alert-${h.id}-${h.kind}`, url: `${APP_URL}#/watchlist` }, vapid).catch(() => 0)
+        if (status === 404 || status === 410) {
+          await db.del(`users/${uid}/settings/push/${sid}`)
+          report.removed++
+        } else if (status >= 200 && status < 300) report.sent++
+      }
+    }
+  }
+  return report
+}
+
 export default {
-  async scheduled(_event, env, ctx) {
+  async scheduled(event, env, ctx) {
+    if (event.cron === ALERTS_CRON) {
+      ctx.waitUntil(runAlerts(env).then(r => console.log(JSON.stringify(r))).catch(e => console.error('Avvisi falliti:', e.message)))
+      return
+    }
     ctx.waitUntil(
       sync(env)
         .then(s => console.log(JSON.stringify(s)))
