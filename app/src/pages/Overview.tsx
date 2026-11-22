@@ -1,5 +1,7 @@
 import { IbkrSyncNotice } from '../components/IbkrSyncNotice'
 import { MarginCard } from '../components/MarginCard'
+import { HistoryCard, IndicesCard } from '../components/MarketCards'
+import { PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioState } from '../data/usePortfolioState'
 import { summarizePortfolios } from '../domain/portfolioState'
@@ -12,7 +14,7 @@ export function Overview() {
     <section className="page">
       <header className="page-head">
         <h1>Panoramica</h1>
-        <p className="muted">Nuova versione in costruzione. Il sito completo resta disponibile.</p>
+        {c.status === 'ready' && <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={c.select} />}
       </header>
 
       {state.status === 'loading' && <div className="card skeleton" aria-busy="true" style={{ height: 120 }} />}
@@ -20,6 +22,8 @@ export function Overview() {
         <div className="card error">Non riesco a leggere i dati: {state.message}</div>
       )}
       <IbkrSyncNotice />
+      <IndicesCard />
+      {c.status === 'ready' && <HistoryCard portfolio={c.portfolio} />}
       {c.status === 'ready' && <MarginCard c={c} />}
       {state.status === 'ready' && <PortfolioList data={state.data} />}
 
