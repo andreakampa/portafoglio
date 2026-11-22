@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { computeAllPortfolios, type PortfolioResult, type RawPortfolio } from '../domain/engine/portfolio.ts'
 import type { FxLookup } from '../domain/engine/types.ts'
 import { totals, valuePositions, type PortfolioTotals, type PositionRow, type QuoteLike, symbolOf } from '../domain/engine/valuation.ts'
-import { loadFx } from '../lib/fxRates.ts'
+import { loadFx, withRecentFallback } from '../lib/fxRates.ts'
 import { cachedQuotes, loadLatestFx, loadQuotes } from '../lib/prices.ts'
 import { useSelectedPortfolioId } from './selection.ts'
 import { usePortfolioState } from './usePortfolioState.ts'
@@ -64,16 +64,23 @@ export function useComputedPortfolio(): Computed {
   const [results, setResults] = useState<Record<string, PortfolioResult> | null>(null)
   const [fx, setFx] = useState<FxLookup | null>(null)
   const [fxError, setFxError] = useState<string | null>(null)
+  const [latestFx, setLatestFx] = useState<Record<string, number>>({})
   useEffect(() => {
     if (!portfolio) return
     let alive = true
     loadFx(fxDates(Object.values(portfolios)))
-      .then(fx => alive && (setResults(computeAllPortfolios(portfolios, fx)), setFx(() => fx), setFxError(null)))
+      .then(hist => {
+        if (!alive) return
+        const fx = withRecentFallback(hist, latestFx, new Date().toISOString().slice(0, 10))
+        setResults(computeAllPortfolios(portfolios, fx))
+        setFx(() => fx)
+        setFxError(null)
+      })
       .catch(e => alive && setFxError(String(e)))
     return () => {
       alive = false
     }
-  }, [portfolio, portfolios])
+  }, [portfolio, portfolios, latestFx])
 
   const result = selectedId && results ? results[selectedId] ?? null : null
 
@@ -83,7 +90,6 @@ export function useComputedPortfolio(): Computed {
     [portfolio],
   )
   const [quotes, setQuotes] = useState<Record<string, QuoteLike>>(() => cachedQuotes())
-  const [latestFx, setLatestFx] = useState<Record<string, number>>({})
   const [loadedFor, setLoadedFor] = useState<string[] | null>(null)
   const pricesLoading = loadedFor !== symbols
   useEffect(() => {

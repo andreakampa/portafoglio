@@ -137,3 +137,104 @@ export function simulate(input: {
     issues: after.issues.filter(i => i.txId?.startsWith(SIM)),
   }
 }
+
+/**
+ * Operazioni del carrello da salvare come movimenti veri, con la data indicata. Il prezzo è quello simulato
+ * (spesso la quotazione del momento): resta "da confermare" finché non si inserisce quello eseguito.
+ * Se il conto è IBKR, la sincronizzazione lo collega all'ordine vero (stessa data, tipo e quantità, prezzo entro l'1%)
+ * e corregge prezzo e commissioni.
+ */
+export function opsToTxs(ops: SimOp[], date: string, newId: () => string): { assetId: string; tx: RawTx }[] {
+  return ops.map(op => ({
+    assetId: op.assetId,
+    tx: {
+      id: newId(),
+      date,
+      type: op.type,
+      qty: op.qty,
+      price: op.price,
+      commission: op.commissionEur,
+      commissionCurrency: 'EUR',
+      source: 'simulatore',
+      priceEstimated: true,
+    },
+  }))
+}
+
+// ── Bollo/IVAFE e dividendi dopo le operazioni simulate ───────────────────────
+
+export interface SimExtras {
+  /** 'bollo' in amministrato (banca italiana), 'ivafe' in dichiarativo (broker estero). */
+  wealthKind: 'bollo' | 'ivafe'
+  /** Variazione del valore dei titoli posseduti (solo long: gli short non sono un'attività). */
+  valueDeltaEur: number
+  /** Variazione dell'imposta su un anno intero e sulla parte che resta dell'anno in corso. */
+  wealthYearDeltaEur: number
+  wealthThisYearDeltaEur: number
+  /** Dividendi degli ultimi 12 mesi × nuova quantità: lordo e netto delle tasse, su un anno. */
+  dividendsGrossDeltaEur: number
+  dividendsNetDeltaEur: number
+  /** Titoli senza prezzo o cambio di oggi: esclusi dal calcolo. */
+  missing: string[]
+}
+
+/** Dividendi per azione staccati negli ultimi 12 mesi (nella valuta del titolo). */
+export function trailingDividend(divs: { exDate: string; amount: number }[], today: string): number {
+  const from = new Date(Date.parse(today + 'T12:00:00Z') - 365 * 86400000).toISOString().slice(0, 10)
+  return divs.filter(d => d.exDate > from && d.exDate <= today).reduce((s, d) => s + d.amount, 0)
+}
+
+const WEALTH_RATE = 0.002
+const DIV_TAX = 0.26
+const US_WITHHOLDING = 0.15
+
+/**
+ * Effetto delle operazioni simulate su bollo/IVAFE (2 per mille annuo sul valore) e sui dividendi attesi
+ * (ultimi 12 mesi). Netto dei dividendi: amministrato 26% sul netto della ritenuta estera; dichiarativo 26% sul lordo,
+ * senza credito per la ritenuta (15% sui titoli in USD), come nel resto dell'app.
+ */
+export function simulateExtras(input: {
+  sim: Simulation
+  regime: 'amministrato' | 'dichiarativo'
+  /** Prezzo di oggi per titolo (valuta del titolo), null se non noto. */
+  prices: Record<string, number | null | undefined>
+  latestFx: Record<string, number>
+  /** Dividendo per azione degli ultimi 12 mesi, per titolo. */
+  dividendPerShare: Record<string, number | undefined>
+  today: string
+}): SimExtras {
+  const { sim, regime, today } = input
+  const missing: string[] = []
+  let valueDelta = 0
+  let grossDelta = 0
+  let netDelta = 0
+  for (const a of sim.assets) {
+    const rate = a.currency === 'EUR' ? 1 : input.latestFx[a.currency]
+    const price = input.prices[a.assetId]
+    const longDelta = Math.max(0, a.after.qty) - Math.max(0, a.before.qty)
+    if (!longDelta) continue
+    if (!rate || !price) {
+      missing.push(a.symbol)
+      continue
+    }
+    valueDelta += (longDelta * price) / rate
+    const dps = input.dividendPerShare[a.assetId] ?? 0
+    const gross = (longDelta * dps) / rate
+    const withholding = a.currency === 'USD' ? gross * US_WITHHOLDING : 0
+    grossDelta += gross
+    netDelta += regime === 'dichiarativo' ? gross - withholding - gross * DIV_TAX : (gross - withholding) * (1 - DIV_TAX)
+  }
+  const y = Number(today.slice(0, 4))
+  const daysInYear = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 366 : 365
+  const left = Math.round((Date.parse(`${y}-12-31T12:00:00Z`) - Date.parse(today + 'T12:00:00Z')) / 86400000) + 1
+  const yearDelta = valueDelta * WEALTH_RATE
+  return {
+    wealthKind: regime === 'dichiarativo' ? 'ivafe' : 'bollo',
+    valueDeltaEur: valueDelta,
+    wealthYearDeltaEur: yearDelta,
+    wealthThisYearDeltaEur: (yearDelta * left) / daysInYear,
+    dividendsGrossDeltaEur: grossDelta,
+    dividendsNetDeltaEur: netDelta,
+    missing,
+  }
+}

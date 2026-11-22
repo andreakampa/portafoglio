@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RawPortfolio } from './engine/portfolio'
-import { simulate, type SimOp } from './simulation'
+import { opsToTxs, simulate, simulateExtras, trailingDividend, type SimOp } from './simulation'
 
 const TODAY = '2026-11-21'
 const noFx = () => undefined
@@ -87,5 +87,49 @@ describe('simulatore', () => {
       op({ id: '1', type: 'short_sell', qty: 10, price: 100 }),
     ])
     expect(s.cashEur).toBeCloseTo(1000, 8)
+  })
+})
+
+describe('registra il carrello come movimenti', () => {
+  it('un movimento per operazione, con la data scelta e il prezzo da confermare', () => {
+    let n = 0
+    const txs = opsToTxs(
+      [{ id: 'a', assetId: 'x', type: 'sell', qty: 5, price: 12.5, commissionEur: 2 }, { id: 'b', assetId: 'y', type: 'buy', qty: 1, price: 100, commissionEur: 0 }],
+      '2026-11-23',
+      () => `id${n++}`,
+    )
+    expect(txs).toEqual([
+      { assetId: 'x', tx: { id: 'id0', date: '2026-11-23', type: 'sell', qty: 5, price: 12.5, commission: 2, commissionCurrency: 'EUR', source: 'simulatore', priceEstimated: true } },
+      { assetId: 'y', tx: expect.objectContaining({ id: 'id1', type: 'buy', qty: 1 }) },
+    ])
+  })
+})
+
+describe('bollo/IVAFE e dividendi nel simulatore', () => {
+  const sim = (before: number, after: number, currency = 'USD') => ({
+    assets: [{ assetId: 'x', symbol: 'X', currency, before: { qty: before, pmcNative: 0, pmcEur: 0, costEur: 0 }, after: { qty: after, pmcNative: 0, pmcEur: 0, costEur: 0 } }],
+  }) as never
+
+  it('dividendi degli ultimi 12 mesi', () => {
+    expect(trailingDividend([{ exDate: '2025-11-01', amount: 9 }, { exDate: '2026-03-01', amount: 0.5 }, { exDate: '2026-09-01', amount: 0.5 }], '2026-11-22')).toBe(1)
+  })
+
+  it('acquisto in dichiarativo: IVAFE in più e dividendi netti (26% sul lordo, ritenuta USA senza credito)', () => {
+    const e = simulateExtras({ sim: sim(0, 100), regime: 'dichiarativo', prices: { x: 50 }, latestFx: { USD: 1.25 }, dividendPerShare: { x: 2 }, today: '2026-12-31' })
+    expect(e.wealthKind).toBe('ivafe')
+    expect(e.valueDeltaEur).toBeCloseTo(4000)
+    expect(e.wealthYearDeltaEur).toBeCloseTo(8)
+    expect(e.wealthThisYearDeltaEur).toBeCloseTo(8 / 365)
+    expect(e.dividendsGrossDeltaEur).toBeCloseTo(160)
+    expect(e.dividendsNetDeltaEur).toBeCloseTo(160 - 24 - 41.6)
+  })
+
+  it('vendita in amministrato: bollo e dividendi in meno; gli short non contano; senza prezzo si segnala', () => {
+    const e = simulateExtras({ sim: sim(10, 4, 'EUR'), regime: 'amministrato', prices: { x: 100 }, latestFx: {}, dividendPerShare: { x: 3 }, today: '2026-01-01' })
+    expect(e.wealthKind).toBe('bollo')
+    expect(e.wealthYearDeltaEur).toBeCloseTo(-1.2)
+    expect(e.dividendsNetDeltaEur).toBeCloseTo(-18 * 0.74)
+    expect(simulateExtras({ sim: sim(0, -5, 'EUR'), regime: 'amministrato', prices: { x: 100 }, latestFx: {}, dividendPerShare: {}, today: '2026-01-01' }).valueDeltaEur).toBe(0)
+    expect(simulateExtras({ sim: sim(0, 5), regime: 'amministrato', prices: {}, latestFx: {}, dividendPerShare: {}, today: '2026-01-01' }).missing).toEqual(['X'])
   })
 })

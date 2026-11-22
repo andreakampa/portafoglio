@@ -113,15 +113,17 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    - **Da fare a inizio 2027:** confrontare i totali con il rendiconto annuale IBKR (Andrea lo invierà), verificare righi/colonne sulle istruzioni 2027 appena escono,
      decidere col commercialista i punti incerti (credito ritenute estere, cambio BdI o IBKR, giacenza media del conto). Mediolanum e Trade Republic: amministrati, servono solo le loro certificazioni.
 2. **Sincronizzazione IBKR — resta:** azioni "premio versamento" (maturano dal 2027); assegnazione/esercizio di opzioni (vanno "da controllare", si registrano a mano);
-   dopo il primo addebito mensile di interessi (inizio dicembre) controllare l'avviso della Panoramica per i movimenti di cassa. Totale in euro dei movimenti di cassa non ancora mostrato.
+   dopo il primo addebito mensile di interessi (inizio dicembre) controllare l'avviso della Panoramica per i movimenti di cassa. Totale in euro dei movimenti di cassa: fatto (scheda Cassa, cambio del giorno salvato da IBKR o di oggi, `cashTotalsEur`).
    **Opzioni (fatto):** titolo di tipo `option`, ticker Yahoo OCC (es. `BMEA280121C00001500`), quantità = contratti × 100, prezzo = premio per azione: il motore non cambia (26%).
    Scadenza senza valore = vendita a 0. Applicato: call BMEA 21JAN28 1.5 (100 quote a 1 $, 26/08/2026) con `tools/opzioni-ibkr-storico.mjs`, backup `.backup/database-20261121-162408.json`; Worker `ibkr-sync` ripubblicato.
 3. **Movimenti nella v2 (fatto, 22/11/2026, PR `movimenti-trasferimenti`):** i trasferimenti si correggono (data e quantità) e si eliminano dalla lista Movimenti;
    uscita ed entrata cambiano insieme in una sola scrittura (`findTransfer`/`transferWrites` in `domain/txEdit.ts`), con controllo delle quantità disponibili da una parte e già vendute dall'altra.
    **Scelta dei lotti: non si fa** (LIFO obbligatorio in dichiarativo, costo medio in amministrato: vedi regole-fiscali.md).
-   Notato col rendiconto IBKR: gli 8 trasferimenti da Mediolanum risultano in IBKR il **26/05/2026**, nell'app il **28/05/2026** (da correggere se Andrea conferma).
+   Date dei trasferimenti da Mediolanum allineate al rendiconto IBKR il 22/11/2026: AHLA e RACE al **26/05/2026** (uscita ed entrata), gli altri 6 erano già giusti al 28/05 (backup `.backup/database-20261122-191834.json`).
    Dopo qualche giorno di uso si può dismettere il sito vecchio per l'inserimento.
-4. **Simulatore:** "Registra come movimenti", bollo/IVAFE nella stima, simulazione di dividendi.
+4. **Simulatore:** "Registra come movimenti" **fatto** (22/11/2026): data scelta, prezzo simulato segnato "da confermare", `source: 'simulatore'`;
+   su IBKR la sincronizzazione lo collega all'ordine vero (stesso giorno, tipo e quantità, prezzo entro l'1%). **Bollo/IVAFE e dividendi nella stima: fatto** (`simulateExtras`): 2‰ annuo sulla variazione del valore dei titoli long (e quota dei giorni che restano dell'anno), dividendi degli ultimi 12 mesi × nuova quantità, netti come nel resto dell'app. Simulatore completo.
+   **Cambi dei giorni recenti:** per i movimenti degli ultimi 7 giorni senza cambio Banca d'Italia (pubblicato nel pomeriggio) si usa quello di oggi finché arriva l'ufficiale (`withRecentFallback`).
 5. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100, S&P 500, VIX, VXN) con lancetta del VIX vicino a 25.
 6. **Watchlist** da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push). Eventuale notifica push per l'avviso di leva.
 7. **Fase 3, grafica definitiva** della v2 (oggi provvisoria).

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadFx, parseBdi } from './fxRates'
+import { loadFx, parseBdi, withRecentFallback } from './fxRates'
 import { parseYahoo } from './prices'
 
 beforeEach(() => localStorage.clear())
@@ -45,5 +45,15 @@ describe('prezzi Yahoo', () => {
     const q = parseYahoo({ chart: { result: [{ meta: { symbol: 'AAPL', regularMarketPrice: 210.5, chartPreviousClose: 200, currency: 'USD', regularMarketTime: 1 } }] } })
     expect(q).toEqual({ symbol: 'AAPL', price: 210.5, previousClose: 200, currency: 'USD', time: 1000 })
     expect(parseYahoo({ chart: { result: [] } })).toBeNull()
+  })
+})
+
+describe('withRecentFallback', () => {
+  it('ultimi giorni senza cambio ufficiale: cambio di oggi; più vecchi: nessun cambio', () => {
+    const fx = withRecentFallback((_c, d) => (d === '2026-11-10' ? 1.1 : undefined), { USD: 1.05 }, '2026-11-22')
+    expect(fx('USD', '2026-11-10')).toBe(1.1)
+    expect(fx('usd', '2026-11-22')).toBe(1.05)
+    expect(fx('USD', '2026-11-01')).toBeUndefined()
+    expect(fx('CAD', '2026-11-22')).toBeUndefined()
   })
 })

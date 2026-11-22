@@ -71,3 +71,13 @@ async function fetchBdiDay(date: string): Promise<DayRates> {
   const url = `https://tassidicambio.bancaditalia.it/terzevalute-wf-web/rest/v1.0/dailyRates?lang=it&currencyIsoCode=EUR&referenceDate=${date}`
   return parseBdi(await proxiedJson<BdiResponse>(url))
 }
+
+/**
+ * Per i movimenti degli ultimi giorni il cambio ufficiale può non essere ancora pubblicato (la Banca d'Italia
+ * lo pubblica nel pomeriggio, e non nei festivi): nel frattempo si usa quello di oggi, poi quello vero sostituisce
+ * da solo il provvisorio. I movimenti più vecchi restano senza cambio (e segnalati) se manca quello storico.
+ */
+export function withRecentFallback(fx: FxLookup, latest: Record<string, number>, today: string, days = 7): FxLookup {
+  const from = new Date(Date.parse(today + 'T12:00:00Z') - days * 86400000).toISOString().slice(0, 10)
+  return (currency, date) => fx(currency, date) ?? (date >= from ? latest[currency.toUpperCase()] : undefined)
+}
