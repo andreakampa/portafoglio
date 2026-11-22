@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computePortfolio } from './engine/portfolio'
 import type { RawTx } from './engine/types'
 import {
-  addToList, assetKey, buildAsset, buildTransferPair, buildTx, findSameAsset, formFromTx, removeFromList, replaceInList,
+  addToList, assetKey, buildAsset, buildTransferPair, buildTx, findSameAsset, findTransfer, formFromTx, heldQty, removeFromList, replaceInList, transferWrites,
   validateNewAsset, validateTransfer, validateTx, type TxForm,
 } from './txEdit'
 
@@ -121,5 +121,49 @@ describe('trasferimento', () => {
     expect(findSameAsset(dest, { ticker: 'race.mi' })).toBe('a2')
     expect(findSameAsset(dest, { ticker: 'NVDA' })).toBeUndefined()
     expect(findSameAsset(undefined, { ticker: 'NVDA' })).toBeUndefined()
+  })
+})
+
+describe('modifica ed eliminazione dei trasferimenti', () => {
+  const out: RawTx = { id: 'o', date: '2026-05-26', type: 'transfer', qty: 10, price: 100, transferId: 'T1', destPortfolioId: 'B' }
+  const inn: RawTx = { id: 'i', date: '2026-05-26', type: 'transfer', qty: 10, price: 100, transferId: 'T1', sourcePortfolioId: 'A' }
+  const portfolios = () => ({
+    A: { assets: { x: { ticker: 'RACE.MI', transactions: [{ id: 'b', date: '2025-01-02', type: 'buy', qty: 18, price: 90 }, out] } } },
+    B: { assets: { y: { ticker: 'RACE.MI', transactions: [inn, { id: 's', date: '2026-07-01', type: 'sell', qty: 4, price: 120 }] } } },
+  })
+
+  it('trova le due metà in portafogli diversi', () => {
+    const p = findTransfer(portfolios(), 'T1')
+    expect(p.out).toMatchObject({ pid: 'A', aid: 'x', index: 1 })
+    expect(p.in).toMatchObject({ pid: 'B', aid: 'y', index: 0 })
+  })
+
+  it('corregge data e quantità di entrambe le metà, il resto non cambia', () => {
+    const ps = portfolios()
+    const w = transferWrites(ps, findTransfer(ps, 'T1'), { form: { date: '2026-06-01', qty: '12' } })
+    expect(Object.keys(w)).toEqual(['A/assets/x/transactions', 'B/assets/y/transactions'])
+    expect(w['A/assets/x/transactions']![1]).toMatchObject({ id: 'o', date: '2026-06-01', qty: 12, price: 100, transferId: 'T1', destPortfolioId: 'B' })
+    expect(w['B/assets/y/transactions']![0]).toMatchObject({ id: 'i', date: '2026-06-01', qty: 12, sourcePortfolioId: 'A' })
+    expect(w['B/assets/y/transactions']![1]!.id).toBe('s')
+  })
+
+  it('elimina entrambe le metà', () => {
+    const ps = portfolios()
+    const w = transferWrites(ps, findTransfer(ps, 'T1'), { remove: true })
+    expect(w['A/assets/x/transactions']!.map(t => t.id)).toEqual(['b'])
+    expect(w['B/assets/y/transactions']!.map(t => t.id)).toEqual(['s'])
+  })
+
+  it('quantità disponibile, escluso il trasferimento stesso', () => {
+    const ps = portfolios()
+    expect(heldQty(ps.A.assets.x.transactions as RawTx[], out)).toBe(18)
+    expect(heldQty(ps.B.assets.y.transactions as RawTx[])).toBe(6)
+  })
+
+  it('se una metà è sparita nel frattempo, si ferma', () => {
+    const ps = portfolios()
+    const pair = findTransfer(ps, 'T1')
+    ps.A.assets.x.transactions = [ps.A.assets.x.transactions[0]!]
+    expect(() => transferWrites(ps, pair, { remove: true })).toThrow(/cambiato/)
   })
 })

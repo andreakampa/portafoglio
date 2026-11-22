@@ -6,7 +6,8 @@ import type { RawAsset } from '../domain/engine/types'
 import type { Movement } from '../domain/engine/movements'
 import { symbolOf } from '../domain/engine/valuation'
 import {
-  ASSET_TYPES, assetKey, buildAsset, buildTx, EDITABLE_LABEL, formFromTx, validateNewAsset, validateTransfer, validateTx,
+  ASSET_TYPES, assetKey, buildAsset, buildTx, EDITABLE_LABEL, findTransfer, formFromTx, heldQty, validateNewAsset, validateTransfer, validateTx,
+  type PortfolioLike,
   type EditableType, type NewAssetForm, type TxForm,
 } from '../domain/txEdit'
 import { money, qty as fmtQty } from '../lib/format'
@@ -198,6 +199,62 @@ export function TransferFormCard({ c, onClose }: { c: Ready; onClose: () => void
       <p className="auth-error" role="alert">{error}</p>
       <div className="form-actions">
         <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Salvo…' : 'Trasferisci'}</button>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>Annulla</button>
+      </div>
+    </form>
+  )
+}
+
+/** Correzione di un trasferimento (data e quantità): uscita ed entrata cambiano insieme. */
+export function TransferEditCard({ c, movement, onClose }: { c: Ready; movement: Movement; onClose: () => void }) {
+  const edit = usePortfolioEdit()
+  const state = usePortfolioState()
+  const portfolios = (state.status === 'ready' ? state.data?.portfolios : undefined) as Record<string, PortfolioLike> | undefined
+  const tx = c.portfolio.assets?.[movement.assetId]?.transactions?.[movement.index]
+  const pair = portfolios && tx?.transferId ? findTransfer(portfolios, tx.transferId) : {}
+  const nameOf = (pid?: string) => c.options.find(o => o.id === pid)?.name ?? 'altro portafoglio'
+  const [date, setDate] = useState(tx?.date ?? today())
+  const [qty, setQty] = useState(tx ? String(tx.qty) : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!portfolios || !tx?.transferId) return setError('Trasferimento non trovato: chiudi e riprova.')
+    const txsOf = (l?: { pid: string; aid: string }) => (l ? portfolios[l.pid]?.assets?.[l.aid]?.transactions ?? [] : [])
+    const oldQty = Number(tx.qty) || 0
+    // Da dove esce deve esserci abbastanza; dove entra non si può togliere più di quanto resta.
+    const available = pair.out ? heldQty(txsOf(pair.out), pair.out.tx) : Infinity
+    const problem = validateTransfer({ date, qty }, available, today())
+    if (problem) return setError(problem)
+    const newQty = Number(qty.replace(',', '.'))
+    if (pair.in && newQty < oldQty && heldQty(txsOf(pair.in)) < oldQty - newQty - 1e-9) {
+      return setError(`In ${nameOf(pair.in.pid)} ne sono già stati venduti: puoi ridurre il trasferimento al massimo di ${fmtQty(heldQty(txsOf(pair.in)))}.`)
+    }
+    setBusy(true)
+    try {
+      await edit.changeTransfer(portfolios, tx.transferId, { form: { date, qty } })
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Salvataggio non riuscito: controlla la connessione e riprova.')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="card note-form" onSubmit={submit}>
+      <h2>Modifica trasferimento</h2>
+      <p className="muted small">
+        {movement.symbol}: da {nameOf(pair.out?.pid)} a {nameOf(pair.in?.pid)}.
+        {pair.out && pair.in ? ' Uscita ed entrata si correggono insieme.' : ' Manca l’altra metà: si corregge solo questa.'}
+      </p>
+      <div className="form-row">
+        <label>Data<input type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} /></label>
+        <label>Quantità<input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} /></label>
+      </div>
+      <p className="auth-error" role="alert">{error}</p>
+      <div className="form-actions">
+        <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Salvo…' : 'Salva'}</button>
         <button type="button" className="btn btn-ghost" onClick={onClose}>Annulla</button>
       </div>
     </form>

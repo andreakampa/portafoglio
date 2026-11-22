@@ -24,7 +24,7 @@ incerti vanno verificati con un commercialista prima di usarli in dichiarazione.
 - Alla chiusura del rapporto la banca rilascia la **certificazione delle minus** (art. 6, c. 5, d.lgs. 461/1997), usabile in un altro amministrato o in dichiarazione. Le minus non passano da sole da un portafoglio all'altro.
 
 ### Regime dichiarativo (broker estero, es. IBKR)
-- **LIFO** (ultimo acquistato, primo venduto), salvo lotti indicati esplicitamente.
+- **LIFO** (ultimo acquistato, primo venduto): è obbligatorio (art. 67, comma 1-bis TUIR), non una scelta. I lotti scelti al broker (es. "specific lot" su IBKR) non cambiano il calcolo italiano; per questo la v2 non offre la scelta dei lotti (il campo `lotAllocation` del sito vecchio resta letto dal motore, ma nei dati non è mai usato).
 - Nel **quadro RT** plus e minus dello **stesso anno** si sommano tutte, a prescindere dall'ordine. Poi si sottraggono le minus degli anni precedenti, prima le più vecchie.
 - Le imposte si versano con F24 a saldo (giugno).
 

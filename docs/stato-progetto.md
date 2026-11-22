@@ -116,7 +116,11 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    dopo il primo addebito mensile di interessi (inizio dicembre) controllare l'avviso della Panoramica per i movimenti di cassa. Totale in euro dei movimenti di cassa non ancora mostrato.
    **Opzioni (fatto):** titolo di tipo `option`, ticker Yahoo OCC (es. `BMEA280121C00001500`), quantità = contratti × 100, prezzo = premio per azione: il motore non cambia (26%).
    Scadenza senza valore = vendita a 0. Applicato: call BMEA 21JAN28 1.5 (100 quote a 1 $, 26/08/2026) con `tools/opzioni-ibkr-storico.mjs`, backup `.backup/database-20261121-162408.json`; Worker `ibkr-sync` ripubblicato.
-3. **Movimenti nella v2:** modifica/eliminazione dei trasferimenti (si inseriscono ma non si correggono), scelta dei lotti da vendere. Dopo qualche giorno di uso si può dismettere il sito vecchio per l'inserimento.
+3. **Movimenti nella v2 (fatto, 22/11/2026, PR `movimenti-trasferimenti`):** i trasferimenti si correggono (data e quantità) e si eliminano dalla lista Movimenti;
+   uscita ed entrata cambiano insieme in una sola scrittura (`findTransfer`/`transferWrites` in `domain/txEdit.ts`), con controllo delle quantità disponibili da una parte e già vendute dall'altra.
+   **Scelta dei lotti: non si fa** (LIFO obbligatorio in dichiarativo, costo medio in amministrato: vedi regole-fiscali.md).
+   Notato col rendiconto IBKR: gli 8 trasferimenti da Mediolanum risultano in IBKR il **26/05/2026**, nell'app il **28/05/2026** (da correggere se Andrea conferma).
+   Dopo qualche giorno di uso si può dismettere il sito vecchio per l'inserimento.
 4. **Simulatore:** "Registra come movimenti", bollo/IVAFE nella stima, simulazione di dividendi.
 5. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100, S&P 500, VIX, VXN) con lancetta del VIX vicino a 25.
 6. **Watchlist** da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push). Eventuale notifica push per l'avviso di leva.
