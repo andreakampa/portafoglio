@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { MovementForm, TransferFormCard } from '../components/MovementForms'
+import { MovementForm, TransferEditCard, TransferFormCard } from '../components/MovementForms'
 import { PacPlansCard } from '../components/PacPlansCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
+import { usePortfolioState } from '../data/usePortfolioState'
+import { findTransfer, type PortfolioLike } from '../domain/txEdit'
 import { marginOnDate, type MarginOnDate, type MarginPortfolio } from '../domain/engine/margin'
 import { buildMovements, CASH_LABEL, cashflowsIn, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
@@ -26,6 +28,7 @@ export function Movements() {
   const [search, setSearch] = useState('')
   const [form, setForm] = useState<'new' | 'transfer' | Movement | null>(null)
   const edit = usePortfolioEdit()
+  const state = usePortfolioState()
   const [delError, setDelError] = useState('')
 
   const all = useMemo(() => (c.status === 'ready' ? buildMovements(c.portfolio, c.result) : []), [c])
@@ -41,7 +44,24 @@ export function Movements() {
   const list = all.filter(m => m.date >= from && m.date < to && kinds.includes(m.kind) && (!q || m.symbol.toUpperCase().includes(q)))
   const gain = list.reduce((s, m) => s + (m.gainEur ?? 0), 0)
   const editable = (m: Movement) => m.kind === 'buy' || m.kind === 'sell' || m.kind === 'short_sell' || m.kind === 'buy_to_cover'
+  const isTransfer = (m: Movement) => m.kind === 'transfer_in' || m.kind === 'transfer_out'
+  const portfolios = (state.status === 'ready' ? state.data?.portfolios : undefined) as Record<string, PortfolioLike> | undefined
+  const removeTransfer = async (m: Movement) => {
+    const t = c.portfolio.assets?.[m.assetId]?.transactions?.[m.index]
+    if (!portfolios || !t?.transferId) return setDelError('Trasferimento non trovato: ricarica la pagina e riprova.')
+    const pair = findTransfer(portfolios, t.transferId)
+    const name = (pid?: string) => c.options.find(o => o.id === pid)?.name ?? 'altro portafoglio'
+    const both = pair.out && pair.in ? ` Si eliminano insieme l'uscita da ${name(pair.out.pid)} e l'entrata in ${name(pair.in.pid)}.` : ''
+    if (!confirm(`Eliminare il trasferimento di ${m.symbol} del ${fmtDate(m.date)}?${both}`)) return
+    setDelError('')
+    try {
+      await edit.changeTransfer(portfolios, t.transferId, { remove: true })
+    } catch (e) {
+      setDelError(e instanceof Error ? e.message : 'Eliminazione non riuscita.')
+    }
+  }
   const remove = async (m: Movement) => {
+    if (isTransfer(m)) return removeTransfer(m)
     const warn = m.fromBroker ? ' (È un movimento importato da IBKR: la sincronizzazione potrebbe riportarlo.)' : ''
     if (!confirm(`Eliminare ${KIND_LABEL[m.kind].toLowerCase()} di ${m.symbol} del ${fmtDate(m.date)}?${warn}`)) return
     setDelError('')
@@ -53,7 +73,7 @@ export function Movements() {
     }
   }
   const actions = (m: Movement) =>
-    editable(m) ? (
+    editable(m) || isTransfer(m) ? (
       <span className="note-actions">
         <button type="button" className="linklike" onClick={() => { setForm(m); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Modifica</button>
         <button type="button" className="linklike neg" onClick={() => void remove(m)}>Elimina</button>
@@ -83,7 +103,10 @@ export function Movements() {
         <button type="button" className="btn btn-ghost" onClick={() => setForm('transfer')}>Trasferisci titolo</button>
       </div>
       {form === 'transfer' && <TransferFormCard c={c} onClose={() => setForm(null)} />}
-      {form && form !== 'transfer' && (
+      {form && form !== 'transfer' && form !== 'new' && isTransfer(form) && (
+        <TransferEditCard key={form.key} c={c} movement={form} onClose={() => setForm(null)} />
+      )}
+      {form && form !== 'transfer' && (form === 'new' || !isTransfer(form)) && (
         <MovementForm key={form === 'new' ? 'new' : form.key} c={c} editing={form === 'new' ? undefined : form} onClose={() => setForm(null)} />
       )}
       {delError && <div className="card error" role="alert">{delError}</div>}

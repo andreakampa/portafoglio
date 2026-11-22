@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { useUser } from '../auth/context'
 import type { RawAsset, RawTx } from '../domain/engine/types'
 import { isRecorded } from '../domain/pac'
-import { addToList, buildTransferPair, findSameAsset, removeFromList, replaceInList, type TransferForm, type TxRef } from '../domain/txEdit'
+import { addToList, buildTransferPair, findSameAsset, findTransfer, removeFromList, replaceInList, transferWrites, type PortfolioLike, type TransferForm, type TxRef } from '../domain/txEdit'
 import { db } from '../lib/firebase'
 
 type Asset = RawAsset & { isin?: string; commDefault?: number }
@@ -78,6 +78,17 @@ export function usePortfolioEdit() {
           const list = cur ? removeFromList(cur.transactions ?? [], at) : null
           return cur && list ? clean({ ...cur, transactions: list }) : undefined
         }),
+
+      /**
+       * Corregge (data e quantità) o elimina un trasferimento: uscita ed entrata cambiano insieme, in una sola scrittura.
+       * `portfolios` = dati attuali di tutti i portafogli.
+       */
+      changeTransfer: async (portfolios: Record<string, PortfolioLike>, transferId: string, change: { remove: true } | { form: TransferForm }) => {
+        const pair = findTransfer(portfolios, transferId)
+        if (!pair.out && !pair.in) throw new Error(STALE)
+        const writes = transferWrites(portfolios, pair, change)
+        await update(ref(db, root), clean(writes))
+      },
 
       /**
        * Trasferisce un titolo in un altro portafoglio: un'uscita e un'entrata collegate dallo stesso `transferId`.

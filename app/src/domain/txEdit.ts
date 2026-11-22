@@ -194,3 +194,64 @@ export function findSameAsset(
     return (isin && (a.isin || '').toUpperCase() === isin) || (t && at === t)
   })?.[0]
 }
+
+// ── Modifica ed eliminazione di un trasferimento (le due metà insieme) ─────────
+
+export type PortfolioLike = { name?: string; assets?: Record<string, RawAsset> }
+
+export interface TxLocation {
+  pid: string
+  aid: string
+  index: number
+  tx: RawTx
+}
+
+/** Le due metà di un trasferimento, cercate in tutti i portafogli per `transferId`. Una può mancare (dati vecchi). */
+export function findTransfer(portfolios: Record<string, PortfolioLike>, transferId: string): { out?: TxLocation; in?: TxLocation } {
+  const found: { out?: TxLocation; in?: TxLocation } = {}
+  for (const [pid, p] of Object.entries(portfolios)) {
+    for (const [aid, a] of Object.entries(p.assets ?? {})) {
+      ;(a.transactions ?? []).forEach((tx, index) => {
+        if (tx?.type !== 'transfer' || tx.transferId !== transferId) return
+        found[tx.sourcePortfolioId ? 'in' : 'out'] = { pid, aid, index, tx }
+      })
+    }
+  }
+  return found
+}
+
+/** Quantità posseduta (long) secondo i movimenti, escluso il movimento indicato. */
+export function heldQty(txs: RawTx[], skip?: RawTx): number {
+  let q = 0
+  for (const t of txs) {
+    if (t === skip) continue
+    const n = Number(t.qty) || 0
+    if (t.type === 'buy') q += n
+    else if (t.type === 'sell') q -= n
+    else if (t.type === 'transfer') q += t.sourcePortfolioId ? n : -n
+  }
+  return q
+}
+
+/**
+ * Scritture per correggere (nuova data e quantità) o eliminare un trasferimento: percorso Firebase
+ * `{pid}/assets/{aid}/transactions` → nuovo elenco dei movimenti. Le due metà cambiano insieme.
+ */
+export function transferWrites(
+  portfolios: Record<string, PortfolioLike>,
+  pair: { out?: TxLocation; in?: TxLocation },
+  change: { remove: true } | { form: TransferForm },
+): Record<string, RawTx[]> {
+  const writes: Record<string, RawTx[]> = {}
+  for (const half of [pair.out, pair.in]) {
+    if (!half) continue
+    const path = `${half.pid}/assets/${half.aid}/transactions`
+    const list = writes[path] ?? [...(portfolios[half.pid]?.assets?.[half.aid]?.transactions ?? [])]
+    const i = list.findIndex(t => t === half.tx || (half.tx.id && t.id === half.tx.id))
+    if (i < 0) throw new Error('Il trasferimento è cambiato nel frattempo (forse da un altro dispositivo): chiudi e riprova.')
+    if ('remove' in change) list.splice(i, 1)
+    else list[i] = { ...list[i]!, date: change.form.date, qty: num(change.form.qty) }
+    writes[path] = sortByDate(list)
+  }
+  return writes
+}
