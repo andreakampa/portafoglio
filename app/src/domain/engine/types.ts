@@ -42,6 +42,8 @@ export interface RawTx {
   pacKey?: string
   /** Prezzo preso dalla chiusura di borsa, non dall'esecuzione vera: da confermare con la fattura. */
   priceEstimated?: boolean
+  /** Azioni premio del broker maturate (`premio:idAssegnazione`): il loro valore è reddito (quadro RM). */
+  bonusKey?: string
   /** Importo di una rata PAC, in euro. */
   importoPac?: number
 }

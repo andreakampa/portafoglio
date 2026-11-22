@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { Kpi } from '../components/PortfolioPicker'
 import { StatementImport } from '../components/StatementImport'
 import { useTaxReturn, type RateMode, type TaxReturnData } from '../data/useTaxReturn'
+import { bonusKeyOf, type BonusGrant } from '../domain/bonusShares'
+import type { RawPortfolio } from '../domain/engine/portfolio'
 import { RM_LETTERS, toEuro } from '../domain/engine/taxReturn'
 import { eur, money, qty } from '../lib/format'
 
@@ -90,6 +92,40 @@ function FieldList({ fields }: { fields: Field[] }) {
   )
 }
 
+/** Azioni premio del broker: in maturazione (solo quadro RW) o maturate (acquisto registrato, reddito nel quadro RM). */
+function BonusCard({ grants, portfolio }: { grants: BonusGrant[]; portfolio: RawPortfolio }) {
+  const txs = Object.values(portfolio.assets ?? {}).flatMap(a => a.transactions ?? [])
+  const sorted = [...grants].sort((a, b) => a.vestDate.localeCompare(b.vestDate))
+  return (
+    <div className="card">
+      <h2>Azioni premio del broker</h2>
+      <ul className="fiscal-lines">
+        {sorted.map(g => {
+          const tx = txs.find(t => t.bonusKey === bonusKeyOf(g))
+          return (
+            <li key={g.id}>
+              <div>
+                <b>{qty(g.qty)} {g.symbol}</b>
+                <br />
+                <small className="muted">assegnate il {it(g.grantDate)} · maturano il {it(g.vestDate)}</small>
+              </div>
+              <div className="num">
+                {tx ? <span className="pos">registrate</span> : <span className="muted">in maturazione</span>}
+                <small className="muted">{tx ? `${it(tx.date)} a ${money(Number(tx.price), g.currency)}` : `assegnazione a ${money(g.grantPrice, g.currency)}`}</small>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="muted small">
+        Le azioni diventano tue alla maturazione: l’app le registra da sola quel giorno, al prezzo di chiusura. Quel valore è il loro
+        costo fiscale e un reddito da dichiarare nel quadro RM (lettera G, 26%) dell’anno della maturazione. Prima stanno solo nel
+        quadro RW. Classificazione da confermare col commercialista (in alternativa: quadro RL, reddito diverso).
+      </p>
+    </div>
+  )
+}
+
 export function TaxReturn() {
   const [picked, setPicked] = useState<string | null>(null)
   const [year, setYear] = useState<number | null>(null)
@@ -140,6 +176,8 @@ export function TaxReturn() {
       </div>
 
       <StatementImport pid={s.selectedId} year={s.year} portfolio={s.portfolio} statement={s.statement} closesUsed={d?.closesFromStatement ?? null} />
+
+      {s.grants.length > 0 && <BonusCard grants={s.grants} portfolio={s.portfolio} />}
 
       {!d ? (
         <div className="card skeleton" style={{ height: 240 }} aria-busy="true" />

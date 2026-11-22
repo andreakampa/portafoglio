@@ -146,7 +146,7 @@ export type RmLetter = 'B' | 'C' | 'G' | 'H'
 export const RM_LETTERS: Record<RmLetter, string> = {
   B: 'Proventi di ETF e fondi esteri armonizzati (anche le plus da vendita)',
   C: 'Prestito titoli garantito (es. SYEP di IBKR)',
-  G: 'Interessi del conto corrente estero',
+  G: 'Interessi del conto estero e azioni premio maturate',
   H: 'Dividendi esteri',
 }
 
@@ -257,6 +257,21 @@ export function rmItemsFrom(s: RmSources): RmItem[] {
       letter, iso: s.brokerIso, date: f.date, label: letter === 'G' ? 'Interessi attivi' : 'Prestito titoli',
       grossEur: num(f.amount) / rate, withholdingEur: 0,
     })
+  }
+
+  // Azioni premio del broker maturate: il valore al vesting è reddito di capitale (premio legato al deposito).
+  for (const [id, a] of Object.entries(s.assets)) {
+    const currency = norm(a.valuta) || 'EUR'
+    for (const t of a.transactions ?? []) {
+      if (!t?.bonusKey || !t.date || yearOf(t.date) !== s.year) continue
+      const saved = num(t.exchangeRate)
+      const rate = currency === 'EUR' ? 1 : saved > 0 ? saved : s.fx(currency, t.date)
+      if (!rate || rate <= 0) continue
+      items.push({
+        letter: 'G', iso: s.brokerIso, date: t.date, label: `Azioni premio ${(a.ticker || a.nome || id).trim()} maturate (${num(t.qty)})`,
+        grossEur: (num(t.qty) * num(t.price)) / rate, withholdingEur: 0,
+      })
+    }
   }
 
   for (const e of s.etfGains) {

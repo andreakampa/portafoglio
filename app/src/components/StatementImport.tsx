@@ -3,7 +3,8 @@ import { useSaveStatement, type StoredStatement } from '../data/taxStatements'
 import type { CashflowLike } from '../domain/engine/dividends'
 import type { RawPortfolio } from '../domain/engine/portfolio'
 import type { RawAsset } from '../domain/engine/types'
-import { checkStatement, parseStatement, summarizeStatement } from '../domain/ibkr/statement'
+import { useBonusGrants } from '../data/useBonusGrants'
+import { checkStatement, grantsOf, parseStatement, summarizeStatement } from '../domain/ibkr/statement'
 import { money, qty } from '../lib/format'
 
 interface Props {
@@ -20,6 +21,7 @@ const it = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
 /** Importa il rendiconto di attività IBKR (CSV) per un anno, lo confronta con l'app e ne salva il riassunto. */
 export function StatementImport({ pid, year, portfolio, statement, closesUsed }: Props) {
   const save = useSaveStatement()
+  const { save: saveGrants } = useBonusGrants()
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +39,8 @@ export function StatementImport({ pid, year, portfolio, statement, closesUsed }:
       const flows = Object.values(((portfolio as { cashflows?: unknown }).cashflows ?? {}) as Record<string, CashflowLike>)
       const check = checkStatement(st, assets, flows)
       await save(pid, year, { ...summarizeStatement(st, assets, new Date().toISOString()), check })
+      const grants = grantsOf(st)
+      if (grants.length) await saveGrants(pid, grants)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -91,6 +95,12 @@ export function StatementImport({ pid, year, portfolio, statement, closesUsed }:
               </ul>
               <p className="small">Correggi i movimenti nella pagina Movimenti (o chiedi a Claude), poi importa di nuovo il rendiconto.</p>
             </div>
+          )}
+          {(c.unvested ?? []).length > 0 && (
+            <p className="muted small">
+              Azioni premio non ancora maturate (giustamente non nell’app fino alla maturazione):{' '}
+              {(c.unvested ?? []).map(u => `${qty(u.qty)} ${u.symbol}, la prima matura il ${it(u.nextVest)}`).join('; ')}.
+            </p>
           )}
           {c.yearEnd ? (
             <p className="muted small">Quadro RW: {closesUsed ?? Object.keys(statement.closes ?? {}).length} titoli valutati col prezzo di chiusura al 31/12 del rendiconto.</p>
