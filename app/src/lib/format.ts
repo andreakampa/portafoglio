@@ -24,7 +24,7 @@ export const pct = (n: number | null | undefined) =>
 export const qty = (n: number) => nf({ maximumFractionDigits: 4 }).format(n)
 
 /** Classe CSS per colorare guadagni e perdite. */
-export const tone = (n: number | null | undefined) => (n === null || n === undefined || Math.abs(n) < 0.005 ? '' : n > 0 ? 'pos' : 'neg')
+export const tone = (n: number | null | undefined) => (n === null || n === undefined || Math.abs(n) < 0.005 ? '' : n > 0 ? 'pos up' : 'neg down')
 
 /** Anno corrente, letto una volta all'avvio (va bene: l'app si ricarica da sola agli aggiornamenti). */
 export const THIS_YEAR = new Date().getFullYear()
