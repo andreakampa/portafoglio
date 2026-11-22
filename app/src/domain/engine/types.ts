@@ -9,7 +9,8 @@ export type CostMethod =
   | 'lifo' // ultimo entrato primo uscito (regime dichiarativo, presunzione di legge)
   | 'fifo' // primo entrato primo uscito: non è un metodo fiscale italiano, serve per confrontarsi con IBKR
 
-export type TxType = 'buy' | 'sell' | 'transfer' | 'short_sell' | 'buy_to_cover'
+/** `exercise` = opzione esercitata o assegnata: si chiude senza risultato e il premio passa al titolo sottostante. */
+export type TxType = 'buy' | 'sell' | 'transfer' | 'short_sell' | 'buy_to_cover' | 'exercise'
 
 export interface LotAllocation {
   lotId: string
@@ -29,6 +30,11 @@ export interface RawTx {
   exchangeRate?: number | string
   /** Lega tra loro l'uscita e l'entrata dello stesso trasferimento tra portafogli. */
   transferId?: string
+  /**
+   * Lega la chiusura di un'opzione per esercizio o assegnazione (tipo `exercise`) al movimento del titolo sottostante
+   * (acquisto o vendita al prezzo d'esercizio): il premio dell'opzione entra nel costo o nel ricavo di quel movimento.
+   */
+  exerciseId?: string
   /** Trasferimento in uscita verso questo portafoglio. */
   destPortfolioId?: string
   /** Trasferimento in entrata da questo portafoglio. */

@@ -1,5 +1,5 @@
 import { computeFiscal, type FiscalEventInput, type FiscalResult, type ManualLoss } from './fiscal.ts'
-import { computePosition, methodFor, type PositionResult, type TransferPiece } from './positions.ts'
+import { computePosition, methodFor, type OptionPremium, type PositionResult, type TransferPiece } from './positions.ts'
 import type { CostMethod, FxLookup, Issue, RawAsset, TaxRegime } from './types.ts'
 
 export interface RawPortfolio {
@@ -24,6 +24,9 @@ export type PositionFn = (assetId: string, asset: RawAsset, method: CostMethod) 
 export function computePortfolio(p: RawPortfolio, fx: FxLookup, positionOf?: PositionFn): PortfolioResult {
   const regime: TaxRegime = p.taxRegime === 'dichiarativo' ? 'dichiarativo' : 'amministrato'
   const method = methodFor(regime)
+  // Da solo (senza i collegamenti tra titoli) si passa dal calcolo completo: esercizi di opzioni e trasferimenti
+  // tra titoli dello stesso portafoglio restano collegati.
+  if (!positionOf) return computeAllPortfolios({ self: p }, fx).self!
   const positions: Record<string, PositionResult> = {}
   const events: FiscalEventInput[] = []
   const issues: PortfolioResult['issues'] = []
@@ -57,6 +60,15 @@ export function computeAllPortfolios(portfolios: Record<string, RawPortfolio>, f
     }
   }
 
+  // Dove si trova la chiusura di ogni opzione esercitata o assegnata.
+  const exOf = new Map<string, string>()
+  for (const [pid, p] of Object.entries(portfolios)) {
+    for (const [aid, a] of Object.entries(p.assets ?? {})) {
+      for (const t of a.transactions ?? []) if (t.type === 'exercise' && t.exerciseId) exOf.set(t.exerciseId, `${pid}|${aid}`)
+    }
+  }
+  const premiums = new Map<string, OptionPremium>()
+
   const assetByKey = (key: string) => {
     const [pid, aid] = key.split('|') as [string, string]
     return { pid, aid, asset: portfolios[pid]?.assets?.[aid] }
@@ -82,6 +94,17 @@ export function computeAllPortfolios(portfolios: Record<string, RawPortfolio>, f
         return pieces.get(tx.transferId!)
       },
       outgoing: (tx, ps) => void pieces.set(tx.transferId!, ps),
+      exercised: (tx, p) => void premiums.set(tx.exerciseId!, p),
+      premium: tx => {
+        const id = tx.exerciseId!
+        const src = exOf.get(id)
+        if (!src) return undefined
+        if (!premiums.has(id) && !busy.has(src)) {
+          const { pid } = assetByKey(src)
+          position(src, methodFor(portfolios[pid]?.taxRegime))
+        }
+        return premiums.get(id)
+      },
     })
     busy.delete(key)
     done.set(key, res)

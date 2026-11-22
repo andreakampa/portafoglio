@@ -378,3 +378,4 @@ textarea {
   .overview-side .market-grid { grid-template-columns: 1fr; justify-items: center; }
   .overview-side .market-grid .kpis { width: 100%; }
 }
+.kind-exercise { color: var(--primary); }

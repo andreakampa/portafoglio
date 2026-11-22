@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computePortfolio } from './engine/portfolio'
 import type { RawTx } from './engine/types'
+import { buildExercise, optionKind, optionStrike } from './txEdit'
 import {
   addToList, assetKey, buildAsset, buildTransferPair, buildTx, findSameAsset, findTransfer, formFromTx, heldQty, removeFromList, replaceInList, transferWrites,
   validateNewAsset, validateTransfer, validateTx, type TxForm,
@@ -165,5 +166,26 @@ describe('modifica ed eliminazione dei trasferimenti', () => {
     const pair = findTransfer(ps, 'T1')
     ps.A.assets.x.transactions = [ps.A.assets.x.transactions[0]!]
     expect(() => transferWrites(ps, pair, { remove: true })).toThrow(/cambiato/)
+  })
+})
+
+describe('esercizio o assegnazione inseriti a mano', () => {
+  it('riconosce call/put e strike dal ticker', () => {
+    expect(optionKind('BMEA280121C00001500')).toBe('call')
+    expect(optionKind('SPY261218P00450000')).toBe('put')
+    expect(optionStrike('BMEA280121C00001500')).toBe(1.5)
+    expect(optionKind('NVDA')).toBeNull()
+  })
+  it('call comprata → acquisto; put venduta → acquisto; put comprata e call venduta → vendita', () => {
+    let n = 0
+    const id = () => String(n++)
+    const f = { date: '2028-01-21', qty: '100', strike: '1,5' }
+    const a = buildExercise('call', 100, f, id)
+    expect(a.option).toMatchObject({ type: 'exercise', qty: 100, price: 0 })
+    expect(a.stock).toMatchObject({ type: 'buy', qty: 100, price: 1.5 })
+    expect(a.stock.exerciseId).toBe(a.option.exerciseId)
+    expect(buildExercise('put', -100, f, id).stock.type).toBe('buy')
+    expect(buildExercise('put', 100, f, id).stock.type).toBe('sell')
+    expect(buildExercise('call', -100, f, id).stock.type).toBe('sell')
   })
 })

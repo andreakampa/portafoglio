@@ -104,7 +104,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
      posizioni a fine periodo (opzioni: simbolo IBKR → ticker OCC). Salva su Firebase in `users/{uid}/taxStatements/{pid}/{anno}` solo i prezzi di fine periodo
      e l'esito del confronto (fuori da `portfolio_state`, così la sincronizzazione non lo cancella). Se il rendiconto arriva al 31/12, i suoi prezzi di chiusura
      valgono per il quadro RW al posto di Yahoo. Prova col rendiconto 1/1–20/11/2026: 120 operazioni e tutti i movimenti di cassa coincidono;
-     unica differenza **3,6168 azioni IBKR** (premio sui versamenti) nel conto ma non nell'app: da decidere come registrarle (trattamento fiscale da verificare).
+     unica differenza le **3,6168 azioni IBKR** del premio sui versamenti: decise e gestite il 22/11/2026 (vedi Azioni premio IBKR qui sotto).
    - **Azioni premio IBKR (fatto, 22/11/2026, PR `azioni-premio`):** l'import del rendiconto salva le assegnazioni ("Attività piano incentivazione")
      in `users/{uid}/settings/bonusGrants/{pid}/{id}`; nel confronto le azioni non maturate non sono più una differenza. `BonusRunner` (come i PAC) registra
      da solo, il giorno dopo ogni maturazione, l'acquisto al prezzo di chiusura (`bonusKey`, `priceEstimated`): è il costo fiscale e il reddito nel quadro RM (G, 26%).
@@ -112,7 +112,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
      **Da controllare a maggio 2027:** se la sincronizzazione IBKR vede la maturazione come un movimento (rischio doppione o "da controllare").
    - **Da fare a inizio 2027:** confrontare i totali con il rendiconto annuale IBKR (Andrea lo invierà), verificare righi/colonne sulle istruzioni 2027 appena escono,
      decidere col commercialista i punti incerti (credito ritenute estere, cambio BdI o IBKR, giacenza media del conto). Mediolanum e Trade Republic: amministrati, servono solo le loro certificazioni.
-2. **Sincronizzazione IBKR — resta:** azioni "premio versamento" (maturano dal 2027); assegnazione/esercizio di opzioni (vanno "da controllare", si registrano a mano);
+2. **Sincronizzazione IBKR — resta:** azioni "premio versamento" (maturano dal 2027); assegnazione/esercizio di opzioni **fatto (22/11/2026, PR `opzioni-esercizio`)**: la sincronizzazione collega opzione e azioni (premio nel costo o ricavo, vedi regole-fiscali.md), modulo manuale Movimenti → Esercizio / assegnazione; restano "da controllare" solo le opzioni regolate in contanti (senza azioni nel report);
    dopo il primo addebito mensile di interessi (inizio dicembre) controllare l'avviso della Panoramica per i movimenti di cassa. Totale in euro dei movimenti di cassa: fatto (scheda Cassa, cambio del giorno salvato da IBKR o di oggi, `cashTotalsEur`).
    **Opzioni (fatto):** titolo di tipo `option`, ticker Yahoo OCC (es. `BMEA280121C00001500`), quantità = contratti × 100, prezzo = premio per azione: il motore non cambia (26%).
    Scadenza senza valore = vendita a 0. Applicato: call BMEA 21JAN28 1.5 (100 quote a 1 $, 26/08/2026) con `tools/opzioni-ibkr-storico.mjs`, backup `.backup/database-20261121-162408.json`; Worker `ibkr-sync` ripubblicato.

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { ExerciseFormCard } from '../components/ExerciseForm'
 import { MovementForm, TransferEditCard, TransferFormCard } from '../components/MovementForms'
 import { PacPlansCard } from '../components/PacPlansCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
@@ -29,7 +30,7 @@ export function Movements() {
   const [search, setSearch] = useState('')
   const location = useLocation()
   const navigate = useNavigate()
-  const [form, setForm] = useState<'new' | 'transfer' | Movement | null>(() => ((location.state as { nuovo?: boolean } | null)?.nuovo ? 'new' : null))
+  const [form, setForm] = useState<'new' | 'transfer' | 'exercise' | Movement | null>(() => ((location.state as { nuovo?: boolean } | null)?.nuovo ? 'new' : null))
   // Toccando di nuovo il "+" mentre si è già qui, si riapre il modulo (ogni tocco è una navigazione nuova).
   const wantsNew = !!(location.state as { nuovo?: boolean } | null)?.nuovo
   const [seenKey, setSeenKey] = useState(location.key)
@@ -116,12 +117,16 @@ export function Movements() {
       <div className="form-actions">
         <button type="button" className="btn btn-primary" onClick={() => setForm('new')}>+ Nuovo movimento</button>
         <button type="button" className="btn btn-ghost" onClick={() => setForm('transfer')}>Trasferisci titolo</button>
+        {Object.values(c.portfolio.assets ?? {}).some(a => a.tipoAsset === 'option') && (
+          <button type="button" className="btn btn-ghost" onClick={() => setForm('exercise')}>Esercizio / assegnazione</button>
+        )}
       </div>
       {form === 'transfer' && <TransferFormCard c={c} onClose={() => setForm(null)} />}
-      {form && form !== 'transfer' && form !== 'new' && isTransfer(form) && (
+      {form === 'exercise' && <ExerciseFormCard c={c} onClose={() => setForm(null)} />}
+      {form && form !== 'transfer' && form !== 'exercise' && form !== 'new' && isTransfer(form) && (
         <TransferEditCard key={form.key} c={c} movement={form} onClose={() => setForm(null)} />
       )}
-      {form && form !== 'transfer' && (form === 'new' || !isTransfer(form)) && (
+      {form && form !== 'transfer' && form !== 'exercise' && (form === 'new' || !isTransfer(form)) && (
         <MovementForm key={form === 'new' ? 'new' : form.key} c={c} editing={form === 'new' ? undefined : form} onClose={() => setForm(null)} />
       )}
       {delError && <div className="card error" role="alert">{delError}</div>}

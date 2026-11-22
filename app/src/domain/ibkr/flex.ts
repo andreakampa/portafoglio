@@ -21,8 +21,10 @@ export interface FlexOrder {
   assetCategory: 'STK' | 'OPT'
   /** Descrizione IBKR, es. `BMEA 21JAN28 1.5 C` (serve a dare un nome alle opzioni). */
   description: string
-  /** Opzione scaduta senza valore, assegnata o esercitata (dal campo `notes`). */
+  /** Opzione scaduta senza valore, assegnata o esercitata (dal campo `notes`); per le azioni: comprate o vendute per un'assegnazione o un esercizio. */
   special?: 'expired' | 'assigned' | 'exercised'
+  /** Per le opzioni: simbolo del titolo sottostante (es. BMEA). */
+  underlying?: string
 }
 
 export type FlexCashKind = 'dividend' | 'pil' | 'withholding' | 'margin-interest' | 'credit-interest' | 'lending' | 'fee'
@@ -165,6 +167,8 @@ export function parseFlex(xml: string): FlexReport {
     o.closes ||= oc.includes('C')
     const notes = (t.notes ?? '').split(';')
     if (isOpt) o.special = notes.includes('Ep') ? 'expired' : notes.includes('A') ? 'assigned' : notes.includes('Ex') ? 'exercised' : o.special
+    else if (notes.includes('A') || notes.includes('Ex')) o.special = notes.includes('A') ? 'assigned' : 'exercised'
+    if (isOpt && t.underlyingSymbol) o.underlying = t.underlyingSymbol.trim()
     const qty = Math.abs(n(t.quantity)) * multiplier
     o.qty += qty
     o.notional += qty * n(t.tradePrice)
