@@ -19,7 +19,7 @@ Regole fiscali applicate dal motore: [docs/regole-fiscali.md](docs/regole-fiscal
 | `app/` | v2: Vite + React + TypeScript + PWA. `src/domain/` motore puro con test, `src/pages/` schermate |
 | `workers/finance-proxy` | proxy Yahoo/cambi + `/chat` Gemini (chiave dell'utente) |
 | `workers/ibkr-relay` | relay Flex IBKR per il browser |
-| `workers/ibkr-sync` | cron giornaliero 06:00 UTC: report Flex → portafoglio IBKR su Firebase (secret su Cloudflare) |
+| `workers/ibkr-sync` | cron giornaliero 06:00 UTC: report Flex → portafoglio IBKR su Firebase; cron ogni 15 min: soglie delle watchlist → notifiche push (secret su Cloudflare) |
 | `database.rules.json`, `tests/rules.test.mjs` | regole Firebase (inviti monouso, membri, admin) e loro test |
 | `tools/` | confronti e riconciliazioni sui dati del backup locale |
 | `.backup/` | backup e report con dati personali: **escluso da git**, mai pubblicarlo |

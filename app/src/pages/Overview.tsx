@@ -2,6 +2,7 @@ import { IbkrSyncNotice } from '../components/IbkrSyncNotice'
 import { MarginCard } from '../components/MarginCard'
 import { HistoryCard, IndicesCard } from '../components/MarketCards'
 import { PortfolioPicker } from '../components/PortfolioPicker'
+import { WatchlistSummary } from '../components/WatchlistSummary'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioState } from '../data/usePortfolioState'
 import { summarizePortfolios } from '../domain/portfolioState'
@@ -23,6 +24,7 @@ export function Overview() {
       )}
       <IbkrSyncNotice />
       <IndicesCard />
+      <WatchlistSummary />
       {c.status === 'ready' && <HistoryCard portfolio={c.portfolio} />}
       {c.status === 'ready' && <MarginCard c={c} />}
       {state.status === 'ready' && <PortfolioList data={state.data} />}

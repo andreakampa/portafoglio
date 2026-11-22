@@ -12,6 +12,7 @@ import { Positions } from './pages/Positions'
 import { Settings } from './pages/Settings'
 import { Simulator } from './pages/Simulator'
 import { TaxReturn } from './pages/TaxReturn'
+import { Watchlist } from './pages/Watchlist'
 
 // Hash router: su GitHub Pages ogni indirizzo funziona anche ricaricando la pagina.
 const router = createHashRouter([
@@ -25,6 +26,7 @@ const router = createHashRouter([
       { path: 'fiscale', element: <Fiscal /> },
       { path: 'fiscale/dichiarazione', element: <TaxReturn /> },
       { path: 'note', element: <Notes /> },
+      { path: 'watchlist', element: <Watchlist /> },
       { path: 'impostazioni', element: <Settings /> },
       { path: '*', element: <Placeholder title="Pagina non trovata" what="Questo indirizzo non esiste." /> },
     ],
