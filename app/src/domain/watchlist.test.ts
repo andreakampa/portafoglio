@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alertText, checkAlerts, parseWatchlistCsv, watchId, yahooSymbol, type WatchItem } from './watchlist.ts'
+import { alertText, checkAlerts, listCounts, mergeIbkrWatchlists, parseWatchlistCsv, watchId, yahooSymbol, type WatchItem } from './watchlist.ts'
 
 describe('avvisi di prezzo', () => {
   const item: WatchItem = { id: 'nvda', symbol: 'NVDA', above: 200, below: 150 }
@@ -48,5 +48,41 @@ describe('importazione watchlist IBKR', () => {
 
   it('id per Firebase', () => {
     expect(watchId('race.mi')).toBe('RACE_MI')
+  })
+})
+
+describe('allineamento con IBKR', () => {
+  const existing: WatchItem[] = [
+    { id: 'NVDA', symbol: 'NVDA', source: 'ibkr', lists: ['Semiconductor'], above: 200, note: 'mia nota' },
+    { id: 'OLD', symbol: 'OLD', source: 'ibkr', lists: ['Spazio'] },
+    { id: 'MIO', symbol: 'MIO', note: 'aggiunto a mano' },
+    { id: 'GONE', symbol: 'GONE', source: 'ibkr', goneFromIbkr: true, lists: ['X'] },
+  ]
+  it('aggiunge i nuovi, aggiorna solo le liste, non cancella mai', () => {
+    const r = mergeIbkrWatchlists(existing, [
+      { symbol: 'NVDA', ibkrSymbol: 'NVDA', lists: ['Watchlist', 'Semiconductor'] },
+      { symbol: 'UCG.MI', ibkrSymbol: 'UCG', name: 'UniCredit', lists: ['Finance'] },
+      { symbol: 'GONE', ibkrSymbol: 'GONE', lists: ['X'] },
+    ], '2026-11-29T20:00:00Z')
+    expect(r.added).toEqual(['UCG.MI'])
+    expect(r.updated).toEqual(['NVDA', 'GONE'])
+    expect(r.gone).toEqual(['OLD'])
+    expect(r.writes).toEqual({
+      'NVDA/lists': ['Semiconductor', 'Watchlist'],
+      UCG_MI: { symbol: 'UCG.MI', name: 'UniCredit', source: 'ibkr', ibkrSymbol: 'UCG', lists: ['Finance'], addedAt: '2026-11-29T20:00:00Z' },
+      'GONE/lists': ['X'],
+      'GONE/goneFromIbkr': null,
+      'OLD/goneFromIbkr': true,
+    })
+    // Soglie, note e titoli aggiunti a mano: nessuna scrittura.
+    expect(Object.keys(r.writes).some(k => k.startsWith('MIO') || k.endsWith('/above') || k.endsWith('/note'))).toBe(false)
+  })
+
+  it('niente da fare se è tutto uguale', () => {
+    expect(mergeIbkrWatchlists([{ id: 'A', symbol: 'A', source: 'ibkr', lists: ['L'] }], [{ symbol: 'A', ibkrSymbol: 'A', lists: ['L'] }], 'x').writes).toEqual({})
+  })
+
+  it('conteggio per lista', () => {
+    expect(listCounts(existing)).toEqual([{ name: 'Semiconductor', count: 1 }, { name: 'Spazio', count: 1 }, { name: 'X', count: 1 }])
   })
 })

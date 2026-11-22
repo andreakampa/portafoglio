@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUser } from '../auth/context'
 import { useWatchlist } from '../data/useWatchlist'
-import { parseWatchlistCsv, type WatchItem } from '../domain/watchlist'
+import { listCounts, parseWatchlistCsv, type WatchItem } from '../domain/watchlist'
 import { pct } from '../lib/format'
 import { loadQuotes, type Quote } from '../lib/prices'
 import { disablePush, enablePush, pushState, type PushState } from '../lib/push'
@@ -22,6 +22,35 @@ export function Watchlist() {
   const [editing, setEditing] = useState<string | null>(null)
   const file = useRef<HTMLInputElement>(null)
   const symbols = (w.items ?? []).map(i => i.symbol).join(',')
+  const [filter, setFilter] = useState(() => {
+    try {
+      return localStorage.getItem('ptpro_watch_filter') ?? 'tutte'
+    } catch {
+      return 'tutte'
+    }
+  })
+  const all = w.items ?? []
+  const hasThreshold = (i: WatchItem) => i.above != null || i.below != null
+  const filters = [
+    { key: 'tutte', label: 'Tutte', count: all.length },
+    { key: 'soglie', label: 'Con soglia', count: all.filter(hasThreshold).length },
+    { key: 'mie', label: 'Aggiunte da me', count: all.filter(i => i.source !== 'ibkr').length },
+    ...listCounts(all).map(l => ({ key: `lista:${l.name}`, label: l.name, count: l.count })),
+  ].filter(f => f.key === 'tutte' || f.count > 0)
+  const active = filters.some(f => f.key === filter) ? filter : 'tutte'
+  const shown = all.filter(i =>
+    active === 'tutte' ? true
+    : active === 'soglie' ? hasThreshold(i)
+    : active === 'mie' ? i.source !== 'ibkr'
+    : (i.lists ?? []).includes(active.slice(6)),
+  )
+  useEffect(() => {
+    try {
+      localStorage.setItem('ptpro_watch_filter', filter)
+    } catch {
+      /* non disponibile */
+    }
+  }, [filter])
 
   useEffect(() => {
     if (!symbols) return
@@ -78,13 +107,23 @@ export function Watchlist() {
         {msg && <p className={msg.ok ? 'small' : 'neg small'} role="status">{msg.text}</p>}
       </form>
 
+      {w.items !== null && w.items.length > 0 && (
+        <div className="pills watch-filter" role="tablist" aria-label="Filtra la watchlist">
+          {filters.map(f => (
+            <button key={f.key} type="button" role="tab" aria-selected={filter === f.key} className={`pill small-pill ${filter === f.key ? 'active' : ''}`} onClick={() => setFilter(f.key)}>
+              {f.label} <span className="pill-sub">{f.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {w.items === null ? (
         <div className="card skeleton" style={{ height: 160 }} />
       ) : w.items.length === 0 ? (
         <div className="card muted">La watchlist è vuota.</div>
       ) : (
         <ul className="mov-list watch-list">
-          {w.items.map(it => (
+          {shown.map(it => (
             <WatchRow key={it.id} it={it} q={quotes[it.symbol]} editing={editing === it.id} onEdit={() => setEditing(editing === it.id ? null : it.id)} save={w.save} remove={w.remove} />
           ))}
         </ul>
@@ -114,6 +153,7 @@ function WatchRow({ it, q, editing, onEdit, save, remove }: {
         <b>{it.symbol}</b>
         {it.name && <span className="muted small">{it.name}</span>}
         {(hitAbove || hitBelow) && <span className="badge status-pill status-critical">▲ soglia raggiunta</span>}
+        {it.goneFromIbkr && <span className="badge" title="Era in una watchlist IBKR ma non c'è più: toglilo se non ti serve">non più su IBKR</span>}
       </div>
       <div className="mov-body">
         <span>{q ? price(q.price, q.currency) : 'prezzo non disponibile'}</span>
@@ -123,7 +163,7 @@ function WatchRow({ it, q, editing, onEdit, save, remove }: {
         {it.above != null && <>sopra {price(it.above)}{hitAbove ? ' ✓' : ''} · </>}
         {it.below != null && <>sotto {price(it.below)}{hitBelow ? ' ✓' : ''} · </>}
         {it.above == null && it.below == null && 'nessuna soglia · '}
-        {it.note}
+        {it.lists?.length ? `${it.lists.join(', ')} · ` : ''}{it.note}
       </div>
       <span className="note-actions">
         <button type="button" className="linklike" onClick={onEdit}>{editing ? 'Chiudi' : 'Soglie e nota'}</button>
