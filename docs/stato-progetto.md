@@ -122,7 +122,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    Date dei trasferimenti da Mediolanum allineate al rendiconto IBKR il 22/11/2026: AHLA e RACE al **26/05/2026** (uscita ed entrata), gli altri 6 erano già giusti al 28/05 (backup `.backup/database-20261122-191834.json`).
    Dopo qualche giorno di uso si può dismettere il sito vecchio per l'inserimento.
 4. **Simulatore:** "Registra come movimenti" **fatto** (22/11/2026): data scelta, prezzo simulato segnato "da confermare", `source: 'simulatore'`;
-   su IBKR la sincronizzazione lo collega all'ordine vero (stesso giorno, tipo e quantità, prezzo entro l'1%). Restano: bollo/IVAFE nella stima, simulazione di dividendi.
+   su IBKR la sincronizzazione lo collega all'ordine vero (stesso giorno, tipo e quantità, prezzo entro l'1%). **Bollo/IVAFE e dividendi nella stima: fatto** (`simulateExtras`): 2‰ annuo sulla variazione del valore dei titoli long (e quota dei giorni che restano dell'anno), dividendi degli ultimi 12 mesi × nuova quantità, netti come nel resto dell'app. Simulatore completo.
    **Cambi dei giorni recenti:** per i movimenti degli ultimi 7 giorni senza cambio Banca d'Italia (pubblicato nel pomeriggio) si usa quello di oggi finché arriva l'ufficiale (`withRecentFallback`).
 5. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100, S&P 500, VIX, VXN) con lancetta del VIX vicino a 25.
 6. **Watchlist** da IBKR (CSV) e avvisi di prezzo illimitati (cron del Worker + notifiche push). Eventuale notifica push per l'avviso di leva.

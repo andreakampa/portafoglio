@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { symbolOf } from '../domain/engine/valuation'
-import { opsToTxs, simulate, type SimOp } from '../domain/simulation'
+import { opsToTxs, simulate, simulateExtras, trailingDividend, type SimOp } from '../domain/simulation'
+import { loadDividends } from '../lib/dividends'
 import { EDITABLE_LABEL, type EditableType } from '../domain/txEdit'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
 
@@ -24,11 +25,25 @@ export function Simulator() {
   const [saveDate, setSaveDate] = useState(TODAY)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
+  /** Dividendo per azione degli ultimi 12 mesi, per simbolo (Yahoo). */
+  const [dps, setDps] = useState<Record<string, number>>({})
 
   const sim = useMemo(
     () => (c.status === 'ready' && ops.length ? simulate({ portfolio: c.portfolio, fx: c.fx, latestFx: c.latestFx, ops, today: TODAY }) : null),
     [c, ops],
   )
+
+  const simSymbols = sim ? sim.assets.map(a => a.symbol).filter(x => !(x in dps)).join(',') : ''
+  useEffect(() => {
+    if (!simSymbols) return
+    let alive = true
+    loadDividends(simSymbols.split(','))
+      .then(byTicker => alive && setDps(d => ({ ...d, ...Object.fromEntries(simSymbols.split(',').map(x => [x, trailingDividend(byTicker[x] ?? [], TODAY)])) })))
+      .catch(() => alive && setDps(d => ({ ...d, ...Object.fromEntries(simSymbols.split(',').map(x => [x, 0])) })))
+    return () => {
+      alive = false
+    }
+  }, [simSymbols])
 
   if (c.status === 'loading') return <section className="page"><h1>Simulatore</h1><div className="card skeleton" style={{ height: 240 }} /></section>
   if (c.status === 'error') return <section className="page"><h1>Simulatore</h1><div className="card error">{c.message}</div></section>
@@ -77,6 +92,21 @@ export function Simulator() {
       setSaving(false)
     }
   }
+
+  const extras = sim
+    ? simulateExtras({
+        sim,
+        regime: c.result.regime,
+        prices: Object.fromEntries(sim.assets.map(a => {
+          const r = c.rows.find(x => x.assetId === a.assetId)
+          const lastOp = [...ops].reverse().find(o => o.assetId === a.assetId)
+          return [a.assetId, r?.price ?? lastOp?.price ?? null]
+        })),
+        latestFx: c.latestFx,
+        dividendPerShare: Object.fromEntries(sim.assets.map(a => [a.assetId, dps[a.symbol]])),
+        today: TODAY,
+      })
+    : null
 
   const label = (txId?: string) => {
     const op = ops.find(o => `sim#${o.id}` === txId)
@@ -192,8 +222,26 @@ export function Simulator() {
                 </li>
               ))}
             </ul>
-            <p className="muted small">Stima con le regole del portafoglio scelto, ai cambi più recenti. Imposta di bollo, IVAFE e dividendi non sono inclusi.</p>
+            <p className="muted small">Stima con le regole del portafoglio scelto, ai cambi più recenti.</p>
           </div>
+
+          {extras && (
+            <div className="card">
+              <h2>Altri effetti</h2>
+              <ul className="plain-list">
+                <li>
+                  <span>{extras.wealthKind === 'ivafe' ? 'IVAFE' : 'Imposta di bollo'} (2‰ sul valore dei titoli)<br /><small className="muted">quest'anno, per i giorni che restano: {eur(extras.wealthThisYearDeltaEur, true)}</small></span>
+                  <b className={tone(-extras.wealthYearDeltaEur)}>{eur(extras.wealthYearDeltaEur, true)} l'anno</b>
+                </li>
+                <li>
+                  <span>Dividendi attesi (ultimi 12 mesi)<br /><small className="muted">lordi {eur(extras.dividendsGrossDeltaEur, true)}; netti di ritenuta estera e 26%</small></span>
+                  <b className={tone(extras.dividendsNetDeltaEur)}>{eur(extras.dividendsNetDeltaEur, true)} l'anno</b>
+                </li>
+              </ul>
+              {extras.missing.length > 0 && <p className="muted small">Senza prezzo o cambio di oggi, esclusi: {extras.missing.join(', ')}.</p>}
+              <p className="muted small">Stime: bollo/IVAFE sul valore di oggi (quello vero è al 31/12), dividendi uguali a quelli degli ultimi 12 mesi.</p>
+            </div>
+          )}
 
           <div className="card note-form">
             <h2>Hai eseguito queste operazioni?</h2>
