@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildMovements, cashflowsIn, marginInterest, periodRange } from './movements.ts'
+import { buildMovements, cashflowsIn, cashTotalsEur, marginInterest, periodRange } from './movements.ts'
 import { computePortfolio, type RawPortfolio } from './portfolio.ts'
 
 const p: RawPortfolio = {
@@ -71,5 +71,25 @@ describe('cashflowsIn', () => {
   })
   it('senza movimenti di cassa torna vuoto', () => {
     expect(cashflowsIn({}, '0000-01-01', '9999-01-01')).toEqual({ items: [], totals: [] })
+  })
+})
+
+describe('cashTotalsEur', () => {
+  it('somma in euro per tipo: cambio salvato, poi cambio di oggi; senza cambio resta fuori', () => {
+    const { items } = cashflowsIn({ cashflows: [
+      { date: '2026-06-11', kind: 'dividend', currency: 'USD', amount: 12, exchangeRate: 1.2 },
+      { date: '2026-06-11', kind: 'withholding', currency: 'USD', amount: -1.8, exchangeRate: 1.2 },
+      { date: '2026-07-01', kind: 'dividend', currency: 'EUR', amount: 5 },
+      { date: '2026-07-02', kind: 'lending', currency: 'CAD', amount: 3 },
+      { date: '2026-07-03', kind: 'fee', currency: 'GBP', amount: -1 },
+    ] }, '2026-01-01', '2027-01-01')
+    const s = cashTotalsEur(items, { CAD: 1.5 })
+    expect(s.byKind).toEqual([
+      { kind: 'dividend', eur: 15 },
+      { kind: 'lending', eur: 2 },
+      { kind: 'withholding', eur: -1.5 },
+    ])
+    expect(s.netEur).toBeCloseTo(15.5)
+    expect(s.missing).toBe(1)
   })
 })

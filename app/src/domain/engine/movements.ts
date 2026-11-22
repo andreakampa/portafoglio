@@ -135,6 +135,8 @@ export interface CashflowItem {
   currency: string
   amount: number
   description: string
+  /** Cambio del giorno salvato dalla sincronizzazione (unità di valuta per 1 EUR). */
+  exchangeRate?: number
 }
 
 export interface CashTotal {
@@ -159,6 +161,7 @@ export function cashflowsIn(
       currency: (r.currency || 'EUR').toUpperCase(),
       amount: num(r.amount),
       description: r.description ?? '',
+      ...(num(r.exchangeRate) > 0 ? { exchangeRate: num(r.exchangeRate) } : {}),
     }))
     .sort((a, b) => b.date.localeCompare(a.date))
   const sums = new Map<string, CashTotal>()
@@ -169,4 +172,32 @@ export function cashflowsIn(
     sums.set(k, t)
   }
   return { items, totals: [...sums.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.currency.localeCompare(b.currency)) }
+}
+
+export interface CashEurSummary {
+  /** Totale in euro per tipo (dividendi, ritenute, interessi…). */
+  byKind: { kind: CashKind; eur: number }[]
+  /** Saldo netto in euro di tutti i movimenti di cassa del periodo. */
+  netEur: number
+  /** Movimenti senza cambio (né salvato né di oggi): esclusi dai totali. */
+  missing: number
+}
+
+/**
+ * Totali in euro dei movimenti di cassa: al cambio del giorno salvato dalla sincronizzazione IBKR,
+ * altrimenti a quello di oggi (`latestFx`, unità di valuta per 1 EUR).
+ */
+export function cashTotalsEur(items: CashflowItem[], latestFx: Record<string, number>): CashEurSummary {
+  const sums = new Map<CashKind, number>()
+  let missing = 0
+  for (const it of items) {
+    const rate = it.currency === 'EUR' ? 1 : it.exchangeRate && it.exchangeRate > 0 ? it.exchangeRate : latestFx[it.currency]
+    if (!rate || rate <= 0) {
+      missing++
+      continue
+    }
+    sums.set(it.kind, (sums.get(it.kind) ?? 0) + it.amount / rate)
+  }
+  const byKind = [...sums].map(([kind, eur]) => ({ kind, eur })).sort((a, b) => a.kind.localeCompare(b.kind))
+  return { byKind, netEur: byKind.reduce((s, k) => s + k.eur, 0), missing }
 }

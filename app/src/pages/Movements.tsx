@@ -7,7 +7,7 @@ import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioState } from '../data/usePortfolioState'
 import { findTransfer, type PortfolioLike } from '../domain/txEdit'
 import { marginOnDate, type MarginOnDate, type MarginPortfolio } from '../domain/engine/margin'
-import { buildMovements, CASH_LABEL, cashflowsIn, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
+import { buildMovements, CASH_LABEL, cashflowsIn, cashTotalsEur, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
 
 const TODAY = new Date().toISOString().slice(0, 10)
@@ -83,6 +83,7 @@ export function Movements() {
   const interest = marginInterest(c.portfolio).filter(r => `${r.period}-01` >= from.slice(0, 8) + '01' && `${r.period}-01` < to)
 
   const cash = cashflowsIn(c.portfolio as { cashflows?: [] }, from, to)
+  const cashEur = cashTotalsEur(cash.items, c.latestFx)
 
   const periods: { key: Period; label: string }[] = [
     { key: '1m', label: '1 mese' },
@@ -180,6 +181,10 @@ export function Movements() {
             <p className="muted">Nessun movimento di cassa nel periodo. Arrivano dalla sincronizzazione IBKR.</p>
           ) : (
             <>
+              <div className="kpis">
+                {cashEur.byKind.map(k => <Kpi key={k.kind} label={CASH_LABEL[k.kind] ?? k.kind} value={eur(k.eur, true)} className={tone(k.eur)} />)}
+                <Kpi label="Saldo netto" value={eur(cashEur.netEur, true)} className={tone(cashEur.netEur)} hint={cashEur.missing ? `${cashEur.missing} senza cambio, esclusi` : 'in euro, al cambio del giorno'} />
+              </div>
               <ul className="plain-list">
                 {cash.totals.map(t => (
                   <li key={t.kind + t.currency}>
@@ -198,7 +203,7 @@ export function Movements() {
               </ul>
             </>
           )}
-          <p className="muted small">Importi nella valuta originale. L'uso nel calcolo fiscale dei dividendi non è ancora attivo.</p>
+          <p className="muted small">Elenco nella valuta originale; i totali in euro usano il cambio del giorno salvato da IBKR (o quello di oggi se manca). Per il fisco vedi Fiscale → Prospetto per la dichiarazione.</p>
         </div>
       ) : (
         <div className="card">

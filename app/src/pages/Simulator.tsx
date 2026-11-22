@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
+import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { symbolOf } from '../domain/engine/valuation'
-import { simulate, type SimOp } from '../domain/simulation'
+import { opsToTxs, simulate, type SimOp } from '../domain/simulation'
 import { EDITABLE_LABEL, type EditableType } from '../domain/txEdit'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
 
@@ -18,6 +20,10 @@ export function Simulator() {
   const [price, setPrice] = useState('')
   const [commission, setCommission] = useState('')
   const [error, setError] = useState('')
+  const edit = usePortfolioEdit()
+  const [saveDate, setSaveDate] = useState(TODAY)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState<string | null>(null)
 
   const sim = useMemo(
     () => (c.status === 'ready' && ops.length ? simulate({ portfolio: c.portfolio, fx: c.fx, latestFx: c.latestFx, ops, today: TODAY }) : null),
@@ -51,6 +57,27 @@ export function Simulator() {
     setQty('')
   }
 
+  /** Salva le operazioni del carrello come movimenti veri e svuota il carrello. */
+  async function register() {
+    if (!sim || sim.issues.length) return
+    const valid = ops.filter(o => sim.ops.some(r => r.op.id === o.id))
+    if (!valid.length) return
+    const day = new Date(saveDate + 'T12:00:00').toLocaleDateString('it-IT')
+    if (!confirm(`Registrare ${valid.length} ${valid.length === 1 ? 'operazione' : 'operazioni'} come movimenti del ${day}? Il prezzo resta "da confermare" finché non inserisci quello eseguito.`)) return
+    setSaving(true)
+    setError('')
+    const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+    try {
+      for (const { assetId: aid, tx } of opsToTxs(valid, saveDate, newId)) await edit.add(c.status === 'ready' ? c.selectedId : '', aid, tx)
+      setOps([])
+      setSaved(`${valid.length} ${valid.length === 1 ? 'movimento registrato' : 'movimenti registrati'} il ${day}.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Salvataggio non riuscito: controlla la connessione e riprova.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const label = (txId?: string) => {
     const op = ops.find(o => `sim#${o.id}` === txId)
     return op ? assets.find(a => a.id === op.assetId)?.label ?? op.assetId : ''
@@ -62,7 +89,8 @@ export function Simulator() {
         <h1>Simulatore</h1>
         <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={id => { c.select(id); setOps([]); setAssetId('') }} />
         <p className="muted small">
-          Prova acquisti e vendite prima di farli: vedi il nuovo PMC, la plus o minus e le tasse stimate con le minus disponibili. Non salva nulla.
+          Prova acquisti e vendite prima di farli: vedi il nuovo PMC, la plus o minus e le tasse stimate con le minus disponibili.
+          Non salva nulla finché non tocchi "Registra come movimenti".
           {c.result.regime === 'dichiarativo' ? ' Dichiarativo: costo LIFO.' : ' Amministrato: costo medio.'}
         </p>
       </header>
@@ -107,6 +135,13 @@ export function Simulator() {
           <button type="submit" className="btn btn-primary">Aggiungi al carrello</button>
         </div>
       </form>
+
+      {saved && (
+        <div className="card" role="status">
+          {saved} <Link to="/movimenti">Vedi i movimenti</Link>{' '}
+          <button type="button" className="linklike" onClick={() => setSaved(null)}>Chiudi</button>
+        </div>
+      )}
 
       {ops.length > 0 && sim && (
         <>
@@ -158,6 +193,21 @@ export function Simulator() {
               ))}
             </ul>
             <p className="muted small">Stima con le regole del portafoglio scelto, ai cambi più recenti. Imposta di bollo, IVAFE e dividendi non sono inclusi.</p>
+          </div>
+
+          <div className="card note-form">
+            <h2>Hai eseguito queste operazioni?</h2>
+            <p className="muted small">
+              Salvale come movimenti veri, con il prezzo simulato segnato "da confermare". Sul conto IBKR la sincronizzazione le collega
+              all'ordine eseguito (stesso giorno, tipo e quantità) e corregge prezzo e commissioni.
+            </p>
+            <label>Data<input type="date" value={saveDate} max={TODAY} onChange={e => setSaveDate(e.target.value)} /></label>
+            <div className="form-actions">
+              <button type="button" className="btn btn-primary" disabled={saving || sim.issues.length > 0 || !sim.ops.length} onClick={() => void register()}>
+                {saving ? 'Salvo…' : 'Registra come movimenti'}
+              </button>
+            </div>
+            {sim.issues.length > 0 && <p className="muted small">Prima correggi le operazioni segnalate in rosso.</p>}
           </div>
         </>
       )}

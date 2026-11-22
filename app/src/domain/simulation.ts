@@ -137,3 +137,26 @@ export function simulate(input: {
     issues: after.issues.filter(i => i.txId?.startsWith(SIM)),
   }
 }
+
+/**
+ * Operazioni del carrello da salvare come movimenti veri, con la data indicata. Il prezzo è quello simulato
+ * (spesso la quotazione del momento): resta "da confermare" finché non si inserisce quello eseguito.
+ * Se il conto è IBKR, la sincronizzazione lo collega all'ordine vero (stessa data, tipo e quantità, prezzo entro l'1%)
+ * e corregge prezzo e commissioni.
+ */
+export function opsToTxs(ops: SimOp[], date: string, newId: () => string): { assetId: string; tx: RawTx }[] {
+  return ops.map(op => ({
+    assetId: op.assetId,
+    tx: {
+      id: newId(),
+      date,
+      type: op.type,
+      qty: op.qty,
+      price: op.price,
+      commission: op.commissionEur,
+      commissionCurrency: 'EUR',
+      source: 'simulatore',
+      priceEstimated: true,
+    },
+  }))
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RawPortfolio } from './engine/portfolio'
-import { simulate, type SimOp } from './simulation'
+import { opsToTxs, simulate, type SimOp } from './simulation'
 
 const TODAY = '2026-11-21'
 const noFx = () => undefined
@@ -87,5 +87,20 @@ describe('simulatore', () => {
       op({ id: '1', type: 'short_sell', qty: 10, price: 100 }),
     ])
     expect(s.cashEur).toBeCloseTo(1000, 8)
+  })
+})
+
+describe('registra il carrello come movimenti', () => {
+  it('un movimento per operazione, con la data scelta e il prezzo da confermare', () => {
+    let n = 0
+    const txs = opsToTxs(
+      [{ id: 'a', assetId: 'x', type: 'sell', qty: 5, price: 12.5, commissionEur: 2 }, { id: 'b', assetId: 'y', type: 'buy', qty: 1, price: 100, commissionEur: 0 }],
+      '2026-11-23',
+      () => `id${n++}`,
+    )
+    expect(txs).toEqual([
+      { assetId: 'x', tx: { id: 'id0', date: '2026-11-23', type: 'sell', qty: 5, price: 12.5, commission: 2, commissionCurrency: 'EUR', source: 'simulatore', priceEstimated: true } },
+      { assetId: 'y', tx: expect.objectContaining({ id: 'id1', type: 'buy', qty: 1 }) },
+    ])
   })
 })
