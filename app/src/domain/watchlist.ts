@@ -13,6 +13,14 @@ export interface WatchItem {
   /** Avvisi già mandati: si riarmano quando il prezzo torna dall'altra parte della soglia. */
   fired?: { above?: boolean; below?: boolean }
   addedAt?: string
+  /** 'ibkr' = arriva dalle watchlist del conto IBKR; assente = aggiunto a mano nell'app. */
+  source?: string
+  /** Liste IBKR in cui si trova (per il filtro). */
+  lists?: string[]
+  /** Simbolo com'è su IBKR (può essere diverso da quello di Yahoo). */
+  ibkrSymbol?: string
+  /** Era in una watchlist IBKR ma non c'è più: resta nell'app finché non lo togli tu. */
+  goneFromIbkr?: boolean
 }
 
 export interface AlertHit {
@@ -137,3 +145,60 @@ export function parseWatchlistCsv(text: string): { symbol: string; name?: string
 
 /** Id adatto a una chiave Firebase. */
 export const watchId = (symbol: string) => symbol.toUpperCase().replace(/[.$#[\]/\s]/g, '_')
+
+// ── Allineamento con le watchlist IBKR (solo aggiunte, mai cancellazioni) ──────
+
+export interface IbkrWatchEntry {
+  /** Simbolo Yahoo già convertito. */
+  symbol: string
+  ibkrSymbol: string
+  name?: string
+  lists: string[]
+}
+
+/**
+ * Cosa scrivere su Firebase (percorso relativo a settings/watchlist → valore) per allineare la watchlist dell'app
+ * a quella di IBKR. Regole decise con Andrea:
+ * - i titoli nuovi su IBKR si aggiungono;
+ * - quelli già presenti tengono soglie e note: si aggiornano solo le liste;
+ * - i titoli aggiunti a mano non si toccano mai (al più ricevono le liste se ci sono anche su IBKR);
+ * - un titolo arrivato da IBKR e poi tolto là NON si cancella: viene solo segnato goneFromIbkr.
+ */
+export function mergeIbkrWatchlists(existing: WatchItem[], imported: IbkrWatchEntry[], now: string): { writes: Record<string, unknown>; added: string[]; updated: string[]; gone: string[] } {
+  const writes: Record<string, unknown> = {}
+  const added: string[] = []
+  const updated: string[] = []
+  const gone: string[] = []
+  const bySymbol = new Map(existing.map(it => [it.symbol.toUpperCase(), it]))
+  const seen = new Set<string>()
+  for (const e of imported) {
+    const key = e.symbol.toUpperCase()
+    seen.add(key)
+    const lists = [...new Set(e.lists)].sort((a, b) => a.localeCompare(b))
+    const cur = bySymbol.get(key)
+    if (!cur) {
+      writes[watchId(e.symbol)] = { symbol: e.symbol, ...(e.name ? { name: e.name } : {}), source: 'ibkr', ibkrSymbol: e.ibkrSymbol, lists, addedAt: now }
+      added.push(e.symbol)
+      continue
+    }
+    const same = JSON.stringify(cur.lists ?? []) === JSON.stringify(lists) && !cur.goneFromIbkr
+    if (same) continue
+    writes[`${cur.id}/lists`] = lists
+    if (cur.goneFromIbkr) writes[`${cur.id}/goneFromIbkr`] = null
+    updated.push(cur.symbol)
+  }
+  for (const it of existing) {
+    if (it.source === 'ibkr' && !it.goneFromIbkr && !seen.has(it.symbol.toUpperCase())) {
+      writes[`${it.id}/goneFromIbkr`] = true
+      gone.push(it.symbol)
+    }
+  }
+  return { writes, added, updated, gone }
+}
+
+/** Liste presenti nella watchlist, con quanti titoli ha ciascuna (per il filtro). */
+export function listCounts(items: WatchItem[]): { name: string; count: number }[] {
+  const m = new Map<string, number>()
+  for (const it of items) for (const l of it.lists ?? []) m.set(l, (m.get(l) ?? 0) + 1)
+  return [...m].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))
+}
