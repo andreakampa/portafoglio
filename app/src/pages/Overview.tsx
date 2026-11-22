@@ -3,6 +3,7 @@ import { MarginCard } from '../components/MarginCard'
 import { HistoryCard, IndicesCard } from '../components/MarketCards'
 import { PortfolioPicker } from '../components/PortfolioPicker'
 import { WatchlistSummary } from '../components/WatchlistSummary'
+import { WelcomeCard } from '../components/PortfolioAdmin'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioState } from '../data/usePortfolioState'
 import { summarizePortfolios } from '../domain/portfolioState'
@@ -38,7 +39,7 @@ export function Overview() {
 
 function PortfolioList({ data }: { data: Parameters<typeof summarizePortfolios>[0] }) {
   const list = summarizePortfolios(data)
-  if (!list.length) return <div className="card">Nessun portafoglio ancora. Crealo dal sito attuale.</div>
+  if (!list.length) return <WelcomeCard />
 
   return (
     <div className="grid">

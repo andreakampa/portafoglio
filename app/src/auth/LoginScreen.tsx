@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { inviteFromUrl } from '../lib/invites'
 import { AuthError, useAuth } from './context'
 
 type Mode = 'login' | 'register' | 'claim'
@@ -7,11 +8,13 @@ const message = (e: unknown) => (e instanceof AuthError ? e.message : 'Qualcosa 
 
 export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
   const { signIn, register, claimInvite, signOut } = useAuth()
-  const [mode, setMode] = useState<Mode>(initial)
+  // Link d'invito (…/v2/?invito=CODICE): si apre direttamente la registrazione con il codice già scritto.
+  const linked = inviteFromUrl(window.location.search)
+  const [mode, setMode] = useState<Mode>(initial === 'login' && linked ? 'register' : initial)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
-  const [invite, setInvite] = useState('')
+  const [invite, setInvite] = useState(linked ?? '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -32,6 +35,8 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
       if (mode === 'login') await signIn(email, password)
       else if (mode === 'register') await register(email, password, invite)
       else await claimInvite(invite)
+      // Il codice non serve più nell'indirizzo (e non deve restare nella cronologia).
+      if (linked) window.history.replaceState(null, '', window.location.pathname + window.location.hash)
     } catch (err) {
       setError(message(err))
     } finally {

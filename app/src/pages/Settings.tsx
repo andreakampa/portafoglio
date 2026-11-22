@@ -1,4 +1,5 @@
 import { useAuth, useUser } from '../auth/context'
+import { InvitesCard, PortfoliosCard } from '../components/PortfolioAdmin'
 
 export function Settings() {
   const { signOut } = useAuth()
@@ -19,10 +20,12 @@ export function Settings() {
           Esci
         </button>
       </div>
+      <PortfoliosCard />
+      {isAdmin && <InvitesCard />}
       <div className="card">
         <h2>Versione</h2>
         <p className="muted">
-          Nuova app {__APP_VERSION__}. La gestione inviti e le altre impostazioni sono ancora nel sito attuale.
+          Nuova app {__APP_VERSION__}.
         </p>
         <a className="btn btn-ghost" href="/portafoglio/#settings">
           Impostazioni del sito attuale

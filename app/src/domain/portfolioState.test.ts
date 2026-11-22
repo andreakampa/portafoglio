@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { summarizePortfolios } from './portfolioState'
+import { newPortfolio, newPortfolioId, summarizePortfolios } from './portfolioState'
 
 describe('summarizePortfolios', () => {
   it('restituisce un elenco vuoto senza dati', () => {
@@ -41,5 +41,13 @@ describe('summarizePortfolios', () => {
     expect(list).toHaveLength(2)
     expect(list.every(p => p.name === 'Portafoglio senza nome' && p.taxRegime === 'amministrato')).toBe(true)
     expect(list.find(p => p.id === 'y')?.assets).toBe(1)
+  })
+})
+
+describe('nuovo portafoglio', () => {
+  it('formato del sito attuale, nome di riserva', () => {
+    expect(newPortfolio('  Fineco ', 'amministrato', 'P1')).toEqual({ id: 'P1', name: 'Fineco', taxRegime: 'amministrato', assets: {}, fiscal: { manualLosses: [] } })
+    expect(newPortfolio('', 'dichiarativo', 'P2').name).toBe('Portafoglio')
+    expect(newPortfolioId(1700000000000)).toBe('P1700000000000')
   })
 })

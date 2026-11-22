@@ -25,3 +25,15 @@ export function newInviteCode(random: (n: number) => Uint8Array = n => crypto.ge
   }
   return `${chars.slice(0, 4).join('')}-${chars.slice(4, 8).join('')}-${chars.slice(8).join('')}`
 }
+
+/** Indirizzo da mandare a chi è invitato: apre la registrazione con il codice già scritto. */
+export function inviteLink(code: string, base = 'https://andreakampa.github.io/portafoglio/v2/'): string {
+  return `${base}?invito=${encodeURIComponent(code)}`
+}
+
+/** Codice invito dall'indirizzo (?invito=…), se valido. */
+export function inviteFromUrl(search: string): string | null {
+  const raw = new URLSearchParams(search).get('invito')
+  const code = raw ? normalizeInvite(raw) : ''
+  return isValidInvite(code) ? code : null
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INVITE_RE, isValidInvite, newInviteCode, normalizeInvite } from './invites'
+import { INVITE_RE, inviteFromUrl, inviteLink, isValidInvite, newInviteCode, normalizeInvite } from './invites'
 
 describe('codici invito', () => {
   it('accetta minuscole e spazi copiati per sbaglio', () => {
@@ -32,5 +32,16 @@ describe('codici invito', () => {
   it('non genera due volte lo stesso codice in 1000 tentativi', () => {
     const seen = new Set(Array.from({ length: 1000 }, () => newInviteCode()))
     expect(seen.size).toBe(1000)
+  })
+})
+
+describe('link di invito', () => {
+  it('il link apre la registrazione con il codice', () => {
+    const link = inviteLink('K7PM-Q2XD-9RWA')
+    expect(link).toBe('https://andreakampa.github.io/portafoglio/v2/?invito=K7PM-Q2XD-9RWA')
+    expect(inviteFromUrl(new URL(link).search)).toBe('K7PM-Q2XD-9RWA')
+    expect(inviteFromUrl('?invito=k7pm-q2xd-9rwa')).toBe('K7PM-Q2XD-9RWA')
+    expect(inviteFromUrl('?invito=<script>')).toBeNull()
+    expect(inviteFromUrl('')).toBeNull()
   })
 })
