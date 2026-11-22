@@ -1,4 +1,5 @@
 import { useAuth, useUser } from '../auth/context'
+import { Link } from 'react-router'
 import { InvitesCard, PortfoliosCard } from '../components/PortfolioAdmin'
 
 export function Settings() {
@@ -19,6 +20,14 @@ export function Settings() {
         <button className="btn btn-danger" type="button" onClick={() => void signOut()}>
           Esci
         </button>
+      </div>
+      <div className="card">
+        <h2>Strumenti</h2>
+        <div className="form-actions">
+          <Link className="btn btn-ghost" to="/watchlist">Watchlist e avvisi</Link>
+          <Link className="btn btn-ghost" to="/assistente">Assistente AI</Link>
+          <Link className="btn btn-ghost" to="/fiscale/dichiarazione">Dichiarazione dei redditi</Link>
+        </div>
       </div>
       <PortfoliosCard />
       {isAdmin && <InvitesCard />}

@@ -2,7 +2,7 @@ import { NavLink, Outlet } from 'react-router'
 import { BonusRunner } from '../components/BonusRunner'
 import { PacRunner } from '../components/PacRunner'
 import { usingEmulator } from '../lib/firebase'
-import { IconHome, IconMovements, IconNotes, IconPositions, IconSettings, IconSimulator, IconTax, IconWatch } from './icons'
+import { IconHome, IconMovements, IconNotes, IconPositions, IconSettings, IconSimulator, IconTax, IconWatch, IconChat } from './icons'
 
 const NAV = [
   { to: '/', label: 'Panoramica', icon: IconHome, end: true },
@@ -13,6 +13,7 @@ const NAV = [
   { to: '/note', label: 'Note', icon: IconNotes },
   // Sul telefono la barra in basso ha già 7 voci: la watchlist si apre dalla Panoramica.
   { to: '/watchlist', label: 'Watchlist', icon: IconWatch, desktopOnly: true },
+  { to: '/assistente', label: 'Assistente', icon: IconChat, desktopOnly: true },
   { to: '/impostazioni', label: 'Impostazioni', icon: IconSettings },
 ] as const
 

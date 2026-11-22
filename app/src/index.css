@@ -323,3 +323,12 @@ textarea {
 .regime-choice legend { font-weight: 600; margin-bottom: 4px; }
 .regime-choice .check { align-items: flex-start; }
 .onboarding-steps { padding-left: 20px; display: grid; gap: 6px; }
+
+/* Assistente */
+.chat { display: grid; gap: 10px; }
+.chat-msg { padding: 10px 12px; border-radius: 12px; white-space: pre-wrap; line-height: 1.45; max-width: 92%; }
+.chat-user { justify-self: end; background: var(--primary); color: var(--primary-text); }
+.chat-model { justify-self: start; background: var(--surface-2); }
+.chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.chat-suggestions .pill { white-space: normal; text-align: left; }
+.chat-input textarea { width: 100%; resize: vertical; font: inherit; }
