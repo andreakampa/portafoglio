@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { MovementForm, TransferEditCard, TransferFormCard } from '../components/MovementForms'
 import { PacPlansCard } from '../components/PacPlansCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
@@ -26,7 +27,20 @@ export function Movements() {
   const [period, setPeriod] = useState<Period>('ytd')
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
-  const [form, setForm] = useState<'new' | 'transfer' | Movement | null>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [form, setForm] = useState<'new' | 'transfer' | Movement | null>(() => ((location.state as { nuovo?: boolean } | null)?.nuovo ? 'new' : null))
+  // Toccando di nuovo il "+" mentre si è già qui, si riapre il modulo (ogni tocco è una navigazione nuova).
+  const wantsNew = !!(location.state as { nuovo?: boolean } | null)?.nuovo
+  const [seenKey, setSeenKey] = useState(location.key)
+  if (wantsNew && location.key !== seenKey) {
+    setSeenKey(location.key)
+    setForm('new')
+  }
+  // Poi si toglie il segnale dalla cronologia, così tornando indietro il modulo non si riapre.
+  useEffect(() => {
+    if (wantsNew) navigate(location.pathname, { replace: true, state: null })
+  }, [wantsNew, location.pathname, navigate])
   const edit = usePortfolioEdit()
   const state = usePortfolioState()
   const [delError, setDelError] = useState('')

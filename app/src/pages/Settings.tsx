@@ -1,5 +1,7 @@
 import { useAuth, useUser } from '../auth/context'
+import { useState } from 'react'
 import { Link } from 'react-router'
+import { readTheme, saveTheme, type ThemePref } from '../lib/theme'
 import { InvitesCard, PortfoliosCard } from '../components/PortfolioAdmin'
 
 export function Settings() {
@@ -21,6 +23,7 @@ export function Settings() {
           Esci
         </button>
       </div>
+      <ThemeCard />
       <div className="card">
         <h2>Strumenti</h2>
         <div className="form-actions">
@@ -41,5 +44,29 @@ export function Settings() {
         </a>
       </div>
     </section>
+  )
+}
+
+const THEMES: { key: ThemePref; label: string; hint: string }[] = [
+  { key: 'auto', label: 'Automatico', hint: 'chiaro di giorno, scuro quando lo è il telefono o il PC' },
+  { key: 'light', label: 'Chiaro', hint: 'carta e inchiostro' },
+  { key: 'dark', label: 'Scuro', hint: 'ardesia e verde acqua' },
+]
+
+/** Tema: vale per questo dispositivo. */
+function ThemeCard() {
+  const [pref, setPref] = useState<ThemePref>(readTheme)
+  return (
+    <div className="card">
+      <h2>Tema</h2>
+      <div className="pills" role="radiogroup" aria-label="Tema">
+        {THEMES.map(t => (
+          <button key={t.key} type="button" role="radio" aria-checked={pref === t.key} className={`pill ${pref === t.key ? 'active' : ''}`} onClick={() => { saveTheme(t.key); setPref(t.key) }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small">{THEMES.find(t => t.key === pref)!.hint}. La scelta vale per questo dispositivo.</p>
+    </div>
   )
 }
