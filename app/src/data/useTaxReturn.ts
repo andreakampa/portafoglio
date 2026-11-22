@@ -14,6 +14,8 @@ import { loadMonthlyFx } from '../lib/fxMonthly.ts'
 import { loadCloses } from '../lib/priceHistory.ts'
 import { THIS_YEAR } from '../lib/format.ts'
 import { loadLatestFx, loadQuotes } from '../lib/prices.ts'
+import { unvestedTxs, type BonusGrant } from '../domain/bonusShares.ts'
+import { useBonusGrants } from './useBonusGrants.ts'
 import { useStoredStatement, type StoredStatement } from './taxStatements.ts'
 import { usePortfolioState } from './usePortfolioState.ts'
 
@@ -54,6 +56,8 @@ export type TaxReturnState =
       portfolio: RawPortfolio
       /** Rendiconto IBKR importato per l'anno (undefined = in caricamento). */
       statement: StoredStatement | null | undefined
+      /** Azioni premio del broker per questo portafoglio. */
+      grants: BonusGrant[]
       data: TaxReturnData | null
     }
 
@@ -103,16 +107,19 @@ export function useTaxReturn(pickedId: string | null, year: number | null, mode:
   const y = year && years.includes(year) ? year : years[0]!
 
   const statement = useStoredStatement(selectedId, y)
+  const { grants: allGrants } = useBonusGrants()
+  const grants = useMemo(() => (selectedId && allGrants?.[selectedId]) || [], [allGrants, selectedId])
+  const grantsKey = grants.map(g => g.id).join(',')
   // Prezzi di chiusura al 31/12 dal rendiconto IBKR: hanno la precedenza su quelli di Yahoo (le istruzioni RW
   // chiedono prima di tutto il valore del rendiconto dell'intermediario).
   const statementCloses = statement && statement.to === `${y}-12-31` ? statement.closes : null
   const closesKey = statementCloses ? JSON.stringify(statementCloses) : ''
 
   const [data, setData] = useState<{ key: string; value: TaxReturnData } | { key: string; error: string } | null>(null)
-  const key = `${selectedId}|${y}|${mode}|${closesKey}`
+  const key = `${selectedId}|${y}|${mode}|${closesKey}|${grantsKey}`
 
   useEffect(() => {
-    if (!portfolio || !selectedId || statement === undefined) return
+    if (!portfolio || !selectedId || statement === undefined || allGrants === null) return
     let alive = true
     ;(async () => {
       // 1. Cambi giornalieri della Banca d'Italia per tutti i movimenti in valuta e i movimenti di cassa.
@@ -149,6 +156,15 @@ export function useTaxReturn(pickedId: string | null, year: number | null, mode:
       // 3. Quadro RW: prezzi di chiusura a cavallo d'anno e cambi medi mensili.
       const provisional = y >= thisYear && !statementCloses
       const assets = Object.entries(portfolio.assets ?? {}) as [string, RawAsset & { isin?: string }][]
+      // Azioni premio non ancora maturate: stanno nel conto, quindi entrano nel quadro RW (non ancora nei redditi).
+      const recordedBonus = assets.flatMap(([, a]) => (a.transactions ?? []).filter(t => t.bonusKey))
+      for (const symbol of new Set(grants.map(g => g.symbol))) {
+        const list = grants.filter(g => g.symbol === symbol)
+        assets.push([`nonmaturate_${symbol}`, {
+          ticker: symbol, nome: `${symbol} (premio)`, valuta: list[0]!.currency, ...(list[0]!.isin ? { isin: list[0]!.isin } : {}),
+          transactions: unvestedTxs(list, recordedBonus),
+        }])
+      }
       const needs = assets
         .map(([id, a]) => ({ id, a, symbol: symbolOf(a, id), pieces: holdingPieces(a.transactions ?? [], y, {}) }))
         .filter(x => x.pieces.length)
@@ -188,11 +204,11 @@ export function useTaxReturn(pickedId: string | null, year: number | null, mode:
     return () => {
       alive = false
     }
-  }, [key, portfolio, portfolios, selectedId, y, mode, thisYear, statement, statementCloses])
+  }, [key, portfolio, portfolios, selectedId, y, mode, thisYear, statement, statementCloses, grants, allGrants])
 
   if (state.status === 'loading') return { status: 'loading' }
   if (state.status === 'error') return { status: 'error', message: state.message }
   if (!selectedId || !portfolio) return { status: 'empty' }
   if (data && data.key === key && 'error' in data) return { status: 'error', message: data.error }
-  return { status: 'ready', options, selectedId, years, year: y, portfolio, statement, data: data && data.key === key && 'value' in data ? data.value : null }
+  return { status: 'ready', options, selectedId, years, year: y, portfolio, statement, grants, data: data && data.key === key && 'value' in data ? data.value : null }
 }

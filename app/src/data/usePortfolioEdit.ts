@@ -52,6 +52,21 @@ export function usePortfolioEdit() {
         return r.committed && wrote
       },
 
+      /**
+       * Registra le azioni premio maturate solo se non ci sono già (stessa chiave); se il titolo non esiste lo crea.
+       * Torna true se l'ha scritta.
+       */
+      addBonus: async (pid: string, aid: string, tx: RawTx, newAsset: Asset) => {
+        let wrote = false
+        const r = await runTransaction(assetRef(pid, aid), cur => {
+          const a = (cur as Asset | null) ?? newAsset
+          if ((a.transactions ?? []).some(t => t.bonusKey && t.bonusKey === tx.bonusKey)) return undefined
+          wrote = true
+          return clean({ ...a, transactions: addToList(a.transactions, tx) })
+        })
+        return r.committed && wrote
+      },
+
       save: (pid: string, aid: string, at: TxRef, tx: RawTx) =>
         change(pid, aid, cur => {
           const list = cur ? replaceInList(cur.transactions ?? [], at, tx) : null

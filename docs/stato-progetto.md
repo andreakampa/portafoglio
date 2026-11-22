@@ -105,6 +105,11 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
      e l'esito del confronto (fuori da `portfolio_state`, così la sincronizzazione non lo cancella). Se il rendiconto arriva al 31/12, i suoi prezzi di chiusura
      valgono per il quadro RW al posto di Yahoo. Prova col rendiconto 1/1–20/11/2026: 120 operazioni e tutti i movimenti di cassa coincidono;
      unica differenza **3,6168 azioni IBKR** (premio sui versamenti) nel conto ma non nell'app: da decidere come registrarle (trattamento fiscale da verificare).
+   - **Azioni premio IBKR (fatto, 22/11/2026, PR `azioni-premio`):** l'import del rendiconto salva le assegnazioni ("Attività piano incentivazione")
+     in `users/{uid}/settings/bonusGrants/{pid}/{id}`; nel confronto le azioni non maturate non sono più una differenza. `BonusRunner` (come i PAC) registra
+     da solo, il giorno dopo ogni maturazione, l'acquisto al prezzo di chiusura (`bonusKey`, `priceEstimated`): è il costo fiscale e il reddito nel quadro RM (G, 26%).
+     Prima della maturazione le azioni entrano solo nel quadro RW. Regola in [regole-fiscali.md](regole-fiscali.md). Oggi: 9 assegnazioni, 3,6168 IBKR, prima maturazione 30/04/2027.
+     **Da controllare a maggio 2027:** se la sincronizzazione IBKR vede la maturazione come un movimento (rischio doppione o "da controllare").
    - **Da fare a inizio 2027:** confrontare i totali con il rendiconto annuale IBKR (Andrea lo invierà), verificare righi/colonne sulle istruzioni 2027 appena escono,
      decidere col commercialista i punti incerti (credito ritenute estere, cambio BdI o IBKR, giacenza media del conto). Mediolanum e Trade Republic: amministrati, servono solo le loro certificazioni.
 2. **Sincronizzazione IBKR — resta:** azioni "premio versamento" (maturano dal 2027); assegnazione/esercizio di opzioni (vanno "da controllare", si registrano a mano);

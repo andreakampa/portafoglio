@@ -54,6 +54,16 @@ Fonte: istruzioni Redditi PF 2026, Fascicolo 2 (anno d'imposta 2025). Nel 730 i 
   Titoli venduti: LIFO. Cambio: **medio mensile** del provvedimento dell'Agenzia (= medie mensili Banca d'Italia). Conto corrente: 34,20 € solo se la giacenza media supera 5.000 €;
   monitoraggio solo sopra 15.000 € di valore massimo.
 
+## Azioni premio del broker (`bonusShares.ts`)
+IBKR assegna azioni IBKR come premio per i versamenti di liquidità; maturano dopo un anno e fino ad allora può riprenderle.
+Nessuna fonte ufficiale italiana sul caso; regola applicata (decisa con Andrea il 22/11/2026, da confermare col commercialista):
+- **Momento:** il reddito nasce alla **maturazione** (vesting), al valore di chiusura di quel giorno: prima le azioni non sono davvero del cliente.
+  Anche IBKR, per il fisco USA, considera il reddito al venir meno delle restrizioni ([prospetto SEC 424B5, 2023](https://www.sec.gov/Archives/edgar/data/1381197/000138119723000056/ibkr_424b5-20230726.htm)).
+- **Categoria:** reddito di capitale estero (premio legato al deposito, "altri proventi" dell'art. 44 TUIR): quadro RM, rigo RM31, lettera G, Stato del broker, 26%.
+  Alternativa sostenuta da alcune guide: reddito diverso da obblighi di fare/non fare (art. 67, quadro RL rigo RL16, IRPEF ordinaria).
+- **Costo fiscale:** lo stesso valore al vesting (acquisto senza commissioni, `bonusKey`), da cui si calcola la plus alla vendita.
+- **Quadro RW:** dalla data di assegnazione, perché le azioni stanno nel conto (scelta prudente).
+
 ## Punti incerti, da verificare
 1. **Short:** trattati come redditi diversi al 26%, come le altre plus da titoli. Non ho trovato fonti specifiche; manca anche la gestione dei dividendi pagati sul titolo preso in prestito.
 2. **Crypto:** le minus crypto compensano plus non crypto (e viceversa)? Il motore le tiene separate (scelta prudente).
@@ -61,6 +71,7 @@ Fonte: istruzioni Redditi PF 2026, Fascicolo 2 (anno d'imposta 2025). Nel 730 i 
 4. **IVAFE sul conto corrente estero:** le istruzioni 2026 confermano l'esenzione sotto i 5.000 € di giacenza media (resta da conoscere la giacenza vera del conto IBKR).
 5. **Riforma dei redditi finanziari** (legge delega 111/2023, art. 5): potrebbe unificare redditi di capitale e diversi, permettendo di compensare le plus degli ETF. A novembre 2026 non risulta approvata.
 6. **Cambio per plus e dividendi:** Banca d'Italia del giorno (base del prospetto) o cambio effettivo IBKR: differenza piccola, va scelto uno e usato sempre.
+7. **Azioni premio del broker:** quadro RM (26%) o RL (IRPEF), e momento del reddito (vesting o assegnazione).
 
 ## Fonti consultate
 - [Art. 6 d.lgs. 461/1997](https://www.doctrine.it/norms/laws/itatextqbhgqma8x7vre9/articles/itaartzn3mqxyoticjl1), [certificazioni di minusvalenza](https://www.tassetrading.it/le-certificazioni-di-minusvalenza-art-6-comma-5-d-lgs-461-97-cosa-sono-e-come-utilizzarle/), [recupero minus in amministrato](https://www.tassetrading.it/recupero-minusvalenze-in-regime-amministrato/)

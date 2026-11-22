@@ -5,6 +5,7 @@
 
 import { num } from '../engine/fx.ts'
 import type { RawAsset, RawTx } from '../engine/types.ts'
+import { grantId, type BonusGrant } from '../bonusShares.ts'
 
 /** Una riga CSV con campi tra virgolette (es. "2026-08-28, 11:19:26" o "1,515"). */
 export function parseCsvLine(line: string): string[] {
@@ -94,6 +95,15 @@ export interface StatementTransfer {
   marketValue: number
 }
 
+/** Azioni premio assegnate dal broker (sezione "Attività piano incentivazione"). */
+export interface StatementGrant {
+  symbol: string
+  grantDate: string
+  vestDate: string
+  qty: number
+  price: number
+}
+
 export interface IbkrStatement {
   broker: string
   from: string
@@ -104,6 +114,7 @@ export interface IbkrStatement {
   interest: StatementInterest[]
   transfers: StatementTransfer[]
   positions: StatementPosition[]
+  grants: StatementGrant[]
   /** Simbolo → ISIN e descrizione (sezione "Informazioni sullo strumento finanziario"). */
   instruments: Record<string, { isin: string | null; description: string }>
   /** Saldo di cassa a fine periodo, in valuta base (dal "Valore patrimoniale netto"). */
@@ -124,7 +135,7 @@ function symbolIsin(desc: string): { symbol: string; isin: string | null } {
 /** Legge il CSV del rendiconto di attività IBKR in italiano. Errore se non lo riconosce. */
 export function parseStatement(text: string): IbkrStatement {
   const st: IbkrStatement = {
-    broker: '', from: '', to: '', trades: [], dividends: [], withholdings: [], interest: [], transfers: [], positions: [],
+    broker: '', from: '', to: '', trades: [], dividends: [], withholdings: [], interest: [], transfers: [], positions: [], grants: [],
     instruments: {}, endCash: null,
   }
   const headers = new Map<string, string[]>()
@@ -191,6 +202,13 @@ export function parseStatement(text: string): IbkrStatement {
         })
         break
       }
+      case 'Attività piano incentivazione':
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(row['Data di assegnazione'] ?? '')) break // righe "Totale"
+        st.grants.push({
+          symbol: row['Simbolo'] ?? '', grantDate: row['Data di assegnazione']!, vestDate: row['Data di maturazione (vesting)'] ?? '',
+          qty: n(row['Quantità']), price: n(row['Prezzo']),
+        })
+        break
       case 'Informazioni sullo strumento finanziario':
         if (row['Simbolo']) st.instruments[row['Simbolo']] = { isin: /^[A-Z]{2}[A-Z0-9]{10}$/.test(row['ID titolo'] ?? '') ? row['ID titolo']! : null, description: row['Descrizione'] ?? '' }
         break
@@ -203,6 +221,21 @@ export function parseStatement(text: string): IbkrStatement {
     throw new Error('Non sembra un rendiconto di attività IBKR in CSV (italiano).')
   }
   return st
+}
+
+/** Azioni premio del rendiconto con ISIN e valuta (dalle sezioni strumenti e posizioni), pronte da salvare. */
+export function grantsOf(st: IbkrStatement): BonusGrant[] {
+  const perDay = new Map<string, number>()
+  return st.grants.map(g => {
+    const k = `${g.symbol}|${g.grantDate}`
+    const i = perDay.get(k) ?? 0
+    perDay.set(k, i + 1)
+    const currency = st.positions.find(p => p.symbol === g.symbol)?.currency || st.dividends.find(d => d.symbol === g.symbol)?.currency || 'USD'
+    return {
+      id: grantId(g.symbol, g.grantDate, i), symbol: g.symbol, isin: st.instruments[g.symbol]?.isin ?? null, currency,
+      qty: g.qty, grantDate: g.grantDate, vestDate: g.vestDate, grantPrice: g.price,
+    }
+  })
 }
 
 // ---------------------------------------------------------------- Confronto con l'app
@@ -294,6 +327,8 @@ export interface StatementCheck {
   cash: CashDiff[]
   positionsChecked: number
   positions: PositionDiff[]
+  /** Azioni premio non ancora maturate a fine periodo: nel conto ma non (ancora) nell'app, ed è giusto così. */
+  unvested: { symbol: string; qty: number; nextVest: string }[]
   /** Rendiconto che arriva al 31/12: i suoi prezzi di chiusura valgono per il quadro RW. */
   yearEnd: boolean
 }
@@ -368,6 +403,14 @@ export function checkStatement(st: IbkrStatement, assets: Record<string, Asset>,
     if (t.type === 'transfer') return s + (t.sourcePortfolioId ? q : -q)
     return s + (t.type === 'buy' ? q : t.type === 'sell' ? -q : t.type === 'short_sell' ? -q : t.type === 'buy_to_cover' ? q : 0)
   }, 0)
+  const unvestedQty = new Map<string, { qty: number; nextVest: string }>()
+  for (const g of st.grants) {
+    if (g.vestDate <= st.to) continue
+    const u = unvestedQty.get(g.symbol) ?? { qty: 0, nextVest: g.vestDate }
+    u.qty += g.qty
+    if (g.vestDate < u.nextVest) u.nextVest = g.vestDate
+    unvestedQty.set(g.symbol, u)
+  }
   const seen = new Set<string>()
   const positions: PositionDiff[] = []
   for (const p of st.positions) {
@@ -375,7 +418,8 @@ export function checkStatement(st: IbkrStatement, assets: Record<string, Asset>,
     if (assetId) seen.add(assetId)
     const mult = p.assetClass === 'option' ? 100 : 1
     const appQty = assetId ? appQtyAt(assets[assetId]!) : 0
-    if (!near(p.qty * mult, appQty, 1e-4)) positions.push({ symbol: p.symbol, currency: p.currency, assetId, statementQty: p.qty * mult, appQty })
+    const stmtQty = p.qty * mult - (p.assetClass === 'stock' ? unvestedQty.get(p.symbol)?.qty ?? 0 : 0)
+    if (!near(stmtQty, appQty, 1e-4)) positions.push({ symbol: p.symbol, currency: p.currency, assetId, statementQty: stmtQty, appQty })
   }
   for (const [aid, a] of Object.entries(assets)) {
     if (seen.has(aid)) continue
@@ -385,7 +429,9 @@ export function checkStatement(st: IbkrStatement, assets: Record<string, Asset>,
 
   return {
     from: st.from, to: st.to, tradesChecked: st.trades.length, trades, cash,
-    positionsChecked: st.positions.length, positions, yearEnd: st.to.endsWith('-12-31'),
+    positionsChecked: st.positions.length, positions,
+    unvested: [...unvestedQty].map(([symbol, u]) => ({ symbol, qty: u.qty, nextVest: u.nextVest })),
+    yearEnd: st.to.endsWith('-12-31'),
   }
 }
 

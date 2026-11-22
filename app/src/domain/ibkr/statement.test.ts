@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkStatement, occSymbol, parseCsvLine, parseStatement, summarizeStatement } from './statement.ts'
+import { checkStatement, grantsOf, occSymbol, parseCsvLine, parseStatement, summarizeStatement } from './statement.ts'
 
 // Rendiconto inventato, con la stessa struttura del CSV IBKR in italiano.
 const CSV = [
@@ -29,6 +29,9 @@ const CSV = [
   'Posizioni aperte,Data,Summary,Azioni,USD,MSFT,-,15,1,400.4,6007,480,7200,1193,',
   'Posizioni aperte,Data,Summary,Opzioni su indici e su azioni,USD,BMEA 21JAN28 1.5 C,-,1,100,0.99,99.86,0.5,50,-49.86,',
   'Posizioni aperte,Data,Summary,Azioni,USD,IBKR,-,0.5,1,0,0,80,40,40,',
+  'Attività piano incentivazione,Header,Simbolo,Data report,Descrizione,Data di assegnazione,Data di maturazione (vesting),Quantità,Prezzo,Valore',
+  'Attività piano incentivazione,Data,IBKR,2026-05-01,Assegnazione azioni come premio per versamento di liquidità,2026-05-01,2027-04-30,0.5,80,40',
+  'Attività piano incentivazione,Data,Totale,,,,,0.5,,40',
   'Informazioni sullo strumento finanziario,Header,Tipo di attivo,Simbolo,Descrizione,Conid,ID titolo,Sottostante,Mercato finanziario,Moltiplicatore,Tipo,Codice',
   'Informazioni sullo strumento finanziario,Data,Azioni,MSFT,MICROSOFT CORP,272093,US5949181045,MSFT,NASDAQ,1,COMMON,',
   'Informazioni sullo strumento finanziario,Data,Azioni,RACEm,FERRARI NV,1,NL0011585146,RACE,BVME,1,COMMON,',
@@ -78,12 +81,15 @@ describe('rendiconto IBKR', () => {
     expect(c.trades).toEqual([expect.objectContaining({ symbol: 'RACEm', assetId: 'fe', statementQty: -1000, appQty: -900 })])
     // Interessi attivi EUR mancanti nell'app.
     expect(c.cash).toEqual([{ kind: 'interessi attivi', currency: 'EUR', statement: 0.2, app: 0 }])
-    // IBKR nel conto ma non nell'app; RACE: 100 nell'app, 0 nel rendiconto.
-    expect(c.positions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ symbol: 'IBKR', assetId: null, statementQty: 0.5 }),
-      expect.objectContaining({ assetId: 'fe', statementQty: 0, appQty: 100 }),
-    ]))
-    expect(c.positions).toHaveLength(2)
+    // Azioni premio IBKR non maturate: non sono una differenza. RACE: 100 nell'app, 0 nel rendiconto.
+    expect(c.positions).toEqual([expect.objectContaining({ assetId: 'fe', statementQty: 0, appQty: 100 })])
+    expect(c.unvested).toEqual([{ symbol: 'IBKR', qty: 0.5, nextVest: '2027-04-30' }])
+  })
+
+  it('azioni premio con ISIN e valuta', () => {
+    const st = parseStatement(CSV)
+    expect(st.grants).toHaveLength(1)
+    expect(grantsOf(st)).toEqual([{ id: 'IBKR_2026-05-01_0', symbol: 'IBKR', isin: null, currency: 'USD', qty: 0.5, grantDate: '2026-05-01', vestDate: '2027-04-30', grantPrice: 80 }])
   })
 
   it('riassunto da salvare: prezzi di chiusura per titolo dell’app', () => {
