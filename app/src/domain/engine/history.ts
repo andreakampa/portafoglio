@@ -97,6 +97,13 @@ export function buildHistory(input: HistoryInput): History {
           qty[ai]! += q
           flow += (q * p) / rate
           break
+        case 'exercise': {
+          // Opzione chiusa per esercizio o assegnazione: esce al valore di mercato (il sottostante entra col suo movimento).
+          const sign = qty[ai]! > 0 ? 1 : -1
+          qty[ai]! -= sign * q
+          flow -= sign * market
+          break
+        }
         case 'transfer':
           if (t.sourcePortfolioId) {
             qty[ai]! += q

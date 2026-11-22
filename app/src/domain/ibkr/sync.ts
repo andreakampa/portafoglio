@@ -99,6 +99,19 @@ export function applyFlexOrders(
     Object.entries(assets).find(([, a]) => base(a.ticker || a.nome || '') === base(o.symbol) && cur(a) === o.currency) ??
     Object.entries(assets).find(([, a]) => o.isin && a.isin === o.isin)
 
+  // Opzioni assegnate o esercitate: la chiusura dell'opzione e il movimento delle azioni (stesso giorno, stesso
+  // sottostante) si collegano con lo stesso exerciseId, così il premio passa nel costo o nel ricavo delle azioni.
+  const exerciseOf = new Map<string, string>() // externalId → exerciseId
+  const usedStock = new Set<string>()
+  for (const o of orders) {
+    if (o.assetCategory !== 'OPT' || (o.special !== 'assigned' && o.special !== 'exercised') || already.has(o.externalId)) continue
+    const stock = orders.find(s => s.assetCategory === 'STK' && s.special === o.special && s.date === o.date && !usedStock.has(s.externalId) && o.underlying && base(s.symbol) === base(o.underlying))
+    if (!stock) continue
+    usedStock.add(stock.externalId)
+    exerciseOf.set(o.externalId, 'X' + o.externalId)
+    exerciseOf.set(stock.externalId, 'X' + o.externalId)
+  }
+
   for (const o of orders) {
     if (already.has(o.externalId)) continue
     if (o.type === 'misto') {
@@ -106,8 +119,18 @@ export function applyFlexOrders(
       continue
     }
 
-    if (o.special === 'assigned' || o.special === 'exercised') {
-      res.review.push(`${label(o)}: opzione ${o.special === 'assigned' ? 'assegnata' : 'esercitata'}, tocca anche il titolo sottostante: va registrata a mano`)
+    const exerciseId = exerciseOf.get(o.externalId)
+    if (o.assetCategory === 'OPT' && (o.special === 'assigned' || o.special === 'exercised')) {
+      const opt = findAsset(o)
+      if (!exerciseId || !opt) {
+        res.review.push(`${label(o)}: opzione ${o.special === 'assigned' ? 'assegnata' : 'esercitata'} senza ${opt ? 'movimento delle azioni nel report' : 'opzione nei dati'}: va registrata a mano`)
+        continue
+      }
+      const txs = (opt[1].transactions ??= []) as Tx[]
+      txs.push({ id: newId(), externalId: o.externalId, source: 'ibkr', date: o.date, type: 'exercise', qty: o.qty, price: 0, commission: o.commission, commissionCurrency: o.commissionCurrency, exerciseId, ...(o.exchangeRate ? { exchangeRate: o.exchangeRate } : {}) })
+      txs.sort((a, b) => a.date.localeCompare(b.date))
+      res.added.push(`${label(o)} (${o.special === 'assigned' ? 'assegnazione' : 'esercizio'})`)
+      res.changed = true
       continue
     }
 
@@ -126,7 +149,7 @@ export function applyFlexOrders(
     }
     const [, asset] = hit
     const txs = (asset.transactions ??= []) as Tx[]
-    const exact = { price: o.price, commission: o.commission, commissionCurrency: o.commissionCurrency, ...(o.exchangeRate ? { exchangeRate: o.exchangeRate } : {}) }
+    const exact = { price: o.price, commission: o.commission, commissionCurrency: o.commissionCurrency, ...(o.exchangeRate ? { exchangeRate: o.exchangeRate } : {}), ...(exerciseId ? { exerciseId } : {}) }
 
     // Movimento inserito a mano che è sicuramente questo ordine: lo si collega e corregge.
     const manual = txs.filter(t => !t.externalId)

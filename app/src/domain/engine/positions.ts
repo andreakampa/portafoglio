@@ -54,6 +54,22 @@ export interface TransferHooks {
   incoming?: (tx: RawTx, currency: string) => TransferPiece[] | undefined
   /** Registra quali lotti sono usciti con un trasferimento in uscita. */
   outgoing?: (tx: RawTx, pieces: TransferPiece[]) => void
+  /** Registra il premio di un'opzione esercitata o assegnata (movimento `exercise`). */
+  exercised?: (tx: RawTx, premium: OptionPremium) => void
+  /** Premio dell'opzione collegata (stesso `exerciseId`) a un acquisto o vendita del sottostante. */
+  premium?: (tx: RawTx) => OptionPremium | undefined
+}
+
+/**
+ * Premio dei contratti chiusi per esercizio o assegnazione. long = opzione comprata (premio pagato),
+ * short = opzione venduta (premio incassato). Regola fiscale (circ. 165/E 1998): il premio entra nel costo
+ * del titolo comprato o nel corrispettivo di quello venduto, non è un risultato a sé.
+ */
+export interface OptionPremium {
+  side: 'long' | 'short'
+  currency: string
+  costNative: number
+  costEur: number
 }
 
 const byDate = (a: RawTx, b: RawTx) => a.date.localeCompare(b.date)
@@ -162,7 +178,28 @@ export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLooku
     }
     commissionsEur += a.commissionEur
 
+    // Titolo comprato o venduto per esercizio/assegnazione di un'opzione: il premio cambia costo o ricavo.
+    if (tx.exerciseId && tx.type !== 'exercise') {
+      const p = hooks.premium?.(tx)
+      if (p) {
+        const native = p.currency === currency ? p.costNative : p.costEur * a.rate
+        // Premio pagato: alza il costo di chi compra e abbassa il ricavo di chi vende; premio incassato: il contrario.
+        const buySide = tx.type === 'buy' || tx.type === 'buy_to_cover'
+        const sign = (p.side === 'long' ? 1 : -1) * (buySide ? 1 : -1)
+        a.grossNative += sign * native
+        a.grossEur += sign * p.costEur
+      }
+    }
+
     switch (tx.type) {
+      case 'exercise': {
+        // Chiude i contratti (lunghi o venduti) senza plus o minus: il loro costo passa al sottostante.
+        const side = longLots.reduce((s, l) => s + l.qty, 0) > EPS ? 'long' : 'short'
+        const c = consume(side === 'long' ? longLots : shortLots, a.qty, method, tx, issues)
+        if (tx.exerciseId) hooks.exercised?.(tx, { side, currency, costNative: c.costNative, costEur: c.costEur })
+        break
+      }
+
       case 'buy':
         longLots.push({
           id: longId(tx.date),

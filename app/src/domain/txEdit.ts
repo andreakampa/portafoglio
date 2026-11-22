@@ -255,3 +255,39 @@ export function transferWrites(
   }
   return writes
 }
+
+// ── Opzione esercitata o assegnata (inserimento a mano) ───────────────────────
+
+/** Call o put dal ticker OCC dell'app (es. BMEA280121C00001500); null se non si riconosce. */
+export function optionKind(ticker: string | undefined): 'call' | 'put' | null {
+  const m = /\d{6}([CP])\d{8}$/.exec((ticker ?? '').toUpperCase())
+  return m ? (m[1] === 'C' ? 'call' : 'put') : null
+}
+
+/** Prezzo d'esercizio dal ticker OCC (le ultime 8 cifre sono lo strike × 1000). */
+export function optionStrike(ticker: string | undefined): number | null {
+  const m = /\d{6}[CP](\d{8})$/.exec((ticker ?? '').toUpperCase())
+  return m ? Number(m[1]) / 1000 : null
+}
+
+/**
+ * Le due metà di un esercizio/assegnazione: chiusura dell'opzione (tipo exercise) e movimento del sottostante
+ * al prezzo d'esercizio, collegati dallo stesso exerciseId. `held` = contratti posseduti con segno (× 100):
+ * positivo = opzione comprata (si esercita), negativo = venduta (si viene assegnati).
+ * Call comprata o put venduta → si comprano le azioni; put comprata o call venduta → si vendono.
+ */
+export function buildExercise(
+  kind: 'call' | 'put',
+  held: number,
+  f: { date: string; qty: string; strike: string },
+  newId: () => string,
+): { option: RawTx; stock: RawTx } {
+  const exerciseId = 'X' + newId()
+  const q = num(f.qty)
+  const long = held > 0
+  const buys = (kind === 'call') === long
+  return {
+    option: { id: newId(), date: f.date, type: 'exercise', qty: q, price: 0, commission: 0, exerciseId },
+    stock: { id: newId(), date: f.date, type: buys ? 'buy' : 'sell', qty: q, price: num(f.strike), commission: 0, exerciseId },
+  }
+}

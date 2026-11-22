@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { computePortfolio } from '../engine/portfolio'
 import { parseFlex, yahooTicker } from './flex'
 import { applyFlexOrders, type SyncPortfolio } from './sync'
 
@@ -276,11 +277,34 @@ describe('opzioni nella sincronizzazione', () => {
     expect(Object.values(res.portfolio.assets!)[0]!.transactions![0]).toMatchObject({ type: 'sell', qty: 100, price: 0 })
   })
 
-  it('assegnazione o esercizio vanno a mano: nessun movimento, segnalati', () => {
+  it('assegnazione senza il movimento delle azioni nel report: segnalata, nessun movimento', () => {
     const orders = parseFlex(report(opt({ tradeDate: '20280121', buySell: 'SELL', openCloseIndicator: 'C', tradePrice: '0', notes: 'A', ibOrderID: '11' }))).orders
     const res = applyFlexOrders({ assets: {} }, orders, idGen)
     expect(res.added).toEqual([])
     expect(res.review[0]).toContain('assegnata')
+  })
+
+  it('esercizio: chiusura dell’opzione e acquisto delle azioni collegati, premio nel costo', () => {
+    const start = applyFlexOrders({ assets: {} }, parseFlex(report(opt({ tradeDate: '20260826', buySell: 'BUY', openCloseIndicator: 'O', tradePrice: '1', ibCommission: '0', underlyingSymbol: 'BMEA' }))).orders, idGen)
+    const xml = report(
+      opt({ tradeDate: '20280121', buySell: 'SELL', openCloseIndicator: 'C', tradePrice: '0', ibCommission: '0', notes: 'Ex', ibOrderID: '20', underlyingSymbol: 'BMEA' }) +
+      trade({ tradeDate: '20280121', symbol: 'BMEA', isin: 'US09075P1057', assetCategory: 'STK', buySell: 'BUY', openCloseIndicator: 'O', quantity: '100', tradePrice: '1.5', ibCommission: '0', notes: 'Ex', ibOrderID: '21', tradeID: 'w', listingExchange: 'NASDAQ' }),
+    )
+    const res = applyFlexOrders(start.portfolio, parseFlex(xml).orders, idGen)
+    const assets = Object.values(res.portfolio.assets!)
+    const option = assets.find(a => a.tipoAsset === 'option')!
+    const stock = assets.find(a => a.ticker === 'BMEA')!
+    const ex = option.transactions!.find(x => x.type === 'exercise')!
+    expect(ex).toMatchObject({ qty: 100, price: 0, exerciseId: 'X20@2028-01-21' })
+    expect(stock.transactions![0]).toMatchObject({ type: 'buy', qty: 100, price: 1.5, exerciseId: 'X20@2028-01-21' })
+    expect(res.review).toEqual([])
+    // Con il motore: opzione chiusa senza risultato, costo delle azioni = 150 + premio 100.
+    const calc = computePortfolio({ ...res.portfolio, taxRegime: 'dichiarativo' }, () => 1)
+    const ids = Object.keys(res.portfolio.assets!)
+    const sid = ids.find(i => res.portfolio.assets![i]!.ticker === 'BMEA')!
+    const oid = ids.find(i => res.portfolio.assets![i]!.tipoAsset === 'option')!
+    expect(calc.positions[oid]!.qty).toBe(0)
+    expect(calc.positions[sid]!.costNative).toBeCloseTo(250)
   })
 
   it('un secondo acquisto va sullo stesso titolo, senza crearne un altro', () => {

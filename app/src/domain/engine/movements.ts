@@ -2,7 +2,7 @@ import { num } from './fx.ts'
 import type { PortfolioResult, RawPortfolio } from './portfolio.ts'
 import { symbolOf } from './valuation.ts'
 
-export type MovementKind = 'buy' | 'sell' | 'short_sell' | 'buy_to_cover' | 'transfer_in' | 'transfer_out'
+export type MovementKind = 'buy' | 'sell' | 'short_sell' | 'buy_to_cover' | 'transfer_in' | 'transfer_out' | 'exercise'
 
 export const KIND_LABEL: Record<MovementKind, string> = {
   buy: 'Acquisto',
@@ -10,6 +10,7 @@ export const KIND_LABEL: Record<MovementKind, string> = {
   short_sell: 'Apertura short',
   buy_to_cover: 'Chiusura short',
   transfer_in: 'Trasferimento in entrata',
+  exercise: 'Esercizio / assegnazione',
   transfer_out: 'Trasferimento in uscita',
 }
 
@@ -49,7 +50,7 @@ export function buildMovements(p: RawPortfolio, result: PortfolioResult): Moveme
     ;(a.transactions ?? []).forEach((t, i) => {
       const kind: MovementKind | null =
         t.type === 'transfer' ? (t.sourcePortfolioId ? 'transfer_in' : 'transfer_out')
-        : t.type === 'buy' || t.type === 'sell' || t.type === 'short_sell' || t.type === 'buy_to_cover' ? t.type
+        : t.type === 'buy' || t.type === 'sell' || t.type === 'short_sell' || t.type === 'buy_to_cover' || t.type === 'exercise' ? t.type
         : null
       if (!kind || !t.date) return
       const qty = num(t.qty)

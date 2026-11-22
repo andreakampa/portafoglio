@@ -330,7 +330,7 @@ export function holdingPieces(txs: RawTx[], year: number, prices: { startClose?:
     const q = num(t.qty)
     if (!(q > 0)) continue
     const incoming = t.type === 'buy' || (t.type === 'transfer' && !!t.sourcePortfolioId)
-    const outgoing = t.type === 'sell' || (t.type === 'transfer' && !t.sourcePortfolioId)
+    const outgoing = t.type === 'sell' || t.type === 'exercise' || (t.type === 'transfer' && !t.sourcePortfolioId)
     if (incoming) {
       lots.push({ qty: q, start: t.date, price: num(t.price) || null, fromClose: false })
     } else if (outgoing) {

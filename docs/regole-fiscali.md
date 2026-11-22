@@ -28,6 +28,16 @@ incerti vanno verificati con un commercialista prima di usarli in dichiarazione.
 - Nel **quadro RT** plus e minus dello **stesso anno** si sommano tutte, a prescindere dall'ordine. Poi si sottraggono le minus degli anni precedenti, prima le più vecchie.
 - Le imposte si versano con F24 a saldo (giugno).
 
+## Opzioni esercitate o assegnate (`exercise`, `exerciseId`)
+Il premio non è un risultato a sé: entra nel costo o nel corrispettivo del titolo sottostante (circ. 165/E 1998), al cambio del giorno in cui è stato pagato o incassato.
+| Caso | Movimento del sottostante | Premio |
+|---|---|---|
+| Call comprata, esercitata | acquisto allo strike | + costo |
+| Put venduta, assegnata | acquisto allo strike | − costo |
+| Put comprata, esercitata | vendita allo strike | − ricavo |
+| Call venduta, assegnata | vendita allo strike | + ricavo |
+L'opzione si chiude (LIFO) senza plus o minus. La sincronizzazione IBKR collega da sola le due righe del report (note "A"/"Ex", stesso giorno e sottostante); a mano: Movimenti → Esercizio / assegnazione. Scadenza senza valore: vendita a 0 (la minus si realizza).
+
 ## Imposte patrimoniali (`wealthTax.ts`)
 
 | Imposta | Dove | Quanto |
