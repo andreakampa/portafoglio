@@ -38,3 +38,6 @@ export const IconSettings = () => (
 export const IconWatch = () => (
   <svg {...base}><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></svg>
 )
+export const IconChat = () => (
+  <svg {...base}><path d="M4 5h16v11H9l-5 4z" /><path d="M8 9h8" /><path d="M8 12h5" /></svg>
+)
