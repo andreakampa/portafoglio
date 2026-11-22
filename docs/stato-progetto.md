@@ -119,7 +119,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 3. **Movimenti nella v2 (fatto, 22/11/2026, PR `movimenti-trasferimenti`):** i trasferimenti si correggono (data e quantità) e si eliminano dalla lista Movimenti;
    uscita ed entrata cambiano insieme in una sola scrittura (`findTransfer`/`transferWrites` in `domain/txEdit.ts`), con controllo delle quantità disponibili da una parte e già vendute dall'altra.
    **Scelta dei lotti: non si fa** (LIFO obbligatorio in dichiarativo, costo medio in amministrato: vedi regole-fiscali.md).
-   Notato col rendiconto IBKR: gli 8 trasferimenti da Mediolanum risultano in IBKR il **26/05/2026**, nell'app il **28/05/2026** (da correggere se Andrea conferma).
+   Date dei trasferimenti da Mediolanum allineate al rendiconto IBKR il 22/11/2026: AHLA e RACE al **26/05/2026** (uscita ed entrata), gli altri 6 erano già giusti al 28/05 (backup `.backup/database-20261122-191834.json`).
    Dopo qualche giorno di uso si può dismettere il sito vecchio per l'inserimento.
 4. **Simulatore:** "Registra come movimenti", bollo/IVAFE nella stima, simulazione di dividendi.
 5. **Dashboard:** grafici storici di valore e performance confrontati con gli indici; pannello indici (Nasdaq 100, S&P 500, VIX, VXN) con lancetta del VIX vicino a 25.
