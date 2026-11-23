@@ -1,11 +1,16 @@
 import { useState } from 'react'
 import { Issues } from '../components/Issues'
 import { MarginCard } from '../components/MarginCard'
+import { PriceBar } from '../components/PriceBar'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { Tag } from '../components/Tag'
+import { useAllPortfoliosValue } from '../data/useAllPortfoliosValue'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
+import { useViewPref } from '../data/viewPrefs'
+import { grossValueEur, toDisplay, weights, type DisplayCurrency, type WeightBase } from '../domain/display'
+import { availableLosses } from '../domain/engine/fiscal'
 import type { PositionRow } from '../domain/engine/valuation'
-import { eur, money, pct, qty, THIS_YEAR, tone } from '../lib/format'
+import { cash, eur, money, pct, qty, THIS_YEAR, tone } from '../lib/format'
 
 type SortKey = 'value' | 'pnl' | 'pnlPct' | 'day' | 'name'
 const SORTS: { key: SortKey; label: string }[] = [
@@ -26,6 +31,10 @@ export function Positions() {
   const c = useComputedPortfolio()
   const [sort, setSort] = useState<SortKey>('value')
   const [showClosed, setShowClosed] = useState(false)
+  const [currency, setCurrency] = useViewPref<DisplayCurrency>('currency', ['EUR', 'USD'], 'EUR')
+  const [weightBase, setWeightBase] = useViewPref<WeightBase>('weightBase', ['portfolio', 'all'], 'portfolio')
+  const ready = c.status === 'ready'
+  const allValue = useAllPortfoliosValue(ready && weightBase === 'all', ready ? c.portfolios : NONE, ready ? c.allResults : NONE, ready ? c.latestFx : NONE)
 
   if (c.status === 'loading') return <section className="page"><h1>Posizioni</h1><div className="card skeleton" style={{ height: 240 }} /></section>
   if (c.status === 'error') return <section className="page"><h1>Posizioni</h1><div className="card error">{c.message}</div></section>
@@ -36,6 +45,11 @@ export function Positions() {
   const t = c.totals
   const currentYear = THIS_YEAR
   const realizedYear = c.result.fiscal.lines.filter(l => l.year === currentYear && l.side !== 'manuale').reduce((s, l) => s + l.gainEur, 0)
+  // Importi della tabella nella valuta scelta (cambio di mercato di oggi); i riquadri restano in euro.
+  const usdRate = c.eurUsd?.rate ?? c.latestFx.USD ?? null
+  const shown = (x: number | null, signed = false) => cash(toDisplay(x, currency, usdRate), currency, signed)
+  const weightOf = weights(open, weightBase === 'all' ? allValue ?? 0 : grossValueEur(open))
+  const weightText = (id: string) => (weightOf[id] === undefined ? '—' : `${weightOf[id].toFixed(1).replace('.', ',')}%`)
 
   return (
     <section className="page">
@@ -56,6 +70,18 @@ export function Positions() {
 
       <Issues result={c.result} portfolio={c.portfolio} />
 
+      <PriceBar
+        eurUsd={c.eurUsd}
+        currency={currency}
+        onCurrency={setCurrency}
+        weightBase={weightBase}
+        onWeightBase={setWeightBase}
+        lossesEur={availableLosses(c.result.fiscal, currentYear)}
+        pricesAt={c.pricesAt}
+        loading={c.pricesLoading}
+        onRefresh={c.refreshPrices}
+      />
+
       <div className="toolbar">
         <label className="inline">
           Ordina per
@@ -68,14 +94,15 @@ export function Positions() {
       {/* Telefono: schede. PC: tabella. Nessuno scorrimento laterale: sotto i 1300px
           quantità e variazione del giorno vanno sotto titolo e prezzo (5 colonne invece di 7). */}
       <ul className="pos-cards">
-        {open.map(r => <PositionCard key={r.assetId} r={r} />)}
+        {open.map(r => <PositionCard key={r.assetId} r={r} shown={shown} weight={weightText(r.assetId)} />)}
       </ul>
       <table className="pos-table">
         <thead>
           <tr>
             <th>Titolo</th><th className="num col-wide">Quantità</th><th className="num">PMC</th>
             <th className="num">Prezzo<span className="col-narrow"> · oggi</span></th>
-            <th className="num col-wide">Oggi</th><th className="num">Valore</th><th className="num">Risultato</th>
+            <th className="num col-wide">Oggi</th><th className="num">Valore<span className="col-narrow"> · peso</span></th>
+            <th className="num col-wide">Peso</th><th className="num">Risultato</th>
           </tr>
         </thead>
         <tbody>
@@ -92,8 +119,12 @@ export function Positions() {
                 <small className={`col-narrow cell-sub ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</small>
               </td>
               <td className={`num col-wide ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</td>
-              <td className="num">{eur(r.valueEur)}</td>
-              <td className={`num ${tone(r.unrealizedEur)}`}>{eur(r.unrealizedEur, true)}<br /><small>{pct(r.unrealizedPct)}</small></td>
+              <td className="num">
+                {shown(r.valueEur)}
+                <small className="col-narrow cell-sub muted">{weightText(r.assetId)}</small>
+              </td>
+              <td className="num col-wide">{weightText(r.assetId)}</td>
+              <td className={`num ${tone(r.unrealizedEur)}`}>{shown(r.unrealizedEur, true)}<br /><small>{pct(r.unrealizedPct)}</small></td>
             </tr>
           ))}
         </tbody>
@@ -109,7 +140,7 @@ export function Positions() {
               {closed.map(r => (
                 <li key={r.assetId}>
                   <span>{r.symbol}</span>
-                  <span className={tone(r.realizedEur)}>{eur(r.realizedEur, true)}</span>
+                  <span className={tone(r.realizedEur)}>{shown(r.realizedEur, true)}</span>
                 </li>
               ))}
             </ul>
@@ -120,7 +151,9 @@ export function Positions() {
   )
 }
 
-function PositionCard({ r }: { r: PositionRow }) {
+const NONE = {}
+
+function PositionCard({ r, shown, weight }: { r: PositionRow; shown: (x: number | null, signed?: boolean) => string; weight: string }) {
   return (
     <li className="card pos-card">
       <div className="pos-card-head">
@@ -129,11 +162,11 @@ function PositionCard({ r }: { r: PositionRow }) {
         <span className={`pos-day ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</span>
       </div>
       <div className="pos-card-main">
-        <span className="pos-value">{eur(r.valueEur)}</span>
-        <span className={tone(r.unrealizedEur)}>{eur(r.unrealizedEur, true)} · {pct(r.unrealizedPct)}</span>
+        <span className="pos-value">{shown(r.valueEur)}</span>
+        <span className={tone(r.unrealizedEur)}>{shown(r.unrealizedEur, true)} · {pct(r.unrealizedPct)}</span>
       </div>
       <div className="pos-card-meta muted">
-        {qty(r.qty)} × {money(r.price, r.currency)} · PMC {money(r.pmcNative, r.currency)}
+        {qty(r.qty)} × {money(r.price, r.currency)} · PMC {money(r.pmcNative, r.currency)} · <span className="nowrap">peso {weight}</span>
       </div>
     </li>
   )

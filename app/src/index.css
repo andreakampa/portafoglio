@@ -431,3 +431,26 @@ b + .tag, .tag + .badge { margin-left: 8px; }
   .pos-table .col-wide { display: table-cell; }
   .pos-table .col-narrow { display: none; }
 }
+
+/* ── Barra prezzi sopra le Posizioni (components/PriceBar.tsx) ── */
+.price-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: .9rem;
+}
+.fx-live { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.seg { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); }
+.seg-label { padding: 0 6px 0 10px; color: var(--muted); font-size: .8rem; font-weight: 600; }
+.seg button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-text); }
+.fiscal-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text); text-decoration: none; font-weight: 600; font-size: .85rem;
+}
+.fiscal-chip:hover { background: var(--surface-2); }
+.fiscal-alert { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--warn); color: var(--surface); font-size: .75rem; font-weight: 800; }
+.price-time { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.btn-small { min-height: 32px; padding: 0 12px; font-size: .85rem; }
+/* Nomi lunghi (es. opzioni BMEA280121C00001500) vanno a capo invece di spingere la tabella oltre il bordo. */
+.pos-table td:first-child { overflow-wrap: anywhere; }
+.fx-live small { margin-left: 6px; }
+.nowrap { white-space: nowrap; }

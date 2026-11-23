@@ -29,8 +29,8 @@ export function parseYahoo(json: YahooChart): Quote | null {
 const CACHE_KEY = 'ptpro_v2_quotes_2' // _2: scarta le chiusure "di 5 giorni fa" salvate prima
 const TTL = 5 * 60 * 1000
 
-/** Ultimi prezzi (Yahoo, via Worker). Cache di 5 minuti: si apre subito anche offline. */
-export async function loadQuotes(symbols: string[]): Promise<Record<string, Quote>> {
+/** Ultimi prezzi (Yahoo, via Worker). Cache di 5 minuti: si apre subito anche offline. `force`: ignora la cache (pulsante Aggiorna). */
+export async function loadQuotes(symbols: string[], force = false): Promise<Record<string, Quote>> {
   let cache: Record<string, Quote & { at: number }> = {}
   try {
     cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
@@ -38,7 +38,7 @@ export async function loadQuotes(symbols: string[]): Promise<Record<string, Quot
     /* cache illeggibile */
   }
   const now = Date.now()
-  const stale = [...new Set(symbols)].filter(s => !(cache[s] && now - cache[s].at < TTL))
+  const stale = [...new Set(symbols)].filter(s => force || !(cache[s] && now - cache[s].at < TTL))
   await mapLimit(stale, 6, async s => {
     try {
       const q = parseYahoo(
@@ -59,7 +59,7 @@ export async function loadQuotes(symbols: string[]): Promise<Record<string, Quot
 }
 
 /** Quotazioni fresche se possibile, altrimenti quelle salvate (anche vecchie): per mostrare subito qualcosa. */
-export function cachedQuotes(): Record<string, Quote> {
+export function cachedQuotes(): Record<string, Quote & { at?: number }> {
   try {
     return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
   } catch {

@@ -1,9 +1,8 @@
 // Etichette colorate con icona: un colore per significato (docs/Parita sito vecchio.md, sezione 0).
 // Il colore non basta mai da solo: c'è sempre l'icona (stesso disegno delle icone Tabler).
 import type { ReactNode } from 'react'
-import type { MovementKind } from '../domain/engine/movements'
+import type { Tone } from './tones'
 
-export type Tone = 'buy' | 'sell' | 'short' | 'cover' | 'transfer' | 'dividend' | 'sim' | 'history' | 'edit' | 'delete' | 'neutral'
 
 const PATHS: Record<Tone, ReactNode> = {
   buy: <path d="M12 5v14M5 12h14" />,
@@ -27,16 +26,6 @@ export function TagIcon({ tone }: { tone: Tone }) {
   )
 }
 
-/** Tono di ogni tipo di movimento. L'esercizio di opzioni resta neutro. */
-export const KIND_TONE: Record<MovementKind, Tone> = {
-  buy: 'buy',
-  sell: 'sell',
-  short_sell: 'short',
-  buy_to_cover: 'cover',
-  transfer_in: 'transfer',
-  transfer_out: 'transfer',
-  exercise: 'neutral',
-}
 
 export function Tag({ tone, children, title }: { tone: Tone; children: ReactNode; title?: string }) {
   return <span className={`tag tag-${tone}`} title={title}><TagIcon tone={tone} />{children}</span>
