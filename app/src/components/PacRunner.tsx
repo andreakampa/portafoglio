@@ -5,6 +5,7 @@ import { usePortfolioState } from '../data/usePortfolioState'
 import type { RawAsset, RawTx } from '../domain/engine/types'
 import { symbolOf } from '../domain/engine/valuation'
 import { buildPacTx, dueDates, executionOn } from '../domain/pac'
+import { loadFx } from '../lib/fxRates'
 import { loadCloses } from '../lib/priceHistory'
 import { localToday } from '../lib/today'
 
@@ -43,11 +44,14 @@ export function PacRunner() {
       for (const { plan, asset, date } of work) {
         const symbol = symbolOf(asset, plan.assetId)
         try {
-          if ((asset.valuta || 'EUR').toUpperCase() !== 'EUR') throw new Error('titolo non in euro')
           if (!closesBy.has(symbol)) closesBy.set(symbol, await loadCloses(symbol))
           const exec = executionOn(closesBy.get(symbol)!, date, today)
           if (!exec) continue // prezzo non ancora disponibile: si riprova alla prossima apertura
-          const tx = buildPacTx(plan, date, exec, () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8))
+          // Titoli non in euro: l'importo in euro si converte al cambio Banca d'Italia del giorno di esecuzione.
+          const currency = (asset.valuta || 'EUR').toUpperCase()
+          const rate = currency === 'EUR' ? 1 : (await loadFx([exec.date]))(currency, exec.date)
+          if (!rate) continue // cambio non ancora pubblicato: si riprova alla prossima apertura
+          const tx = buildPacTx(plan, date, exec, () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8), rate)
           if (await edit.addPacRate(plan.portfolioId, plan.assetId, tx, plan.id, date)) added += 1
           tried.current.add(`${plan.id}:${date}`)
         } catch (e) {

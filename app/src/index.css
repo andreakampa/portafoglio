@@ -596,3 +596,12 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .mov-table tfoot td { font-weight: 650; border-top: 2px solid var(--border); }
 .mov-table th, .mov-table td { padding-left: 8px; padding-right: 8px; }
 .mov-table .row-actions { flex-wrap: nowrap; }
+
+/* Piani PAC: riepilogo del piano */
+.pac-list > li.pac-plan { display: grid; gap: 8px; justify-content: stretch; }
+.pac-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.pac-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.pac-stats > span { display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .pac-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pac-rates li { padding: 6px 0; font-size: .9rem; }
+.pac-rates .badge { margin-left: 6px; }
