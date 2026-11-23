@@ -7,10 +7,11 @@ import { symbolOf } from '../domain/engine/valuation'
 import { addToList, assetKey, buildExercise, optionKind, optionStrike } from '../domain/txEdit'
 import { db } from '../lib/firebase'
 import { money, qty as fmtQty } from '../lib/format'
+import { localToday } from '../lib/today'
 
 type Ready = Extract<Computed, { status: 'ready' }>
 type Asset = RawAsset & { isin?: string; commDefault?: number }
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => localToday()
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 const clean = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 

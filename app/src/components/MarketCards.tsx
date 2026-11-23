@@ -6,6 +6,7 @@ import type { RawPortfolio } from '../domain/engine/portfolio'
 import { loadQuotes, type Quote } from '../lib/prices'
 import { eur, pct } from '../lib/format'
 import { LineChart } from './LineChart'
+import { localToday } from '../lib/today'
 
 const INDICES = [
   { symbol: '^NDX', name: 'Nasdaq 100' },
@@ -13,7 +14,7 @@ const INDICES = [
   { symbol: '^VIX', name: 'VIX' },
   { symbol: '^VXN', name: 'VXN' },
 ]
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 const eur0 = (v: number) => `${Math.round(v).toLocaleString('it-IT')} €`
 
 const n2 = (v: number) => v.toLocaleString('it-IT', { maximumFractionDigits: 2, minimumFractionDigits: 2 })

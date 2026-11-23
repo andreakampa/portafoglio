@@ -6,6 +6,7 @@ import type { RawAsset, RawTx } from '../domain/engine/types'
 import { symbolOf } from '../domain/engine/valuation'
 import { buildPacTx, dueDates, executionOn } from '../domain/pac'
 import { loadCloses } from '../lib/priceHistory'
+import { localToday } from '../lib/today'
 
 type PlanAsset = RawAsset & { transactions?: RawTx[] }
 
@@ -24,7 +25,7 @@ export function PacRunner() {
   useEffect(() => {
     if (state.status !== 'ready' || !plans?.length || busy.current) return
     const portfolios = state.data?.portfolios as Record<string, { assets?: Record<string, PlanAsset> }> | undefined
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localToday()
     const work = plans.flatMap(plan => {
       const asset = portfolios?.[plan.portfolioId]?.assets?.[plan.assetId]
       if (!asset) return []

@@ -162,11 +162,11 @@ Scorsi `ui/cart.js`, `ui/pac.js`, `ui/storico.js`, `ui/transactions.js`, `ui/ibk
 `core/toast.js`, `api/fiscale.js`, `api/search.js`. Non si rifanno (decisioni già prese): scelta dei lotti in vendita,
 campo quota a margine, cambio scritto a mano sul movimento (il motore usa i cambi storici).
 
-### 10. Inserimento movimenti (`transactions.js`, `api/search.js`)
-- [ ] Anteprima mentre scrivi: costo, nuova quantità e PMC; in vendita guadagno, imposta con minus compensate, incasso netto.
-- [ ] Blocco vendita/copertura oltre la quantità posseduta (oggi solo avviso dopo il salvataggio).
+### 10. Inserimento movimenti (`transactions.js`, `api/search.js`) — anteprima e blocco fatti (PR `inserimento-anteprima`)
+- [x] Anteprima mentre scrivi: costo, nuova quantità e PMC; in vendita guadagno, imposta con minus compensate, incasso netto.
+- [x] Blocco vendita/copertura oltre la quantità posseduta (oggi solo avviso dopo il salvataggio).
 - [ ] Ricerca del titolo su Yahoo (nome, valuta e tipo compilati da soli) per i titoli nuovi.
-- [ ] Valuta della commissione anche USD/CAD.
+- [x] Valuta della commissione anche USD/CAD. (In più: la data di oggi ora segue il fuso locale, prima dopo mezzanotte risultava ieri.)
 
 ### 11. Cassetto fiscale (`api/fiscale.js`) — insieme al punto 9
 - [ ] Riepilogo anno con "Imponibile netto".

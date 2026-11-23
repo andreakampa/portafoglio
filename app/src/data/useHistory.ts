@@ -4,6 +4,7 @@ import type { RawPortfolio } from '../domain/engine/portfolio.ts'
 import { symbolOf } from '../domain/engine/valuation.ts'
 import { loadCloses } from '../lib/priceHistory.ts'
 import { mapLimit } from '../lib/proxy.ts'
+import { localToday } from '../lib/today'
 
 /** Indici di confronto (simbolo Yahoo, nome, valuta). */
 export const BENCHMARKS = [
@@ -11,7 +12,7 @@ export const BENCHMARKS = [
   { symbol: '^NDX', name: 'Nasdaq 100', currency: 'USD' },
 ] as const
 
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 
 // Le chiusure storiche cambiano solo una volta al giorno: cache in memoria per la sessione.
 const memory = new Map<string, Promise<Closes>>()

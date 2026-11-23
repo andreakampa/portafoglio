@@ -5,6 +5,7 @@ import { usePortfolioState } from '../data/usePortfolioState'
 import { buildBonusTx, dueGrants, vestingPrice } from '../domain/bonusShares'
 import type { RawAsset, RawTx } from '../domain/engine/types'
 import { loadCloses } from '../lib/priceHistory'
+import { localToday } from '../lib/today'
 
 type Asset = RawAsset & { isin?: string; commDefault?: number }
 
@@ -37,7 +38,7 @@ export function BonusRunner() {
   useEffect(() => {
     if (state.status !== 'ready' || !grants || busy.current) return
     const portfolios = state.data?.portfolios as Record<string, { assets?: Record<string, Asset> }> | undefined
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localToday()
     const work = Object.entries(grants).flatMap(([pid, list]) => {
       const assets = portfolios?.[pid]?.assets
       if (!assets) return []

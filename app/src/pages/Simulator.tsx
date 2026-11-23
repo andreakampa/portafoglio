@@ -8,8 +8,9 @@ import { opsToTxs, qtyForBudget, simulate, simulateExtras, trailingDividend, typ
 import { loadDividends } from '../lib/dividends'
 import { EDITABLE_LABEL, type EditableType } from '../domain/txEdit'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
+import { localToday } from '../lib/today'
 
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 const num = (s: string) => Number(s.trim().replace(',', '.'))
 
 /**
