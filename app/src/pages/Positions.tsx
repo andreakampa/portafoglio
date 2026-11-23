@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Issues } from '../components/Issues'
 import { MarginCard } from '../components/MarginCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
+import { Tag } from '../components/Tag'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import type { PositionRow } from '../domain/engine/valuation'
 import { eur, money, pct, qty, THIS_YEAR, tone } from '../lib/format'
@@ -64,25 +65,33 @@ export function Positions() {
         </label>
       </div>
 
-      {/* Telefono: schede. PC: tabella. Nessuno scorrimento laterale. */}
+      {/* Telefono: schede. PC: tabella. Nessuno scorrimento laterale: sotto i 1300px
+          quantità e variazione del giorno vanno sotto titolo e prezzo (5 colonne invece di 7). */}
       <ul className="pos-cards">
         {open.map(r => <PositionCard key={r.assetId} r={r} />)}
       </ul>
       <table className="pos-table">
         <thead>
           <tr>
-            <th>Titolo</th><th className="num">Quantità</th><th className="num">PMC</th><th className="num">Prezzo</th>
-            <th className="num">Oggi</th><th className="num">Valore</th><th className="num">Risultato</th>
+            <th>Titolo</th><th className="num col-wide">Quantità</th><th className="num">PMC</th>
+            <th className="num">Prezzo<span className="col-narrow"> · oggi</span></th>
+            <th className="num col-wide">Oggi</th><th className="num">Valore</th><th className="num">Risultato</th>
           </tr>
         </thead>
         <tbody>
           {open.map(r => (
             <tr key={r.assetId}>
-              <td><b>{r.symbol}</b>{r.isShort && <span className="badge">short</span>}</td>
-              <td className="num">{qty(r.qty)}</td>
+              <td>
+                <b>{r.symbol}</b>{r.isShort && <Tag tone="short">short</Tag>}
+                <small className="col-narrow cell-sub muted">{qty(Math.abs(r.qty))} {Math.abs(r.qty) === 1 ? 'azione' : 'azioni'}</small>
+              </td>
+              <td className="num col-wide">{qty(r.qty)}</td>
               <td className="num">{money(r.pmcNative, r.currency)}</td>
-              <td className="num">{money(r.price, r.currency)}</td>
-              <td className={`num ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</td>
+              <td className="num">
+                {money(r.price, r.currency)}
+                <small className={`col-narrow cell-sub ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</small>
+              </td>
+              <td className={`num col-wide ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</td>
               <td className="num">{eur(r.valueEur)}</td>
               <td className={`num ${tone(r.unrealizedEur)}`}>{eur(r.unrealizedEur, true)}<br /><small>{pct(r.unrealizedPct)}</small></td>
             </tr>
@@ -116,7 +125,7 @@ function PositionCard({ r }: { r: PositionRow }) {
     <li className="card pos-card">
       <div className="pos-card-head">
         <b>{r.symbol}</b>
-        {r.isShort && <span className="badge">short</span>}
+        {r.isShort && <Tag tone="short">short</Tag>}
         <span className={`pos-day ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</span>
       </div>
       <div className="pos-card-main">

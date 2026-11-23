@@ -10,6 +10,7 @@ import { usePortfolioState } from '../data/usePortfolioState'
 import { overviewKpis, topPositions } from '../domain/overview'
 import { summarizePortfolios } from '../domain/portfolioState'
 import { eur, money, pct, qty, THIS_YEAR, tone } from '../lib/format'
+import { Tag } from '../components/Tag'
 
 type Ready = Extract<ReturnType<typeof useComputedPortfolio>, { status: 'ready' }>
 
@@ -78,7 +79,7 @@ function TopPositions({ c }: { c: Ready }) {
       <ul className="top-list">
         {top.map(r => (
           <li key={r.assetId}>
-            <span><b>{r.symbol}</b>{r.isShort && <span className="badge">short</span>}<br /><small className="muted">{qty(Math.abs(r.qty))} × {money(r.price, r.currency)}</small></span>
+            <span><b>{r.symbol}</b>{r.isShort && <Tag tone="short">short</Tag>}<br /><small className="muted">{qty(Math.abs(r.qty))} × {money(r.price, r.currency)}</small></span>
             <span className="num">{eur(r.valueEur)}<br /><small className={tone(r.unrealizedPct)}>{r.unrealizedPct == null ? '' : pct(r.unrealizedPct)}</small></span>
           </li>
         ))}

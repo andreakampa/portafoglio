@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNotes, type NoteDraft } from '../data/useNotes'
 import { NOTE_KINDS, parseTickers, sortNotes, upcoming, type Note, type NoteKind } from '../domain/notes'
+import { TagButton } from '../components/Tag'
 
 const TODAY = new Date().toISOString().slice(0, 10)
 const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -76,8 +77,8 @@ export function Notes() {
               <div className="note-actions">
                 <button type="button" className="linklike" onClick={() => void save(n.id, { done: !n.done })}>{n.done ? 'Riapri' : 'Fatto'}</button>
                 <button type="button" className="linklike" onClick={() => void save(n.id, { pinned: !n.pinned })}>{n.pinned ? 'Sblocca' : 'Fissa'}</button>
-                <button type="button" className="linklike" onClick={() => setEditing(n)}>Modifica</button>
-                <button type="button" className="linklike neg" onClick={() => confirm(`Eliminare la nota “${n.title}”?`) && void del(n.id)}>Elimina</button>
+                <TagButton tone="edit" onClick={() => setEditing(n)}>Modifica</TagButton>
+                <TagButton tone="delete" onClick={() => { if (confirm(`Eliminare la nota “${n.title}”?`)) void del(n.id) }}>Elimina</TagButton>
               </div>
             </li>
           ))}

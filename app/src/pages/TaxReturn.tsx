@@ -7,6 +7,7 @@ import { bonusKeyOf, type BonusGrant } from '../domain/bonusShares'
 import type { RawPortfolio } from '../domain/engine/portfolio'
 import { RM_LETTERS, toEuro } from '../domain/engine/taxReturn'
 import { eur, money, qty } from '../lib/format'
+import { Tag } from '../components/Tag'
 
 const it = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
 /** Unità di euro col punto delle migliaia anche sotto 10.000 (es. 4.675). */
@@ -225,7 +226,7 @@ export function TaxReturn() {
               <ul className="fiscal-lines">
                 {d.rt.sales.map(x => (
                   <li key={x.key}>
-                    <div><b>{x.assetName}</b>{x.side === 'short' && <span className="badge">short</span>}{x.bond && <span className="badge">48,08%</span>}<br /><small className="muted">{it(x.date)}</small></div>
+                    <div><b>{x.assetName}</b>{x.side === 'short' && <Tag tone="short">short</Tag>}{x.bond && <span className="badge">48,08%</span>}<br /><small className="muted">{it(x.date)}</small></div>
                     <div className="num"><span>{eur(x.gainEur, true)}</span><small className="muted">incasso {eur(x.proceedsEur)} · costo {eur(x.costEur)}</small></div>
                   </li>
                 ))}
