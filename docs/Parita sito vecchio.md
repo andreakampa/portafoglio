@@ -180,11 +180,11 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Esportazione PDF/Excel.
 - [x] Interessi a margine: inserimento ed eliminazione a mano (quelli IBKR restano della sincronizzazione).
 
-### 13. PAC (`pac.js`)
-- [ ] Modifica del piano, data di fine, commissione per rata.
-- [ ] Riepilogo: prossima rata, rate fatte, totale versato, commissioni, elenco rate.
-- [ ] Eliminare una rata senza che torni.
-- [ ] Titoli non in euro.
+### 13. PAC (`pac.js`) — fatto (PR `pac-completo`)
+- [x] Modifica del piano, data di fine, commissione per rata, anteprima delle prossime date.
+- [x] Riepilogo: prossima rata, rate fatte, totale versato, commissioni, elenco rate (anche quelle del sito vecchio).
+- [x] Eliminare una rata senza che torni (`skipDates` del piano).
+- [x] Titoli non in euro (importo convertito al cambio Banca d'Italia del giorno).
 
 ### 14. Carrello simulazioni (`cart.js`)
 - [ ] Salvato per portafoglio (oggi si perde ricaricando).

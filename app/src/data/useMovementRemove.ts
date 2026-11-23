@@ -1,6 +1,8 @@
 import { useCallback } from 'react'
 import { KIND_LABEL, type Movement } from '../domain/engine/movements'
+import { pacSkipsFor } from '../domain/pac'
 import { findTransfer, type PortfolioLike } from '../domain/txEdit'
+import { usePacPlans, usePacSkip } from './usePacPlans'
 import type { Computed } from './useComputedPortfolio'
 import { usePortfolioEdit } from './usePortfolioEdit'
 import { usePortfolioState } from './usePortfolioState'
@@ -16,6 +18,8 @@ export const isTransferMovement = (m: Movement) => m.kind === 'transfer_in' || m
  */
 export function useMovementRemove(c: Computed): (m: Movement) => Promise<string | null> {
   const edit = usePortfolioEdit()
+  const skipPac = usePacSkip()
+  const { plans } = usePacPlans()
   const state = usePortfolioState()
   const portfolios = (state.status === 'ready' ? state.data?.portfolios : undefined) as Record<string, PortfolioLike> | undefined
   return useCallback(
@@ -35,15 +39,22 @@ export function useMovementRemove(c: Computed): (m: Movement) => Promise<string 
           return e instanceof Error ? e.message : 'Eliminazione non riuscita.'
         }
       }
-      const warn = m.fromBroker ? ' (È un movimento importato da IBKR: la sincronizzazione potrebbe riportarlo.)' : ''
+      const pac = t ? pacSkipsFor(t, plans ?? [], c.selectedId, m.assetId) : []
+      const warn = m.fromBroker
+        ? ' (È un movimento importato da IBKR: la sincronizzazione potrebbe riportarlo.)'
+        : pac.length
+          ? ' È una rata del piano PAC: non verrà ricreata.'
+          : ''
       if (!confirm(`Eliminare ${KIND_LABEL[m.kind].toLowerCase()} di ${m.symbol} del ${fmtDate(m.date)}?${warn}`)) return null
       try {
+        // Prima si segna la rata come saltata, poi si elimina: così il PAC non la ricrea nel frattempo.
+        for (const s of pac) await skipPac(s.planId, s.date)
         await edit.remove(c.selectedId, m.assetId, { id: m.txId, index: m.index, date: t?.date ?? m.date, type: String(t?.type ?? m.kind) })
         return null
       } catch (e) {
         return e instanceof Error ? e.message : 'Eliminazione non riuscita.'
       }
     },
-    [c, edit, portfolios],
+    [c, edit, portfolios, skipPac, plans],
   )
 }
