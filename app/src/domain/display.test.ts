@@ -5,7 +5,7 @@ import type { PositionResult } from './engine/positions.ts'
 import type { PositionRow } from './engine/valuation.ts'
 
 const row = (assetId: string, qty: number, valueEur: number | null): PositionRow => ({
-  assetId, symbol: assetId, currency: 'EUR', qty, isShort: qty < 0, pmcNative: 1, costEur: 1, price: 1,
+  assetId, symbol: assetId, currency: 'EUR', qty, isShort: qty < 0, pmcNative: 1, costEur: 1, costTodayFxEur: 1, price: 1,
   valueEur, unrealizedEur: 0, unrealizedPct: 0, dayChangePct: 0, realizedEur: 0,
 })
 

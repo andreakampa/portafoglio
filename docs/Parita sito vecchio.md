@@ -67,7 +67,13 @@ Barra sopra la tabella Posizioni (`components/PriceBar.tsx`); scelte ricordate s
 - [x] Badge **Cassetto fiscale** con avviso (!) se ci sono minus da compensare, apre la pagina Fiscale.
 - [x] Ora dell'ultimo aggiornamento prezzi + pulsante Aggiorna (scarica di nuovo ignorando la cache).
 
-## 3. Numeri chiave (vecchio: 12, v2: 4)
+## 3. Numeri chiave (vecchio: 12, v2: 4) — ✅ fatto (PR `numeri-chiave`)
+
+Fatto in `components/PositionsKpiGroups.tsx` + `domain/positionsKpis.ts` (test). Differenze volute rispetto al vecchio:
+- "Non realizzato netto": l'imposta è quella del **simulatore** vendendo tutto oggi (perdite e minus del cassetto compensano;
+  in dichiarativo può essere un risparmio sulle plus già realizzate nell'anno), non 26% titolo per titolo.
+- Dividendi = lordo meno ritenuta estera (IBKR veri, altri stimati Yahoo); Dividendi e Tasse aprono la pagina Fiscale.
+- Realizzato lordo/netto da sempre, netto = meno l'imposta del cassetto; "Non realizzato fiscale" = cambi storici BdI.
 
 Ripristinare, in due gruppi come nel vecchio:
 - **Portafoglio:** Investito, Controvalore, Commissioni pagate, Interessi margine (totale addebitato), Dividendi

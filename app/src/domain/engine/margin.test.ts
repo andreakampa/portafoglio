@@ -3,7 +3,7 @@ import { leverageAlert, marginOnDate, summarizeMargin, type MarginPortfolio } fr
 import type { PositionRow } from './valuation'
 
 const row = (valueEur: number | null, qty = 1): PositionRow => ({
-  assetId: 'a', symbol: 'X', currency: 'EUR', qty, isShort: (valueEur ?? 0) < 0, pmcNative: 0, costEur: 0, price: 1,
+  assetId: 'a', symbol: 'X', currency: 'EUR', qty, isShort: (valueEur ?? 0) < 0, pmcNative: 0, costEur: 0, costTodayFxEur: 0, price: 1,
   valueEur, unrealizedEur: 0, unrealizedPct: 0, dayChangePct: 0, realizedEur: 0,
 })
 

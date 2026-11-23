@@ -3,7 +3,7 @@ import { overviewKpis, topPositions } from './overview'
 import type { PositionRow } from './engine/valuation'
 
 const row = (p: Partial<PositionRow>): PositionRow => ({
-  assetId: 'a', symbol: 'A', currency: 'EUR', qty: 1, isShort: false, pmcNative: 1, costEur: 100, price: 1,
+  assetId: 'a', symbol: 'A', currency: 'EUR', qty: 1, isShort: false, pmcNative: 1, costEur: 100, costTodayFxEur: 100, price: 1,
   valueEur: 110, unrealizedEur: 10, unrealizedPct: 10, dayChangePct: 10, realizedEur: 0, ...p,
 })
 

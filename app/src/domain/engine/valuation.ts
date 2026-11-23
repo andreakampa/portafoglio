@@ -15,6 +15,8 @@ export interface PositionRow {
   isShort: boolean
   pmcNative: number
   costEur: number
+  /** Costo nella valuta del titolo convertito al cambio di OGGI (vista del broker); null senza cambio. */
+  costTodayFxEur: number | null
   price: number | null
   valueEur: number | null
   /** Risultato non realizzato in EUR (al cambio di oggi), positivo = guadagno anche per gli short. */
@@ -63,6 +65,7 @@ export function valuePositions(
       isShort: pos.isShort,
       pmcNative: pos.pmcNative,
       costEur: pos.costEur,
+      costTodayFxEur: rate ? pos.costNative / rate : null,
       price: q?.price ?? null,
       valueEur,
       unrealizedEur,

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Issues } from '../components/Issues'
 import { MarginCard } from '../components/MarginCard'
+import { PositionsKpiGroups } from '../components/PositionsKpiGroups'
 import { PriceBar } from '../components/PriceBar'
-import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
+import { PortfolioPicker } from '../components/PortfolioPicker'
 import { Tag } from '../components/Tag'
 import { useAllPortfoliosValue } from '../data/useAllPortfoliosValue'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
@@ -10,7 +11,7 @@ import { useViewPref } from '../data/viewPrefs'
 import { grossValueEur, toDisplay, weights, type DisplayCurrency, type WeightBase } from '../domain/display'
 import { availableLosses } from '../domain/engine/fiscal'
 import type { PositionRow } from '../domain/engine/valuation'
-import { cash, eur, money, pct, qty, THIS_YEAR, tone } from '../lib/format'
+import { cash, money, pct, qty, THIS_YEAR, tone } from '../lib/format'
 
 type SortKey = 'value' | 'pnl' | 'pnlPct' | 'day' | 'name'
 const SORTS: { key: SortKey; label: string }[] = [
@@ -44,7 +45,6 @@ export function Positions() {
   const closed = c.rows.filter(r => r.qty === 0 && Math.abs(r.realizedEur) > 0.005).sort((a, b) => b.realizedEur - a.realizedEur)
   const t = c.totals
   const currentYear = THIS_YEAR
-  const realizedYear = c.result.fiscal.lines.filter(l => l.year === currentYear && l.side !== 'manuale').reduce((s, l) => s + l.gainEur, 0)
   // Importi della tabella nella valuta scelta (cambio di mercato di oggi); i riquadri restano in euro.
   const usdRate = c.eurUsd?.rate ?? c.latestFx.USD ?? null
   const shown = (x: number | null, signed = false) => cash(toDisplay(x, currency, usdRate), currency, signed)
@@ -58,12 +58,7 @@ export function Positions() {
         <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={c.select} />
       </header>
 
-      <div className="kpis">
-        <Kpi label="Valore" value={eur(t.valueEur)} hint={c.pricesLoading ? 'aggiorno i prezzi…' : undefined} />
-        <Kpi label="Investito" value={eur(t.investedEur)} />
-        <Kpi label="Non realizzato" value={eur(t.unrealizedEur, true)} className={tone(t.unrealizedEur)} hint={t.investedEur > 0 ? pct((t.unrealizedEur / t.investedEur) * 100) : undefined} />
-        <Kpi label={`Realizzato ${currentYear}`} value={eur(realizedYear, true)} className={tone(realizedYear)} hint="lordo, prima delle tasse" />
-      </div>
+      <PositionsKpiGroups c={c} />
       {t.missingPrices > 0 && <p className="muted small">{t.missingPrices} titoli senza prezzo aggiornato: esclusi dai totali.</p>}
 
       <MarginCard c={c} />
