@@ -141,7 +141,10 @@ Si apre toccando il pallino dei dividendi. `components/AssetDividends.tsx` + `do
 - [x] Tabella: Ex-date, Pagamento, Stato (Maturato / Pagato), Div/azione, Quantità, Importo totale, Importo €,
       Netto atteso, **Netto reale inseribile a mano** con avviso anomalia oltre il 3% (logica già in `current-work`).
 
-## 8. Posizioni chiuse
+## 8. Posizioni chiuse — ✅ fatto (PR `posizioni-chiuse`)
+
+Gruppo "Chiuse" della tabella: nella colonna Risultato il realizzato lordo e netto; nuove colonne (dall'ingranaggio) Tasse realizzato,
+Dividendi incassati (IBKR veri o stima Yahoo), Aperta il, Chiusa il; commissioni e Storico c'erano già.
 
 Oggi: solo simbolo + realizzato. Ripristinare le stesse colonne della tabella (realizzato lordo/netto, tasse,
 commissioni, dividendi incassati, date di apertura/chiusura) e l'accesso allo storico del titolo.

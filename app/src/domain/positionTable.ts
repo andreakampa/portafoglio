@@ -7,7 +7,8 @@ import type { PositionRow } from './engine/valuation.ts'
 
 export type ColumnId =
   | 'qty' | 'pmc' | 'price' | 'prevClose' | 'day' | 'cost' | 'value' | 'weightCost' | 'weightValue'
-  | 'unrealized' | 'unrealizedNet' | 'realized' | 'realizedNet' | 'pmcEur' | 'commissions'
+  | 'unrealized' | 'unrealizedNet' | 'realized' | 'realizedNet' | 'realizedTax' | 'pmcEur' | 'commissions'
+  | 'dividends' | 'openedOn' | 'closedOn'
 
 export interface ColumnDef {
   id: ColumnId
@@ -31,8 +32,12 @@ export const COLUMNS: ColumnDef[] = [
   { id: 'unrealizedNet', label: 'Risultato netto', defaultHidden: true },
   { id: 'realized', label: 'Realizzato', defaultHidden: true },
   { id: 'realizedNet', label: 'Realizzato netto', defaultHidden: true },
+  { id: 'realizedTax', label: 'Tasse realizzato', defaultHidden: true },
   { id: 'pmcEur', label: 'PMC in €', defaultHidden: true },
   { id: 'commissions', label: 'Commissioni', defaultHidden: true },
+  { id: 'dividends', label: 'Dividendi incassati', defaultHidden: true },
+  { id: 'openedOn', label: 'Aperta il', defaultHidden: true },
+  { id: 'closedOn', label: 'Chiusa il', defaultHidden: true },
 ]
 const IDS = COLUMNS.map(c => c.id)
 
@@ -83,8 +88,14 @@ export interface RowFigures {
   /** Imposta se si vendesse oggi solo questo titolo (sul guadagno fiscale, aliquota del tipo), e risultato netto. */
   taxEur: number | null
   unrealizedNetEur: number | null
-  /** Realizzato del titolo al netto dell'imposta calcolata dal cassetto. */
+  /** Realizzato del titolo al netto dell'imposta calcolata dal cassetto, e l'imposta. */
   realizedNetEur: number
+  realizedTaxEur: number
+  /** Dividendi incassati dal titolo (lordo meno ritenuta), se noti. */
+  dividendsEur: number | null
+  /** Primo movimento e, per le posizioni chiuse, ultimo movimento. */
+  openedOn: string | null
+  closedOn: string | null
   commissionsEur: number
   pmcEur: number
   prevClose: number | null
@@ -96,6 +107,7 @@ export function rowFigures(
   pos: PositionResult | undefined,
   lines: FiscalLine[],
   prevClose: number | null,
+  dividendsEur: number | null = null,
 ): RowFigures {
   let dayEur: number | null = null
   if (r.valueEur !== null && r.dayChangePct !== null && r.qty !== 0) {
@@ -110,13 +122,18 @@ export function rowFigures(
     fxEffectEur = r.unrealizedEur - todayFxGain
   }
   const taxEur = r.unrealizedEur === null ? null : Math.max(0, r.unrealizedEur) * taxRateFor(asset?.tipoAsset)
-  const ownTax = lines.filter(l => l.assetId === r.assetId).reduce((s, l) => s + l.taxEur, 0)
+  const ownTax = lines.filter(l => l.assetId === r.assetId && l.side !== 'manuale').reduce((s, l) => s + l.taxEur, 0)
+  const dates = (asset?.transactions ?? []).map(t => t.date).filter(Boolean).sort()
   return {
     dayEur,
     fxEffectEur,
     taxEur,
     unrealizedNetEur: r.unrealizedEur === null || taxEur === null ? null : r.unrealizedEur - taxEur,
     realizedNetEur: r.realizedEur - ownTax,
+    realizedTaxEur: ownTax,
+    dividendsEur,
+    openedOn: dates[0] ?? null,
+    closedOn: Math.abs(r.qty) < EPS && dates.length ? dates[dates.length - 1]! : null,
     commissionsEur: pos?.commissionsEur ?? 0,
     pmcEur: pos?.pmcEur ?? 0,
     prevClose,
@@ -184,6 +201,10 @@ export function sortValue(r: PositionRow, f: RowFigures, key: SortKey, weightBas
     case 'realizedNet': return f.realizedNetEur
     case 'pmcEur': return f.pmcEur
     case 'commissions': return f.commissionsEur
+    case 'realizedTax': return f.realizedTaxEur
+    case 'dividends': return f.dividendsEur
+    case 'openedOn': return f.openedOn
+    case 'closedOn': return f.closedOn
   }
 }
 

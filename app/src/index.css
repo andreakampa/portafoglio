@@ -571,3 +571,6 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .more-actions summary::-webkit-details-marker { display: none; }
 .more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; display: grid; gap: 4px; padding: 8px; min-width: 150px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); }
 .more-menu .tag-btn { justify-content: flex-start; }
+/* Celle un po' più strette anche sugli schermi grandi: più colonne prima di passare alle schede. */
+.pos-table-wrap .pos-table th, .pos-table-wrap .pos-table td { padding-left: 10px; padding-right: 10px; }
+@media (max-width: 1299px) { .pos-table-wrap .pos-table th, .pos-table-wrap .pos-table td { padding: 8px 8px; } }

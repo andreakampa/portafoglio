@@ -123,3 +123,15 @@ describe('azioni sulla riga', () => {
     expect(rowActions('transferred', 3)).toEqual(['history'])
   })
 })
+
+describe('posizioni chiuse', () => {
+  it('date di apertura e chiusura, tasse sul realizzato (senza minus a mano) e dividendi', () => {
+    const asset = { tipoAsset: 'stock', transactions: [{ date: '2026-03-01', type: 'sell' }, { date: '2025-01-10', type: 'buy' }] } as RawAsset
+    const lines = [{ assetId: 'a', taxEur: 7, side: 'long' } as FiscalLine, { assetId: 'a', taxEur: 3, side: 'manuale' } as FiscalLine]
+    const closed = rowFigures(row({ qty: 0, realizedEur: 50 }), asset, undefined, lines, null, 12.5)
+    expect(closed).toMatchObject({ openedOn: '2025-01-10', closedOn: '2026-03-01', realizedTaxEur: 7, realizedNetEur: 43, dividendsEur: 12.5 })
+    const open = rowFigures(row({ qty: 5 }), asset, undefined, [], null)
+    expect(open.closedOn).toBeNull()
+    expect(open.dividendsEur).toBeNull()
+  })
+})
