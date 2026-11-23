@@ -83,20 +83,22 @@ Ripristinare, in due gruppi come nel vecchio:
 
 ## 4. Tabella Posizioni (vecchio: `COLUMN_DEFS` in `js/modules/portfolio/render.js`, gestione in `index.js` ~r. 890-920)
 
-- [ ] **Colonne configurabili**: mostra/nascondi e riordina (pulsante ingranaggio), salvate per utente su Firebase.
+- [x] **Colonne configurabili**: mostra/nascondi e riordina (pulsante ingranaggio), salvate per utente su Firebase.
+      Fatto: `settings/positionColumns`, pannello "⚙ Colonne" (mostra/nascondi, ↑ ↓). Logica in `domain/positionTable.ts`.
+      Se le colonne scelte non entrano nella larghezza, la pagina passa da sola alle schede (misura con ResizeObserver).
       Colonne del vecchio: Symbol, Shares, AC/Share (PMC), Last Price, Open, Prev Close, Daily P&L, Total Cost,
       Market Value, % Costo, % Mercato, P&L Gross UNRL, P&L Net UNRL, P&L Gross REAL, P&L Net REAL, PMC EUR,
       Commissioni tot., Dividendi titolo, Trading tools.
-- [ ] **Ordinamento cliccando l'intestazione** (crescente/decrescente, numeri e nomi), al posto del menu a tendina.
+- [x] **Ordinamento cliccando l'intestazione** (crescente/decrescente, numeri e nomi), al posto del menu a tendina.
 - [ ] Sotto il prezzo: variazione % del giorno + **barra 52 settimane** (min–max, segno colorato secondo la posizione).
 - [ ] Sparkline intraday (vecchio: commento "Sparkline intraday minimale" in `render.js` ~r. 196).
-- [ ] **Daily P&L in €** e %, non solo %.
-- [ ] P&L non realizzato con **"di cui cambio"**; P&L netto con **tasse** della riga.
-- [ ] Logo del titolo accanto al simbolo, badge valuta (USD, EUR, CAD…).
+- [x] **Daily P&L in €** e %, non solo %.
+- [x] P&L non realizzato con **"di cui cambio"**; P&L netto con **tasse** della riga (colonna "Risultato netto").
+- [x] Logo del titolo accanto al simbolo, badge valuta (USD, EUR, CAD…).
 - [ ] **Pallino dividendi** accanto al simbolo (vecchio: `dividendoDot()` in `render.js` r. 233-251):
       verde = dividendi già pagati, arancione = maturato dopo lo stacco ma non ancora accreditato, entrambi se ci sono
       tutti e due; **cliccabile → finestra Dividendi del titolo**.
-- [ ] **Gruppi** come nel vecchio (`groupedSortedIds`): Titoli attivi (n), Short, Chiuse, Vuote, Trasferiti — sezioni
+- [x] **Gruppi** come nel vecchio (`groupedSortedIds`): Titoli attivi (n), Short, Chiuse, Vuote, Trasferiti — sezioni
       apribili/chiudibili.
 - [ ] **Esporta** PDF / XLSX (vecchio: `js/modules/portfolio/export.js`).
 - [ ] Schede telefono: stesse informazioni principali + pulsanti azione.

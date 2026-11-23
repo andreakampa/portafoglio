@@ -18,6 +18,8 @@ export interface PositionRow {
   /** Costo nella valuta del titolo convertito al cambio di OGGI (vista del broker); null senza cambio. */
   costTodayFxEur: number | null
   price: number | null
+  /** Chiusura di ieri, nella valuta del titolo. */
+  previousClose?: number | null
   valueEur: number | null
   /** Risultato non realizzato in EUR (al cambio di oggi), positivo = guadagno anche per gli short. */
   unrealizedEur: number | null
@@ -67,6 +69,7 @@ export function valuePositions(
       costEur: pos.costEur,
       costTodayFxEur: rate ? pos.costNative / rate : null,
       price: q?.price ?? null,
+      previousClose: q?.previousClose ?? null,
       valueEur,
       unrealizedEur,
       unrealizedPct: unrealizedEur !== null && pos.costEur > 0 ? (unrealizedEur / pos.costEur) * 100 : null,

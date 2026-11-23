@@ -9,6 +9,7 @@ import { eur, pct, THIS_YEAR, tone } from '../lib/format'
 import { Kpi } from './PortfolioPicker'
 
 type Ready = Extract<Computed, { status: 'ready' }>
+const TODAY = new Date().toISOString().slice(0, 10)
 
 export function PositionsKpiGroups({ c }: { c: Ready }) {
   const d = useDividends(c.portfolio, c.fx)
@@ -19,7 +20,7 @@ export function PositionsKpiGroups({ c }: { c: Ready }) {
       .map(r => ({ id: r.assetId, assetId: r.assetId, type: r.isShort ? 'buy_to_cover' : 'sell', qty: Math.abs(r.qty), price: r.price!, commissionEur: 0 }))
     if (!ops.length) return 0
     try {
-      return simulate({ portfolio: c.portfolio, fx: c.fx, latestFx: c.latestFx, ops, today: new Date().toISOString().slice(0, 10) }).taxEur
+      return simulate({ portfolio: c.portfolio, fx: c.fx, latestFx: c.latestFx, ops, today: TODAY }).taxEur
     } catch {
       return null
     }
