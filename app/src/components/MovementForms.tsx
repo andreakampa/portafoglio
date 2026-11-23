@@ -10,6 +10,7 @@ import {
   type PortfolioLike,
   type EditableType, type NewAssetForm, type TxForm,
 } from '../domain/txEdit'
+import { TickerSearch } from './TickerSearch'
 import { previewMovement, type MovementPreview } from '../domain/movementPreview'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
 import { localToday } from '../lib/today'
@@ -127,6 +128,7 @@ export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; 
 
       {isNew && (
         <fieldset className="new-asset">
+          <TickerSearch onPick={h => setNa({ ...na, ticker: h.ticker, nome: h.name, valuta: h.currency, tipoAsset: h.tipoAsset })} />
           <div className="form-row">
             <label>Ticker (Yahoo)<input value={na.ticker} onChange={e => setNa({ ...na, ticker: e.target.value })} placeholder="es. NVDA o RACE.MI" autoCapitalize="characters" /></label>
             <label>Valuta<input value={na.valuta} onChange={e => setNa({ ...na, valuta: e.target.value })} maxLength={3} autoCapitalize="characters" /></label>
