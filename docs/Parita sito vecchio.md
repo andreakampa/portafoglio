@@ -168,11 +168,11 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Ricerca del titolo su Yahoo (nome, valuta e tipo compilati da soli) per i titoli nuovi; anche nella Watchlist (PR `ricerca-titolo`).
 - [x] Valuta della commissione anche USD/CAD. (In più: la data di oggi ora segue il fuso locale, prima dopo mezzanotte risultava ieri.)
 
-### 11. Cassetto fiscale (`api/fiscale.js`) — insieme al punto 9
-- [ ] Riepilogo anno con "Imponibile netto".
-- [ ] Minus disponibili: barra e "scade tra N giorni".
-- [ ] Inserimento a mano di minus esterne (il motore le legge già).
-- [ ] Correzione a mano del compensato (✎).
+### 11. Cassetto fiscale (`api/fiscale.js`) — insieme al punto 9; fatto (PR `fiscale-minus`) tranne la correzione del compensato
+- [x] Riepilogo anno con "Imponibile netto".
+- [x] Minus disponibili: barra (quanto resta) e "scadono tra N giorni".
+- [x] Inserimento ed eliminazione a mano di minus esterne (stessi campi del sito vecchio, `fiscal/manualLosses`).
+- [ ] Correzione a mano del compensato (✎): nei dati non è mai stata usata; si fa solo se Andrea la chiede.
 
 ### 12. Movimenti (`storico.js`)
 - [ ] Periodo dal/al a scelta.

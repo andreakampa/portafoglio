@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { DividendsCard } from '../components/DividendsCard'
 import { Issues } from '../components/Issues'
+import { ManualLossesCard } from '../components/ManualLossesCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { availableLosses } from '../domain/engine/fiscal'
+import { daysToExpiry, type StoredManualLoss } from '../domain/manualLosses'
+import { localToday } from '../lib/today'
 import { wealthTax, wealthTaxKindFor } from '../domain/engine/wealthTax'
 import { eur, THIS_YEAR, tone } from '../lib/format'
 import { Tag } from '../components/Tag'
@@ -26,6 +29,9 @@ export function Fiscal() {
   const minus = -lines.filter(l => l.gainEur < 0).reduce((s, l) => s + l.gainEur, 0)
   const compensated = lines.reduce((s, l) => s + l.compensatedEur, 0)
   const tax = lines.reduce((s, l) => s + l.taxEur, 0)
+  const taxable = lines.reduce((s, l) => s + l.taxableEur, 0)
+  const manual = ((c.portfolio as { fiscal?: { manualLosses?: StoredManualLoss[] } }).fiscal?.manualLosses ?? []).filter(Boolean)
+  const today = localToday()
   const open = fiscal.buckets.filter(b => b.remainingEur > 0.005 && b.expiresYear >= currentYear)
   const kind = wealthTaxKindFor(c.result.regime)
   const regimeNote =
@@ -57,6 +63,7 @@ export function Fiscal() {
         <Kpi label="Plus realizzate" value={eur(plus)} className={tone(plus)} />
         <Kpi label="Minus realizzate" value={eur(-minus)} className={tone(-minus)} />
         <Kpi label="Minus usate" value={eur(compensated)} />
+        <Kpi label="Imponibile netto" value={eur(taxable)} hint="plus meno minus usate" />
         <Kpi label={c.result.regime === 'dichiarativo' ? 'Imposta da versare' : 'Imposta trattenuta'} value={eur(tax)} hint="stima: 26%, 12,5% titoli di Stato, 33% crypto" />
       </div>
 
@@ -72,10 +79,19 @@ export function Fiscal() {
                   Realizzate nel {b.year}{b.category === 'crypto' ? ' (crypto)' : ''}
                   <br />
                   <small className={b.expiresYear === currentYear ? 'neg' : 'muted'}>
-                    {b.expiresYear === currentYear ? `scadono il 31/12/${b.expiresYear}` : `usabili fino al ${b.expiresYear}`}
+                    {b.expiresYear === currentYear
+                      ? `scadono il 31/12/${b.expiresYear}, tra ${daysToExpiry(b.expiresYear, today)} giorni`
+                      : `usabili fino al 31/12/${b.expiresYear}`}
                   </small>
+                  <span className="loss-bar" title={`usate ${eur(b.originalEur - b.remainingEur)} su ${eur(b.originalEur)}`}>
+                    <span style={{ width: `${Math.min(100, (b.remainingEur / b.originalEur) * 100)}%` }} />
+                  </span>
                 </span>
-                <b>{eur(b.remainingEur)}</b>
+                <span className="num">
+                  <b>{eur(b.remainingEur)}</b>
+                  <br />
+                  <small className="muted">di {eur(b.originalEur)}</small>
+                </span>
               </li>
             ))}
             <li>
@@ -85,6 +101,8 @@ export function Fiscal() {
           </ul>
         )}
       </div>
+
+      <ManualLossesCard pid={c.selectedId} list={manual} />
 
       <div className="card">
         <h2>Movimenti {year}</h2>
