@@ -454,3 +454,13 @@ b + .tag, .tag + .badge { margin-left: 8px; }
 .pos-table td:first-child { overflow-wrap: anywhere; }
 .fx-live small { margin-left: 6px; }
 .nowrap { white-space: nowrap; }
+
+/* Numeri chiave delle Posizioni in due gruppi (components/PositionsKpiGroups.tsx) */
+.kpi-groups { display: grid; gap: 14px; }
+.kpi-group { display: grid; gap: 8px; }
+.kpi-group-title { font-family: var(--font-body); font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+@media (min-width: 700px) { .kpis.kpis-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1300px) { .kpis.kpis-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+a.kpi-link { color: inherit; text-decoration: none; }
+a.kpi-link:hover { border-color: var(--primary); }
+a.kpi-link .kpi-label::after { content: ' ›'; }

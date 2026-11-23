@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import type { PortfolioOption } from '../data/useComputedPortfolio'
 
 export function PortfolioPicker({ options, selectedId, onSelect }: { options: PortfolioOption[]; selectedId: string; onSelect: (id: string) => void }) {
@@ -21,12 +22,14 @@ export function PortfolioPicker({ options, selectedId, onSelect }: { options: Po
   )
 }
 
-export function Kpi({ label, value, className = '', hint }: { label: string; value: string; className?: string; hint?: string }) {
-  return (
-    <div className="kpi">
+/** Riquadro con un numero. Con `to` è un collegamento (es. Dividendi → Fiscale). */
+export function Kpi({ label, value, className = '', hint, to }: { label: string; value: string; className?: string; hint?: string; to?: string }) {
+  const body = (
+    <>
       <span className="kpi-label">{label}</span>
       <span className={`kpi-value ${className}`}>{value}</span>
       {hint && <span className="kpi-hint">{hint}</span>}
-    </div>
+    </>
   )
+  return to ? <Link to={to} className="kpi kpi-link">{body}</Link> : <div className="kpi">{body}</div>
 }
