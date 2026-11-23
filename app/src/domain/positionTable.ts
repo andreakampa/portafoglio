@@ -233,8 +233,9 @@ export function dividendDot(divs: { exDate: string }[], qtyAtExDate: (exDate: st
 
 // ── Azioni sulla riga (come "Trading tools" nel sito vecchio) ───────────
 
-export type RowAction = 'buy' | 'sell' | 'short' | 'cover' | 'sim' | 'transfer' | 'delete'
+export type RowAction = 'history' | 'buy' | 'sell' | 'short' | 'cover' | 'sim' | 'transfer' | 'delete'
 export const ROW_ACTION_LABEL: Record<RowAction, string> = {
+  history: 'Storico',
   buy: 'Compra',
   sell: 'Vendi',
   short: 'Short',
@@ -244,10 +245,11 @@ export const ROW_ACTION_LABEL: Record<RowAction, string> = {
   delete: 'Elimina',
 }
 
-/** Pulsanti di una riga secondo il gruppo: aperto long, short, chiuso o vuoto. I trasferiti non hanno azioni qui. */
+/** Pulsanti di una riga secondo il gruppo: aperto long, short, chiuso o vuoto. I trasferiti hanno solo lo storico. */
 export function rowActions(group: GroupId, qty: number): RowAction[] {
-  if (group === 'transferred') return []
-  if (qty <= -EPS) return ['cover', 'delete']
-  if (qty >= EPS) return ['buy', 'sell', 'sim', 'transfer', 'delete']
-  return ['buy', 'short', 'sim', 'delete']
+  if (group === 'transferred') return ['history']
+  if (group === 'empty') return ['buy', 'short', 'delete']
+  if (qty <= -EPS) return ['history', 'cover', 'delete']
+  if (qty >= EPS) return ['history', 'buy', 'sell', 'sim', 'transfer', 'delete']
+  return ['history', 'buy', 'short', 'sim', 'delete']
 }

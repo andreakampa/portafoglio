@@ -543,3 +543,23 @@ a.kpi-link .kpi-label::after { content: ' ›'; }
 .card-actions { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
 .card-actions summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: var(--muted); }
 .card-actions .row-actions { justify-content: flex-start; margin-top: 8px; }
+
+/* ── Storico del titolo (components/AssetHistory.tsx) ── */
+.modal-wide { width: min(1240px, calc(100vw - 24px)); }
+.history { display: grid; gap: 12px; min-width: 0; }
+.history-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.history-summary { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin: 0; }
+.history-summary div { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.history-summary dt { color: var(--muted); font-size: .78rem; font-weight: 600; }
+.history-summary dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.history-note { margin: 0; }
+.history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.history-list .card { gap: 4px; padding: 12px; }
+.history-table { font-size: .88rem; }
+.history-table th, .history-table td { white-space: nowrap; }
+.row-warn td { background: color-mix(in srgb, var(--warn-tint) 60%, transparent); }
+.history-list .row-warn { border-color: var(--warn-border); }
+.warn-tri { margin-left: 6px; color: var(--warn); font-weight: 700; cursor: help; }
+@media (min-width: 900px) and (pointer: fine), (min-width: 1200px) {
+  .history-list { display: none; }
+}

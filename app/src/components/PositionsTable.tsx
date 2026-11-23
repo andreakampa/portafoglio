@@ -41,7 +41,7 @@ interface Props {
   onAction: (action: RowAction, assetId: string) => void
 }
 
-const ACTION_TONE: Record<RowAction, Tone> = { buy: 'buy', sell: 'sell', short: 'short', cover: 'cover', sim: 'sim', transfer: 'transfer', delete: 'delete' }
+const ACTION_TONE: Record<RowAction, Tone> = { history: 'history', buy: 'buy', sell: 'sell', short: 'short', cover: 'cover', sim: 'sim', transfer: 'transfer', delete: 'delete' }
 
 function RowButtons({ group, r, onAction, compact }: { group: GroupId; r: PositionRow; onAction: Props['onAction']; compact?: boolean }) {
   const list = rowActions(group, r.qty)
