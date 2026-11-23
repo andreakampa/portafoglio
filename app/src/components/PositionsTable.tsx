@@ -5,6 +5,7 @@ import { useColumnConfig } from '../data/useColumnConfig'
 import type { Computed } from '../data/useComputedPortfolio'
 import { useViewPref } from '../data/viewPrefs'
 import { useYahooDividends } from '../data/useYahooDividends'
+import { useDividends } from '../data/useDividends'
 import { qtyBefore } from '../domain/engine/dividends'
 import type { PositionRow } from '../domain/engine/valuation'
 import {
@@ -71,7 +72,8 @@ function RowButtons({ group, r, onAction, compact }: { group: GroupId; r: Positi
 }
 
 const PER_ASSET_CCY: ColumnId[] = ['pmc', 'price', 'prevClose']
-const NO_UNIT: ColumnId[] = ['qty', 'weightCost', 'weightValue', 'pmcEur']
+const NO_UNIT: ColumnId[] = ['qty', 'weightCost', 'weightValue', 'pmcEur', 'openedOn', 'closedOn']
+const fmtDay = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
 const round = (x: number | null | undefined, d = 2) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10 ** d) / 10 ** d)
 
 export function PositionsTable({ c, shown, weightOf, convert, currency, onAction }: Props) {
@@ -84,8 +86,17 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
   const colsKey = cols.join(',')
 
   const assets = c.portfolio.assets ?? {}
+  // Dividendi incassati per titolo: veri dai movimenti di cassa IBKR, altrimenti stima Yahoo (come nel Fiscale).
+  const divs = useDividends(c.portfolio, c.fx)
+  const base = (s: string) => s.trim().toUpperCase().split('.')[0]!
+  const divOf = (r: PositionRow): number | null => {
+    if (divs.status !== 'ready') return null
+    const isin = (assets[r.assetId] as { isin?: string } | undefined)?.isin
+    const mine = divs.rows.filter(d => (isin && d.isin === isin) || base(d.symbol) === base(r.symbol))
+    return mine.reduce((s, d) => s + d.grossEur - d.withholdingEur, 0)
+  }
   const items = (rows: PositionRow[]): Item[] =>
-    rows.map(r => ({ r, f: rowFigures(r, assets[r.assetId], c.result.positions[r.assetId], c.result.fiscal.lines, r.previousClose ?? null) }))
+    rows.map(r => ({ r, f: rowFigures(r, assets[r.assetId], c.result.positions[r.assetId], c.result.fiscal.lines, r.previousClose ?? null, divOf(r)) }))
   const groups = groupRows(c.rows, assets)
   // Pallino dei dividendi: stima Yahoo come nel sito vecchio (pagato 21 giorni dopo lo stacco).
   const yDivs = useYahooDividends(c.rows.map(r => r.symbol))
@@ -143,13 +154,23 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
             <small className="cell-sub">{pct(r.unrealizedPct)}</small>
             {f.fxEffectEur !== null && Math.abs(f.fxEffectEur) >= 0.01 && <small className="cell-sub muted nowrap" title="Parte del risultato dovuta al cambio">cambio {shown(f.fxEffectEur, true)}</small>}
           </span>
-        ) : '—'
+        ) : (
+          // Posizione chiusa: al posto del risultato aperto, il realizzato lordo e netto.
+          <span className={tone(r.realizedEur)} title="Posizione chiusa: risultato realizzato">
+            {shown(r.realizedEur, true)}
+            <small className="cell-sub muted nowrap">netto {shown(f.realizedNetEur, true)}</small>
+          </span>
+        )
       case 'unrealizedNet':
         return open ? <span className={tone(f.unrealizedNetEur)}>{shown(f.unrealizedNetEur, true)}<small className="cell-sub muted">tasse {shown(f.taxEur)}</small></span> : '—'
       case 'realized': return <span className={tone(r.realizedEur)}>{shown(r.realizedEur, true)}</span>
       case 'realizedNet': return <span className={tone(f.realizedNetEur)}>{shown(f.realizedNetEur, true)}</span>
       case 'pmcEur': return open ? eur(f.pmcEur) : '—'
       case 'commissions': return shown(f.commissionsEur)
+      case 'realizedTax': return shown(f.realizedTaxEur)
+      case 'dividends': return f.dividendsEur === null ? '…' : f.dividendsEur ? shown(f.dividendsEur) : '—'
+      case 'openedOn': return f.openedOn ? fmtDay(f.openedOn) : '—'
+      case 'closedOn': return f.closedOn ? fmtDay(f.closedOn) : '—'
     }
   }
 
@@ -170,7 +191,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
 
   // Esportazione: titoli attivi e short con le colonne visibili (come il sito vecchio).
   // Excel riceve numeri veri (si possono sommare), il PDF gli stessi già formattati.
-  const exportValue = (id: ColumnId, { r, f }: Item): number | null => {
+  const exportValue = (id: ColumnId, { r, f }: Item): number | string | null => {
     switch (id) {
       case 'qty': return r.qty
       case 'pmc': return round(r.pmcNative, 4)
@@ -187,6 +208,10 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
       case 'realizedNet': return round(convert(f.realizedNetEur))
       case 'pmcEur': return round(f.pmcEur, 4)
       case 'commissions': return round(convert(f.commissionsEur))
+      case 'realizedTax': return round(convert(f.realizedTaxEur))
+      case 'dividends': return round(convert(f.dividendsEur))
+      case 'openedOn': return f.openedOn
+      case 'closedOn': return f.closedOn
     }
   }
   const exportText = (id: ColumnId, it: Item): string => {
@@ -198,7 +223,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
       case 'prevClose': return money(f.prevClose, r.currency)
       case 'day': return `${shown(f.dayEur, true)} (${pct(r.dayChangePct)})`
       case 'weightCost':
-      case 'weightValue': return pctText(exportValue(id, it))
+      case 'weightValue': { const v = exportValue(id, it); return pctText(typeof v === 'number' ? v : null) }
       case 'unrealized': return `${shown(r.unrealizedEur, true)} (${pct(r.unrealizedPct)})`
       case 'unrealizedNet': return shown(f.unrealizedNetEur, true)
       case 'realized': return shown(r.realizedEur, true)
@@ -207,6 +232,10 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
       case 'cost': return shown(r.costEur)
       case 'value': return shown(r.valueEur)
       case 'commissions': return shown(f.commissionsEur)
+      case 'realizedTax': return shown(f.realizedTaxEur)
+      case 'dividends': return shown(f.dividendsEur)
+      case 'openedOn': return f.openedOn ? fmtDay(f.openedOn) : '—'
+      case 'closedOn': return f.closedOn ? fmtDay(f.closedOn) : '—'
     }
   }
   const header = (id: ColumnId) => LABEL[id] + (PER_ASSET_CCY.includes(id) ? ' (valuta titolo)' : NO_UNIT.includes(id) ? '' : ` (${currency})`)
