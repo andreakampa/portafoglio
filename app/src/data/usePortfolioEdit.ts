@@ -29,6 +29,19 @@ export function usePortfolioEdit() {
     }
 
     return {
+      /**
+       * Elimina un titolo con tutti i suoi movimenti. Solo se nel frattempo non è cambiato
+       * (stesso numero di movimenti visti da chi ha confermato), altrimenti errore.
+       */
+      removeAsset: async (pid: string, aid: string, expectedTxCount: number) => {
+        const r = await runTransaction(assetRef(pid, aid), cur => {
+          const a = cur as Asset | null
+          if (!a) return null
+          return (a.transactions?.length ?? 0) === expectedTxCount ? null : undefined
+        })
+        if (!r.committed) throw new Error(STALE)
+      },
+
       /** Aggiunge un movimento; se il titolo non esiste lo crea con `newAsset`. */
       add: (pid: string, aid: string, tx: RawTx, newAsset?: Asset) =>
         change(pid, aid, cur => {

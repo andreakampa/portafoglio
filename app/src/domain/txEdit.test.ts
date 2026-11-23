@@ -3,7 +3,7 @@ import { computePortfolio } from './engine/portfolio'
 import type { RawTx } from './engine/types'
 import { buildExercise, optionKind, optionStrike } from './txEdit'
 import {
-  addToList, assetKey, buildAsset, buildTransferPair, buildTx, findSameAsset, findTransfer, formFromTx, heldQty, removeFromList, replaceInList, transferWrites,
+  addToList, assetKey, deleteAssetBlock, buildAsset, buildTransferPair, buildTx, findSameAsset, findTransfer, formFromTx, heldQty, removeFromList, replaceInList, transferWrites,
   validateNewAsset, validateTransfer, validateTx, type TxForm,
 } from './txEdit'
 
@@ -187,5 +187,16 @@ describe('esercizio o assegnazione inseriti a mano', () => {
     expect(buildExercise('put', -100, f, id).stock.type).toBe('buy')
     expect(buildExercise('put', 100, f, id).stock.type).toBe('sell')
     expect(buildExercise('call', -100, f, id).stock.type).toBe('sell')
+  })
+})
+
+describe('deleteAssetBlock', () => {
+  it('si può eliminare un titolo senza trasferimenti', () => {
+    expect(deleteAssetBlock({ transactions: [{ type: 'buy' }, { type: 'sell' }] })).toBeNull()
+    expect(deleteAssetBlock(undefined)).toBeNull()
+  })
+  it('bloccato se ha un trasferimento (uscita o entrata)', () => {
+    expect(deleteAssetBlock({ transactions: [{ type: 'buy' }, { type: 'transfer' }] })).toMatch(/trasferimenti/)
+    expect(deleteAssetBlock({ transactions: [{ type: 'buy', transferId: 'x' }] })).toMatch(/trasferimenti/)
   })
 })

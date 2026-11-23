@@ -103,20 +103,21 @@ Ripristinare, in due gruppi come nel vecchio:
 - [x] **Esporta** PDF / XLSX (jsPDF 4 + autotable, write-excel-file; caricati solo al primo uso) (vecchio: `js/modules/portfolio/export.js`).
 - [x] Schede telefono: stesse informazioni principali (i pulsanti azione arrivano col blocco 5).
 
-## 5. Azioni sulla riga del titolo ("Trading tools")
+## 5. Azioni sulla riga del titolo ("Trading tools") — ✅ fatto (PR `azioni-riga`)
 
 Vecchio: `data-action` = `history`, `buy`, `sell`, `short`, `cover`, `sim`, `transfer`, `dividendi`, `delete`.
 Nella v2 le righe non sono cliccabili e tutto passa da Movimenti / Simulatore.
 
-- [ ] Pulsanti sulla riga con i colori della sezione 0. Sul telefono: in un menu della scheda.
-- [ ] Compra / Vendi / Short / Chiudi short → aprono il modulo movimento **già compilato** con titolo, valuta e
+- [x] Pulsanti sulla riga con i colori della sezione 0 (solo icone nella tabella). Sul telefono: menu "Azioni" della scheda.
+- [x] Compra / Vendi / Short / Chiudi short → aprono il modulo movimento **già compilato** con titolo, valuta e
       quantità (MAX per vendite e chiusure).
-- [ ] Simula → simulatore della v2 (più completo del vecchio) aperto sul titolo, in finestra, senza cambiare pagina.
+- [x] Simula → simulatore della v2 (più completo del vecchio) aperto sul titolo, in finestra, senza cambiare pagina.
       Mantenere le modalità del vecchio: Simula acquisto/vendita, **Per budget / Per quantità**, prezzo, commissioni.
-- [ ] Trasferisci → finestra come la vecchia (`js/modules/portfolio/ui/transfer.js`): PMC attuale, q.tà disponibile,
+- [x] Trasferisci → finestra come la vecchia (`js/modules/portfolio/ui/transfer.js`): PMC attuale, q.tà disponibile,
       data, portafoglio destinazione, quantità (1–max), riepilogo (prezzo usato = PMC, commissioni, "trasferimento
       totale: il ticker verrà spostato in Titoli trasferiti"). Usa il `transferId` della v2.
-- [ ] Elimina titolo (con conferma).
+- [x] Elimina titolo (con conferma; bloccato se il titolo ha trasferimenti collegati, `deleteAssetBlock`).
+- Storico sulla riga: arriva col blocco 6.
 
 ## 6. Finestra Storico del titolo (vecchio: `ui/history.js`)
 

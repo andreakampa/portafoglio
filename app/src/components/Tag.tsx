@@ -32,6 +32,6 @@ export function Tag({ tone, children, title }: { tone: Tone; children: ReactNode
 }
 
 /** Pulsante piccolo con lo stesso stile (Modifica, Elimina, …). */
-export function TagButton({ tone, children, onClick }: { tone: Tone; children: ReactNode; onClick: () => void }) {
-  return <button type="button" className={`tag tag-btn tag-${tone}`} onClick={onClick}><TagIcon tone={tone} />{children}</button>
+export function TagButton({ tone, children, onClick, title }: { tone: Tone; children: ReactNode; onClick: () => void; title?: string }) {
+  return <button type="button" className={`tag tag-btn tag-${tone}`} onClick={onClick} title={title}><TagIcon tone={tone} />{children}</button>
 }

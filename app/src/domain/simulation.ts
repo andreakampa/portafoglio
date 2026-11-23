@@ -238,3 +238,10 @@ export function simulateExtras(input: {
     missing,
   }
 }
+
+/** Quantità intera comprabile con un budget in euro (commissioni comprese). */
+export function qtyForBudget(budgetEur: number, priceNative: number, rate: number, commissionEur: number): number {
+  const unitEur = priceNative / rate
+  if (!(budgetEur > 0) || !(unitEur > 0)) return 0
+  return Math.max(0, Math.floor((budgetEur - commissionEur) / unitEur))
+}

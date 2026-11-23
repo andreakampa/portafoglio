@@ -18,13 +18,22 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 const NEW = '__new__'
 
 /** Nuovo movimento (acquisto, vendita, short, PAC) o modifica di uno esistente. */
-export function MovementForm({ c, editing, onClose }: { c: Ready; editing?: Movement; onClose: () => void }) {
+/** Titolo e tipo già scelti (dai pulsanti sulla riga in Posizioni). `bare`: dentro una finestra, senza riquadro e titolo. */
+export interface MovementPreset {
+  assetId: string
+  type: EditableType
+}
+
+/** Quantità massima sensata: tutto ciò che si ha (vendita) o tutto lo short (chiusura). */
+const maxFor = (type: EditableType, held: number) => (type === 'sell' ? Math.max(held, 0) : type === 'buy_to_cover' ? Math.max(-held, 0) : 0)
+
+export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; editing?: Movement; onClose: () => void; preset?: MovementPreset; bare?: boolean }) {
   const edit = usePortfolioEdit()
   const assets = Object.entries(c.portfolio.assets ?? {})
     .map(([id, a]) => ({ id, label: symbolOf(a, id), currency: (a.valuta || 'EUR').toUpperCase() }))
     .sort((a, b) => a.label.localeCompare(b.label))
 
-  const [assetId, setAssetId] = useState(editing?.assetId ?? assets[0]?.id ?? NEW)
+  const [assetId, setAssetId] = useState(editing?.assetId ?? preset?.assetId ?? assets[0]?.id ?? NEW)
   const [na, setNa] = useState<NewAssetForm>({ ticker: '', nome: '', valuta: 'EUR', tipoAsset: 'stock', isin: '' })
   const isNew = assetId === NEW
   const currency = isNew ? na.valuta.trim().toUpperCase() || 'EUR' : assets.find(a => a.id === assetId)?.currency ?? 'EUR'
@@ -33,8 +42,20 @@ export function MovementForm({ c, editing, onClose }: { c: Ready; editing?: Move
   const [f, setF] = useState<TxForm>(
     prev && editing
       ? formFromTx(prev, currency)
-      : { type: 'buy', date: today(), qty: '', price: '', commission: '', commissionCurrency: 'EUR', pac: false },
+      : {
+          type: preset?.type ?? 'buy',
+          date: today(),
+          // Vendita e chiusura short partono da tutta la quantità (MAX), come nel sito vecchio.
+          qty: preset ? String(maxFor(preset.type, c.result.positions[preset.assetId]?.qty ?? 0) || '') : '',
+          price: '',
+          commission: '',
+          commissionCurrency: 'EUR',
+          pac: false,
+        },
   )
+  const held = isNew ? 0 : c.result.positions[assetId]?.qty ?? 0
+  const max = maxFor(f.type, held)
+  const quote = c.rows.find(r => r.assetId === assetId)?.price ?? null
   const set = <K extends keyof TxForm>(k: K, v: TxForm[K]) => setF(x => ({ ...x, [k]: v }))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -63,8 +84,8 @@ export function MovementForm({ c, editing, onClose }: { c: Ready; editing?: Move
   }
 
   return (
-    <form className="card note-form" onSubmit={submit}>
-      <h2>{editing ? 'Modifica movimento' : 'Nuovo movimento'}</h2>
+    <form className={bare ? 'note-form' : 'card note-form'} onSubmit={submit}>
+      {!bare && <h2>{editing ? 'Modifica movimento' : 'Nuovo movimento'}</h2>}
       {editing?.fromBroker && (
         <p className="muted small">Questo movimento arriva da IBKR. Se lo modifichi resta collegato all'ordine, ma la prossima sincronizzazione non lo corregge più.</p>
       )}
@@ -104,10 +125,17 @@ export function MovementForm({ c, editing, onClose }: { c: Ready; editing?: Move
 
       <div className="form-row">
         <label>Data<input type="date" value={f.date} max={today()} onChange={e => set('date', e.target.value)} /></label>
-        <label>Quantità<input inputMode="decimal" value={f.qty} onChange={e => set('qty', e.target.value)} /></label>
+        <label>
+          Quantità
+          <span className="inline-pair">
+            <input inputMode="decimal" value={f.qty} onChange={e => set('qty', e.target.value)} />
+            {max > 0 && <button type="button" className="btn btn-ghost" onClick={() => set('qty', String(max))}>MAX</button>}
+          </span>
+        </label>
       </div>
+      {!isNew && !editing && <p className="muted small">In portafoglio: {fmtQty(held)}{quote !== null && <> · prezzo attuale {money(quote, currency)}</>}</p>}
       <div className="form-row">
-        <label>Prezzo ({currency})<input inputMode="decimal" value={f.price} onChange={e => set('price', e.target.value)} /></label>
+        <label>Prezzo ({currency})<input inputMode="decimal" value={f.price} onChange={e => set('price', e.target.value)} placeholder={quote !== null && !editing ? String(quote) : ''} /></label>
         <label>Commissioni
           <span className="inline-pair">
             <input inputMode="decimal" value={f.commission} onChange={e => set('commission', e.target.value)} placeholder="0" />
@@ -131,7 +159,7 @@ export function MovementForm({ c, editing, onClose }: { c: Ready; editing?: Move
 }
 
 /** Trasferimento di un titolo in un altro portafoglio (es. da Mediolanum a IBKR). */
-export function TransferFormCard({ c, onClose }: { c: Ready; onClose: () => void }) {
+export function TransferFormCard({ c, onClose, presetAssetId, bare }: { c: Ready; onClose: () => void; presetAssetId?: string; bare?: boolean }) {
   const edit = usePortfolioEdit()
   const state = usePortfolioState()
   const open = Object.entries(c.portfolio.assets ?? {})
@@ -140,7 +168,7 @@ export function TransferFormCard({ c, onClose }: { c: Ready; onClose: () => void
     .sort((x, y) => x.label.localeCompare(y.label))
   const others = c.options.filter(o => o.id !== c.selectedId)
 
-  const [assetId, setAssetId] = useState(open[0]?.id ?? '')
+  const [assetId, setAssetId] = useState(presetAssetId && open.some(x => x.id === presetAssetId) ? presetAssetId : open[0]?.id ?? '')
   const [destId, setDestId] = useState(others[0]?.id ?? '')
   const [date, setDate] = useState(today())
   const [qty, setQty] = useState('')
@@ -179,8 +207,8 @@ export function TransferFormCard({ c, onClose }: { c: Ready; onClose: () => void
   }
 
   return (
-    <form className="card note-form" onSubmit={submit}>
-      <h2>Trasferisci un titolo</h2>
+    <form className={bare ? 'note-form' : 'card note-form'} onSubmit={submit}>
+      {!bare && <h2>Trasferisci un titolo</h2>}
       <label>Titolo
         <select value={assetId} onChange={e => setAssetId(e.target.value)}>
           {open.map(x => <option key={x.id} value={x.id}>{x.label} — {fmtQty(x.pos!.qty)} in portafoglio</option>)}
@@ -193,9 +221,26 @@ export function TransferFormCard({ c, onClose }: { c: Ready; onClose: () => void
       </label>
       <div className="form-row">
         <label>Data<input type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} /></label>
-        <label>Quantità<input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} placeholder={sel ? String(sel.pos!.qty) : ''} /></label>
+        <label>
+          Quantità
+          <span className="inline-pair">
+            <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} placeholder={sel ? String(sel.pos!.qty) : ''} />
+            {sel && <button type="button" className="btn btn-ghost" onClick={() => setQty(String(sel.pos!.qty))}>MAX</button>}
+          </span>
+        </label>
       </div>
-      {sel && <p className="muted small">Costo medio che passa con il titolo: {money(sel.pos!.pmcNative, (sel.a.valuta || 'EUR').toUpperCase())}. Le due metà (uscita e entrata) restano collegate.</p>}
+      {sel && (
+        <ul className="plain-list transfer-summary">
+          <li><span>PMC attuale</span><b>{money(sel.pos!.pmcNative, (sel.a.valuta || 'EUR').toUpperCase())}</b></li>
+          <li><span>Quantità disponibile</span><b>{fmtQty(sel.pos!.qty)}</b></li>
+          <li><span>Prezzo usato</span><b>il PMC (nessuna plus o minus)</b></li>
+          <li><span>Commissioni</span><b>nessuna</b></li>
+        </ul>
+      )}
+      {sel && Number(qty.replace(',', '.')) >= sel.pos!.qty - 1e-9 && (
+        <p className="muted small">Trasferimento totale: il titolo passerà nel gruppo "Trasferiti" di questo portafoglio.</p>
+      )}
+      <p className="muted small">Uscita ed entrata restano collegate: il costo e le date degli acquisti originali passano con il titolo.</p>
       <p className="auth-error" role="alert">{error}</p>
       <div className="form-actions">
         <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Salvo…' : 'Trasferisci'}</button>
