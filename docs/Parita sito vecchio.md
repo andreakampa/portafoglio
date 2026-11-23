@@ -174,11 +174,11 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Inserimento ed eliminazione a mano di minus esterne (stessi campi del sito vecchio, `fiscal/manualLosses`).
 - [ ] Correzione a mano del compensato (✎): nei dati non è mai stata usata; si fa solo se Andrea la chiede.
 
-### 12. Movimenti (`storico.js`)
-- [ ] Periodo dal/al a scelta.
-- [ ] Colonna imposta stimata e totali (plus, minus, imposta) in fondo.
-- [ ] Esportazione PDF/Excel.
-- [ ] Interessi a margine: inserimento ed eliminazione a mano (oggi rimanda al sito vecchio).
+### 12. Movimenti (`storico.js`) — fatto (PR `movimenti-periodo`)
+- [x] Periodo dal/al a scelta.
+- [x] Colonna imposta stimata e totali (plus, minus, imposta) in fondo.
+- [x] Esportazione PDF/Excel.
+- [x] Interessi a margine: inserimento ed eliminazione a mano (quelli IBKR restano della sincronizzazione).
 
 ### 13. PAC (`pac.js`)
 - [ ] Modifica del piano, data di fine, commissione per rata.

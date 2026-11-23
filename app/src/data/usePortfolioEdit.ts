@@ -2,6 +2,7 @@ import { ref, runTransaction, update } from 'firebase/database'
 import { useMemo } from 'react'
 import { useUser } from '../auth/context'
 import type { RawAsset, RawTx } from '../domain/engine/types'
+import type { MarginInterestRow } from '../domain/engine/movements'
 import type { StoredManualLoss } from '../domain/manualLosses'
 import { isRecorded } from '../domain/pac'
 import { addToList, buildTransferPair, findSameAsset, findTransfer, removeFromList, replaceInList, transferWrites, type PortfolioLike, type TransferForm, type TxRef } from '../domain/txEdit'
@@ -39,6 +40,16 @@ export function usePortfolioEdit() {
           return clean(next)
         })
         if (!r.committed) throw new Error('Le minus sono cambiate nel frattempo (forse da un altro dispositivo): riprova.')
+      },
+
+      /** Interessi di margine del portafoglio (quelli a mano si aggiungono e tolgono; quelli IBKR li scrive la sincronizzazione). */
+      changeMarginInterest: async (pid: string, fn: (list: MarginInterestRow[]) => MarginInterestRow[] | undefined) => {
+        const r = await runTransaction(ref(db, `${root}/${pid}/marginInterest`), cur => {
+          const next = fn(Array.isArray(cur) ? (cur as MarginInterestRow[]) : Object.values((cur ?? {}) as Record<string, MarginInterestRow>))
+          if (next === undefined) return cur == null ? null : undefined
+          return clean(next)
+        })
+        if (!r.committed) throw new Error('Gli interessi sono cambiati nel frattempo (forse da un altro dispositivo): riprova.')
       },
 
       /**
