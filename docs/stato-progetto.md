@@ -1,4 +1,4 @@
-# Stato del progetto — aggiornato al 21/11/2026
+# Stato del progetto — aggiornato al 24/11/2026
 
 ## Obiettivo
 Un'app (PWA, telefono e PC) per seguire più portafogli (IBKR dichiarativo, Mediolanum e Trade Republic
@@ -72,7 +72,15 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 - **Nota tecnica:** Firebase scarta i `null`: i campi opzionali salvati (es. `ratePct`) possono mancare, vanno letti con `== null`.
 - **Non si fa più:** quota a margine stimata per titolo e tasto MAX (decisione di Andrea). Il campo `marginAmount` dei movimenti resta com'è.
 
-## Stato al 21/11/2026 (fine sessione) — da dove ripartire
+## Parità con il sito vecchio (23-24/11/2026) — da dove ripartire
+Checklist: [Parita sito vecchio.md](Parita%20sito%20vecchio.md). **Il sito vecchio non si dismette finché non è tutta spuntata.**
+Fatti e pubblicati (PR #34-#42): 0 colori con icona (tema giorno verde acqua scuro), 1 telefono/layout, 2 barra prezzi (EUR/USD, €/$, peso, cassetto,
+Aggiorna), 3 dodici numeri chiave, 4 tabella Posizioni (colonne su Firebase `settings/positionColumns`, ordinamento, gruppi, logo, 52 settimane,
+grafico del giorno, pallino dividendi, PDF/Excel), 5 azioni sulla riga in finestra, 6 Storico del titolo, 7 Dividendi del titolo
+(netto reale in `settings/dividendActuals`), 8 posizioni chiuse. **Resta:** 9 cassetto fiscale (da verificare con Andrea) e le funzioni minori trovate nell'inventario (blocchi 10-15, più due decisioni per Andrea).
+Prove nel browser: Chrome headless + emulatori con la copia del backup (script in scratchpad di sessione, non salvato nel repo).
+
+## Stato al 21/11/2026 (fine sessione)
 **Pubblicato su `main` e online** (v2 su `/portafoglio/v2/`): margine, scheda Cassa (Movimenti), dividendi e "Imposte stimate" nel Fiscale, PAC automatico, opzioni.
 **PR aperte:** strumento opzioni + stato (#20) e prospetto per la dichiarazione (branch `dichiarazione`). Su `main` il resto è tutto unito; ultima verifica: 170 test verdi.
 
@@ -120,7 +128,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    uscita ed entrata cambiano insieme in una sola scrittura (`findTransfer`/`transferWrites` in `domain/txEdit.ts`), con controllo delle quantità disponibili da una parte e già vendute dall'altra.
    **Scelta dei lotti: non si fa** (LIFO obbligatorio in dichiarativo, costo medio in amministrato: vedi regole-fiscali.md).
    Date dei trasferimenti da Mediolanum allineate al rendiconto IBKR il 22/11/2026: AHLA e RACE al **26/05/2026** (uscita ed entrata), gli altri 6 erano già giusti al 28/05 (backup `.backup/database-20261122-191834.json`).
-   Dopo qualche giorno di uso si può dismettere il sito vecchio per l'inserimento.
+   ~~Dopo qualche giorno di uso si può dismettere il sito vecchio~~: annullato, vedi checklist di parità.
 4. **Simulatore:** "Registra come movimenti" **fatto** (22/11/2026): data scelta, prezzo simulato segnato "da confermare", `source: 'simulatore'`;
    su IBKR la sincronizzazione lo collega all'ordine vero (stesso giorno, tipo e quantità, prezzo entro l'1%). **Bollo/IVAFE e dividendi nella stima: fatto** (`simulateExtras`): 2‰ annuo sulla variazione del valore dei titoli long (e quota dei giorni che restano dell'anno), dividendi degli ultimi 12 mesi × nuova quantità, netti come nel resto dell'app. Simulatore completo.
    **Cambi dei giorni recenti:** per i movimenti degli ultimi 7 giorni senza cambio Banca d'Italia (pubblicato nel pomeriggio) si usa quello di oggi finché arriva l'ufficiale (`withRecentFallback`).
@@ -129,7 +137,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
    **Watchlist IBKR (22/11/2026):** importate le 13 watchlist del conto (105 titoli) con il connettore IBKR; ogni titolo ha `lists` (filtro per lista nella pagina) e `source: ibkr`. **Allineamento settimanale**: attività programmata di Claude `allinea-watchlist-ibkr` (domenica 21:10, gira dall'app Claude del PC): legge le watchlist con il connettore → `.backup/ibkr-watchlists.json` → `tools/watchlist-ibkr.mjs` (regole `mergeIbkrWatchlists`: solo aggiunte, soglie/note e titoli aggiunti a mano mai toccati, titoli tolti da IBKR solo segnati `goneFromIbkr`) → `firebase database:update`. Si annulla dalla sezione «Programmate» dell'app Claude. Simbolo «OS» (Spazio) non trovato su Yahoo: da controllare.
 7. **Grafica definitiva (fatto, 22/11/2026, PR `tema-e`):** temi scelti da Andrea sulla pagina di prova (artifact «Temi Portafoglio»): **E giorno** (carta e inchiostro, blu profondo) ed **E sera** (ardesia, verde acqua; arancio solo per gli avvisi). Stessi caratteri nei due temi (titoli Source Serif 4, testo e numeri Inter, ospitati nell'app con @fontsource, funzionano offline). Impostazioni → Tema: automatico/chiaro/scuro (`lib/theme.ts`, `data-theme` su <html>, per dispositivo). Guadagni e perdite con ▲ ▼ oltre al colore (`tone()` → classi up/down). Menu: PC barra laterale scura a tre gruppi; telefono barra con 5 voci (Home, Posizioni, + nuovo movimento, Fiscale, Altro) e pagina **Altro**. Panoramica: 4 numeri chiave (valore e variazione di oggi, non realizzato, realizzato dell'anno, imposta), poi su PC due colonne (andamento e posizioni principali | mercati, watchlist, margine).
 8. **Multiutente (fatto, 22/11/2026, PR `inviti-v2`):** Impostazioni → **Inviti** (solo admin): crea codice con nota, **Condividi** (WhatsApp/mail con link `…/v2/?invito=CODICE`, oppure copia), elimina i liberi, elenco con chi li ha usati. Il link apre la registrazione con il codice già scritto. **Primo accesso guidato**: senza portafogli la Panoramica mostra «Benvenuto!» con i tre passi e la creazione del primo portafoglio (spiegazione amministrato/dichiarativo). Impostazioni → **Portafogli**: rinomina e «+ Nuovo portafoglio». Provato sugli emulatori con le regole vere: invito → link → registrazione → primo portafoglio.
-9. **Assistente AI (fatto, 22/11/2026, PR `assistente`):** pagina Assistente (barra laterale su PC; sul telefono da Altro → Strumenti), stessa chiave Gemini del sito vecchio (`localStorage.gemini_api_key`, stesso dominio), Worker `/chat` invariato. Contesto = `buildAiContext` (posizioni, totali, fiscale dell'anno, minus disponibili, ultimi 25 movimenti; niente nome del conto), domande suggerite, storico della conversazione solo in memoria. Provato fino a Gemini con chiave finta (errore gestito). **Resta: dismissione del sito vecchio** (dopo qualche giorno d'uso della v2; servono ancora: margine/interessi inseriti a mano? controllare con Andrea).
+9. **Assistente AI (fatto, 22/11/2026, PR `assistente`):** pagina Assistente (barra laterale su PC; sul telefono da Altro → Strumenti), stessa chiave Gemini del sito vecchio (`localStorage.gemini_api_key`, stesso dominio), Worker `/chat` invariato. Contesto = `buildAiContext` (posizioni, totali, fiscale dell'anno, minus disponibili, ultimi 25 movimenti; niente nome del conto), domande suggerite, storico della conversazione solo in memoria. Provato fino a Gemini con chiave finta (errore gestito). **Dismissione del sito vecchio:** solo a checklist di parità completata.
 
 ## Da chiedere o verificare con Andrea
 - Aggiornare la PWA sul telefono (chiuderla e riaprirla due volte) e controllare: scheda "Dividendi" nel Fiscale per ogni portafoglio (Mediolanum: Meta ≈ 0,58 €, Microsoft ≈ 3,45 € netti), scheda "Piani PAC".
