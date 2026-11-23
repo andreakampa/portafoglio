@@ -3,7 +3,7 @@ import type { FiscalLine } from './engine/fiscal.ts'
 import type { PositionResult } from './engine/positions.ts'
 import type { RawAsset } from './engine/types.ts'
 import type { PositionRow } from './engine/valuation.ts'
-import { COLUMNS, groupRows, moveColumn, reconcileColumns, rowFigures, sortRows, toggleColumn, visibleColumns } from './positionTable.ts'
+import { COLUMNS, dividendDot, groupRows, moveColumn, reconcileColumns, rowFigures, sortRows, toggleColumn, visibleColumns } from './positionTable.ts'
 
 const row = (p: Partial<PositionRow>): PositionRow => ({
   assetId: 'a', symbol: 'A', currency: 'USD', qty: 10, isShort: false, pmcNative: 10, costEur: 100, costTodayFxEur: 90, price: 12,
@@ -96,5 +96,18 @@ describe('ordinamento', () => {
   })
   it('nomi senza badare alle maiuscole', () => {
     expect(sortRows(items, { key: 'name', dir: 'asc' }).map(i => i.r.symbol)).toEqual(['alfa', 'Beta', 'Zeta'])
+  })
+})
+
+describe('pallino dividendi', () => {
+  const divs = [{ exDate: '2026-01-10' }, { exDate: '2026-11-10' }, { exDate: '2026-12-10' }]
+  it('pagato dopo 21 giorni dallo stacco, maturato prima, futuro ignorato', () => {
+    expect(dividendDot(divs, () => 10, '2026-11-20')).toEqual({ paid: true, pending: true })
+    expect(dividendDot(divs, () => 10, '2026-12-05')).toEqual({ paid: true, pending: false })
+    expect(dividendDot(divs.slice(1), () => 10, '2026-11-20')).toEqual({ paid: false, pending: true })
+  })
+  it('senza azioni allo stacco: niente pallino', () => {
+    expect(dividendDot(divs, () => 0, '2026-11-20')).toEqual({ paid: false, pending: false })
+    expect(dividendDot(divs, d => (d === '2026-11-10' ? 5 : 0), '2026-11-20')).toEqual({ paid: false, pending: true })
   })
 })

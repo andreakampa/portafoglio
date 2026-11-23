@@ -4,12 +4,16 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useColumnConfig } from '../data/useColumnConfig'
 import type { Computed } from '../data/useComputedPortfolio'
 import { useViewPref } from '../data/viewPrefs'
+import { useYahooDividends } from '../data/useYahooDividends'
+import { qtyBefore } from '../domain/engine/dividends'
 import type { PositionRow } from '../domain/engine/valuation'
 import {
-  COLUMNS, GROUP_LABEL, GROUPS_OPEN_BY_DEFAULT, groupRows, moveColumn, rowFigures, sortRows, toggleColumn, visibleColumns,
-  type ColumnId, type GroupId, type RowFigures, type SortKey, type SortState,
+  COLUMNS, dividendDot, GROUP_LABEL, GROUPS_OPEN_BY_DEFAULT, groupRows, moveColumn, rowFigures, sortRows, toggleColumn, visibleColumns,
+  type ColumnId, type DividendDot, type GroupId, type RowFigures, type SortKey, type SortState,
 } from '../domain/positionTable'
+import { exportPdf, exportXlsx, type ExportTable } from '../lib/exportTable'
 import { eur, money, pct, qty, tone } from '../lib/format'
+import { DividendDotView, Range52, Sparkline } from './MiniCharts'
 import { Tag } from './Tag'
 import { TickerLogo } from './TickerLogo'
 
@@ -21,6 +25,7 @@ const GROUP_ORDER: GroupId[] = ['active', 'short', 'closed', 'transferred', 'emp
 const SORT_KEYS: SortKey[] = ['name', ...COLUMNS.map(c => c.id)]
 const SORT_PREFS = SORT_KEYS.flatMap(k => [`${k}:asc`, `${k}:desc`])
 const LABEL: Record<ColumnId, string> = Object.fromEntries(COLUMNS.map(c => [c.id, c.label])) as Record<ColumnId, string>
+const TODAY = new Date().toISOString().slice(0, 10)
 const pctText = (x: number | undefined | null) => (x == null || !Number.isFinite(x) ? '—' : `${x.toFixed(1).replace('.', ',')}%`)
 
 interface Props {
@@ -28,9 +33,16 @@ interface Props {
   shown: Shown
   /** Peso % di ogni titolo sulla base scelta (portafoglio o tutti). */
   weightOf: Record<string, number>
+  /** Euro → valuta mostrata (per l'esportazione) e la sua sigla. */
+  convert: (eur: number | null) => number | null
+  currency: string
 }
 
-export function PositionsTable({ c, shown, weightOf }: Props) {
+const PER_ASSET_CCY: ColumnId[] = ['pmc', 'price', 'prevClose']
+const NO_UNIT: ColumnId[] = ['qty', 'weightCost', 'weightValue', 'pmcEur']
+const round = (x: number | null | undefined, d = 2) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10 ** d) / 10 ** d)
+
+export function PositionsTable({ c, shown, weightOf, convert, currency }: Props) {
   const [cfg, saveCfg] = useColumnConfig()
   const [sortPref, setSortPref] = useViewPref('positionsSort', SORT_PREFS, 'value:desc')
   const [k, d] = sortPref.split(':') as [SortKey, 'asc' | 'desc']
@@ -43,6 +55,10 @@ export function PositionsTable({ c, shown, weightOf }: Props) {
   const items = (rows: PositionRow[]): Item[] =>
     rows.map(r => ({ r, f: rowFigures(r, assets[r.assetId], c.result.positions[r.assetId], c.result.fiscal.lines, r.previousClose ?? null) }))
   const groups = groupRows(c.rows, assets)
+  // Pallino dei dividendi: stima Yahoo come nel sito vecchio (pagato 21 giorni dopo lo stacco).
+  const yDivs = useYahooDividends(c.rows.map(r => r.symbol))
+  const dotOf = (r: PositionRow): DividendDot =>
+    dividendDot(yDivs[r.symbol] ?? [], ex => qtyBefore(assets[r.assetId]?.transactions ?? [], ex), TODAY)
   const costBase = c.rows.reduce((s, r) => (r.qty > 0 ? s + r.costEur : s), 0)
 
   const onSort = (key: SortKey) => {
@@ -73,10 +89,17 @@ export function PositionsTable({ c, shown, weightOf }: Props) {
       case 'qty': return qty(r.qty)
       case 'pmc': return open ? money(r.pmcNative, r.currency) : '—'
       case 'price':
-        return <>{money(r.price, r.currency)}{open && !cols.includes('day') && <small className={`cell-sub ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</small>}</>
+        return (
+          <>
+            {money(r.price, r.currency)}
+            {open && !cols.includes('day') && <small className={`cell-sub ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</small>}
+            {open && !cols.includes('day') && <Sparkline points={r.spark} previousClose={r.previousClose} />}
+            <Range52 price={r.price} low={r.low52} high={r.high52} currency={r.currency} />
+          </>
+        )
       case 'prevClose': return money(f.prevClose, r.currency)
       case 'day':
-        return open ? <span className={tone(f.dayEur)}>{shown(f.dayEur, true)}<small className="cell-sub">{pct(r.dayChangePct)}</small></span> : '—'
+        return open ? <span className={tone(f.dayEur)}>{shown(f.dayEur, true)}<small className="cell-sub">{pct(r.dayChangePct)}</small><Sparkline points={r.spark} previousClose={r.previousClose} /></span> : '—'
       case 'cost': return open ? shown(r.costEur) : '—'
       case 'value': return open ? shown(r.valueEur) : '—'
       case 'weightCost': return open && r.qty > 0 && costBase > 0 ? pctText((r.costEur / costBase) * 100) : '—'
@@ -104,6 +127,7 @@ export function PositionsTable({ c, shown, weightOf }: Props) {
       <div>
         <b>{r.symbol}</b>
         {r.currency !== 'EUR' && <span className="ccy">{r.currency}</span>}
+        <DividendDotView {...dotOf(r)} />
         {r.isShort && <Tag tone="short">short</Tag>}
         {r.qty !== 0 && <small className="cell-sub muted">{qty(Math.abs(r.qty))} {Math.abs(r.qty) === 1 ? 'azione' : 'azioni'}</small>}
       </div>
@@ -111,6 +135,70 @@ export function PositionsTable({ c, shown, weightOf }: Props) {
   )
 
   const visibleGroups = GROUP_ORDER.filter(g => groups[g].length > 0)
+
+  // Esportazione: titoli attivi e short con le colonne visibili (come il sito vecchio).
+  // Excel riceve numeri veri (si possono sommare), il PDF gli stessi già formattati.
+  const exportValue = (id: ColumnId, { r, f }: Item): number | null => {
+    switch (id) {
+      case 'qty': return r.qty
+      case 'pmc': return round(r.pmcNative, 4)
+      case 'price': return r.price
+      case 'prevClose': return f.prevClose
+      case 'day': return round(convert(f.dayEur))
+      case 'cost': return round(convert(r.costEur))
+      case 'value': return round(convert(r.valueEur))
+      case 'weightCost': return r.qty > 0 && costBase > 0 ? round((r.costEur / costBase) * 100, 1) : null
+      case 'weightValue': return round(weightOf[r.assetId], 1)
+      case 'unrealized': return round(convert(r.unrealizedEur))
+      case 'unrealizedNet': return round(convert(f.unrealizedNetEur))
+      case 'realized': return round(convert(r.realizedEur))
+      case 'realizedNet': return round(convert(f.realizedNetEur))
+      case 'pmcEur': return round(f.pmcEur, 4)
+      case 'commissions': return round(convert(f.commissionsEur))
+    }
+  }
+  const exportText = (id: ColumnId, it: Item): string => {
+    const { r, f } = it
+    switch (id) {
+      case 'qty': return qty(r.qty)
+      case 'pmc': return money(r.pmcNative, r.currency)
+      case 'price': return money(r.price, r.currency)
+      case 'prevClose': return money(f.prevClose, r.currency)
+      case 'day': return `${shown(f.dayEur, true)} (${pct(r.dayChangePct)})`
+      case 'weightCost':
+      case 'weightValue': return pctText(exportValue(id, it))
+      case 'unrealized': return `${shown(r.unrealizedEur, true)} (${pct(r.unrealizedPct)})`
+      case 'unrealizedNet': return shown(f.unrealizedNetEur, true)
+      case 'realized': return shown(r.realizedEur, true)
+      case 'realizedNet': return shown(f.realizedNetEur, true)
+      case 'pmcEur': return eur(f.pmcEur)
+      case 'cost': return shown(r.costEur)
+      case 'value': return shown(r.valueEur)
+      case 'commissions': return shown(f.commissionsEur)
+    }
+  }
+  const header = (id: ColumnId) => LABEL[id] + (PER_ASSET_CCY.includes(id) ? ' (valuta titolo)' : NO_UNIT.includes(id) ? '' : ` (${currency})`)
+  const buildExport = (): ExportTable => {
+    const list = sortRows(items([...groups.active, ...groups.short]), sort, costBase)
+    const name = c.options.find(o => o.id === c.selectedId)?.name ?? 'Portafoglio'
+    const now = new Date()
+    return {
+      title: `${name}: posizioni`,
+      subtitle: `${now.toLocaleString('it-IT')} · importi in ${currency} al cambio di oggi · ${list.length} titoli`,
+      headers: ['Titolo', ...cols.map(header)],
+      values: list.map(it => [it.r.symbol, ...cols.map(id => exportValue(id, it))]),
+      texts: list.map(it => [it.r.symbol, ...cols.map(id => exportText(id, it))]),
+      fileName: `posizioni-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${now.toISOString().slice(0, 10)}`,
+    }
+  }
+  const [exporting, setExporting] = useState<string | null>(null)
+  const doExport = (kind: 'pdf' | 'xlsx') => {
+    setExporting(null)
+    const t = buildExport()
+    void (kind === 'pdf' ? exportPdf(t) : exportXlsx(t))
+      .then(() => setExporting(`File ${kind === 'pdf' ? 'PDF' : 'Excel'} creato: ${t.fileName}`))
+      .catch(e => setExporting(`Esportazione non riuscita: ${e instanceof Error ? e.message : String(e)}`))
+  }
 
   return (
     <div className={`pos-view ${fits ? '' : 'use-cards'}`}>
@@ -125,10 +213,17 @@ export function PositionsTable({ c, shown, weightOf }: Props) {
             <option value="name:asc">Nome</option>
           </select>
         </label>
+        <span className="export-btns">
+          <span className="muted small">Esporta</span>
+          <button type="button" className="btn btn-ghost btn-small" onClick={() => doExport('pdf')}>PDF</button>
+          <button type="button" className="btn btn-ghost btn-small" onClick={() => doExport('xlsx')}>Excel</button>
+        </span>
         <button type="button" className="btn btn-ghost btn-small table-only" aria-expanded={showCols} onClick={() => setShowCols(v => !v)}>
           ⚙ Colonne
         </button>
       </div>
+
+      {exporting && <p className="muted small export-msg" role="status">{exporting}</p>}
 
       {showCols && (
         <div className="card col-settings">
@@ -156,7 +251,7 @@ export function PositionsTable({ c, shown, weightOf }: Props) {
           <Group key={g} id={g} count={groups[g].length}>
             <ul className="pos-cards">
               {sortRows(items(groups[g]), sort, costBase).map(it => (
-                <PositionCard key={it.r.assetId + g} it={it} shown={shown} weight={pctText(weightOf[it.r.assetId])} />
+                <PositionCard key={it.r.assetId + g} it={it} shown={shown} weight={pctText(weightOf[it.r.assetId])} dot={dotOf(it.r)} />
               ))}
             </ul>
           </Group>
@@ -233,7 +328,7 @@ function Group({ id, count, children }: { id: GroupId; count: number; children: 
   )
 }
 
-function PositionCard({ it: { r, f }, shown, weight }: { it: Item; shown: Shown; weight: string }) {
+function PositionCard({ it: { r, f }, shown, weight, dot }: { it: Item; shown: Shown; weight: string; dot: DividendDot }) {
   const open = r.qty !== 0
   return (
     <li className="card pos-card">
@@ -241,8 +336,10 @@ function PositionCard({ it: { r, f }, shown, weight }: { it: Item; shown: Shown;
         <TickerLogo symbol={r.symbol} />
         <b>{r.symbol}</b>
         {r.currency !== 'EUR' && <span className="ccy">{r.currency}</span>}
+        <DividendDotView {...dot} />
         {r.isShort && <Tag tone="short">short</Tag>}
         {open && <span className={`pos-day ${tone(f.dayEur)}`}>{shown(f.dayEur, true)} · {pct(r.dayChangePct)}</span>}
+        {open && <Sparkline points={r.spark} previousClose={r.previousClose} />}
       </div>
       {open ? (
         <>

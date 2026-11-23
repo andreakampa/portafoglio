@@ -5,6 +5,9 @@ export interface QuoteLike {
   price: number
   previousClose: number | null
   currency: string
+  low52?: number | null
+  high52?: number | null
+  spark?: number[]
 }
 
 export interface PositionRow {
@@ -20,6 +23,10 @@ export interface PositionRow {
   price: number | null
   /** Chiusura di ieri, nella valuta del titolo. */
   previousClose?: number | null
+  /** Minimo e massimo a 52 settimane e prezzi della giornata (valuta del titolo). */
+  low52?: number | null
+  high52?: number | null
+  spark?: number[]
   valueEur: number | null
   /** Risultato non realizzato in EUR (al cambio di oggi), positivo = guadagno anche per gli short. */
   unrealizedEur: number | null
@@ -70,6 +77,9 @@ export function valuePositions(
       costTodayFxEur: rate ? pos.costNative / rate : null,
       price: q?.price ?? null,
       previousClose: q?.previousClose ?? null,
+      low52: q?.low52 ?? null,
+      high52: q?.high52 ?? null,
+      spark: q?.spark,
       valueEur,
       unrealizedEur,
       unrealizedPct: unrealizedEur !== null && pos.costEur > 0 ? (unrealizedEur / pos.costEur) * 100 : null,
