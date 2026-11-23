@@ -4,6 +4,7 @@ import { ExerciseFormCard } from '../components/ExerciseForm'
 import { MovementForm, TransferEditCard, TransferFormCard } from '../components/MovementForms'
 import { PacPlansCard } from '../components/PacPlansCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
+import { KIND_TONE, Tag, TagButton } from '../components/Tag'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioState } from '../data/usePortfolioState'
@@ -90,8 +91,8 @@ export function Movements() {
   const actions = (m: Movement) =>
     editable(m) || isTransfer(m) ? (
       <span className="note-actions">
-        <button type="button" className="linklike" onClick={() => { setForm(m); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Modifica</button>
-        <button type="button" className="linklike neg" onClick={() => void remove(m)}>Elimina</button>
+        <TagButton tone="edit" onClick={() => { setForm(m); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Modifica</TagButton>
+        <TagButton tone="delete" onClick={() => void remove(m)}>Elimina</TagButton>
       </span>
     ) : null
   const marginAt = (m: Movement) => (m.kind === 'buy' ? marginOnDate(c.portfolio as MarginPortfolio, m.date) : null)
@@ -179,7 +180,7 @@ export function Movements() {
                     <tr key={m.key}>
                       <td>{fmtDate(m.date)}</td>
                       <td><b>{m.symbol}</b></td>
-                      <td><span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>{m.estimated && <span className="badge" title="Prezzo di chiusura di borsa: modifica il movimento per inserire quello vero">da confermare</span>}{m.marginAmount > 0 && <span className="badge" title="Finanziato a margine">margine {money(m.marginAmount, m.currency)}</span>}<MarginDayNote margin={marginAt(m)} /></td>
+                      <td><Tag tone={KIND_TONE[m.kind]}>{KIND_LABEL[m.kind]}</Tag>{m.estimated && <span className="badge badge-warn" title="Prezzo di chiusura di borsa: modifica il movimento per inserire quello vero">da confermare</span>}{m.marginAmount > 0 && <span className="badge badge-warn" title="Finanziato a margine">margine {money(m.marginAmount, m.currency)}</span>}<MarginDayNote margin={marginAt(m)} /></td>
                       <td className="num">{qty(m.qty)}</td>
                       <td className="num">{money(m.price, m.currency)}</td>
                       <td className="num">{money(m.gross, m.currency)}</td>
@@ -215,7 +216,7 @@ export function Movements() {
               <ul className="plain-list">
                 {cash.items.map(r => (
                   <li key={r.id} title={r.description}>
-                    <span>{fmtDate(r.date)} · {CASH_LABEL[r.kind] ?? r.kind}{r.symbol ? ` · ${r.symbol}` : ''}</span>
+                    <span>{fmtDate(r.date)} · {r.kind === 'dividend' ? <Tag tone="dividend">{CASH_LABEL[r.kind]}</Tag> : CASH_LABEL[r.kind] ?? r.kind}{r.symbol ? ` · ${r.symbol}` : ''}</span>
                     <b className={tone(r.amount)}>{money(r.amount, r.currency)}</b>
                   </li>
                 ))}
@@ -260,10 +261,10 @@ function MovementItem({ m, actions, margin }: { m: Movement; actions: React.Reac
     <li className="card mov-item">
       <div className="mov-head">
         <b>{m.symbol}</b>
-        <span className={`kind kind-${m.kind}`}>{KIND_LABEL[m.kind]}</span>
+        <Tag tone={KIND_TONE[m.kind]}>{KIND_LABEL[m.kind]}</Tag>
         <span className="muted mov-date">{fmtDate(m.date)}</span>
         {m.pac && <span className="badge">PAC</span>}
-        {m.estimated && <span className="badge" title="Prezzo di chiusura di borsa: modifica il movimento per inserire quello vero">da confermare</span>}
+        {m.estimated && <span className="badge badge-warn" title="Prezzo di chiusura di borsa: modifica il movimento per inserire quello vero">da confermare</span>}
       </div>
       <div className="mov-body">
         <span>{qty(m.qty)} × {money(m.price, m.currency)} = {money(m.gross, m.currency)}</span>

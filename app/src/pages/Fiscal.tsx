@@ -7,6 +7,7 @@ import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { availableLosses } from '../domain/engine/fiscal'
 import { wealthTax, wealthTaxKindFor } from '../domain/engine/wealthTax'
 import { eur, THIS_YEAR, tone } from '../lib/format'
+import { Tag } from '../components/Tag'
 
 export function Fiscal() {
   const c = useComputedPortfolio()
@@ -95,7 +96,7 @@ export function Fiscal() {
               <li key={l.key}>
                 <div>
                   <b>{l.assetName}</b>
-                  {l.side === 'short' && <span className="badge">short</span>}
+                  {l.side === 'short' && <Tag tone="short">short</Tag>}
                   {l.side === 'manuale' && <span className="badge">a mano</span>}
                   {l.excluded && <span className="badge">ETF/fondo: non compensabile</span>}
                   <br />
