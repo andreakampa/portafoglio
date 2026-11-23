@@ -57,13 +57,15 @@ Nuova regola: **un colore per significato, sempre con icona** (leggibile anche s
       (Andrea aveva "Sito desktop" attivo: risolto reinstallando la PWA.)
       Fatto: barra laterale con `(min-width: 900px) and (pointer: fine), (min-width: 1200px)`.
 
-## 2. Header / barra superiore (vecchio: `render.js`, `index.js`)
+## 2. Header / barra superiore (vecchio: `render.js`, `index.js`) — ✅ fatto (PR `barra-superiore`)
 
-- [ ] Cambio EUR/USD in tempo reale visibile.
-- [ ] **Mostra in: € EUR / $ USD** — interruttore che converte gli importi della tabella.
-- [ ] **Peso su: Portafoglio / Tutti** (base dei % peso).
-- [ ] Badge **Cassetto fiscale** con avviso (!), che apre il riepilogo tasse (vecchio: azione `tasse-dovute-dashboard`).
-- [ ] Ora dell'ultimo aggiornamento prezzi + pulsante Aggiorna.
+Barra sopra la tabella Posizioni (`components/PriceBar.tsx`); scelte ricordate sul dispositivo (`data/viewPrefs.ts`), logica in `domain/display.ts`.
+
+- [x] Cambio EUR/USD in tempo reale visibile (Yahoo `EURUSD=X`, variazione del giorno; se manca, cambio del giorno).
+- [x] **Mostra in: € EUR / $ USD** — interruttore che converte gli importi della tabella (valore, risultato, chiuse; i riquadri restano in €).
+- [x] **Peso su: Portafoglio / Tutti** (base dei % peso): nuova colonna Peso = valore lordo del titolo / valore lordo (long + |short|) del portafoglio o di tutti.
+- [x] Badge **Cassetto fiscale** con avviso (!) se ci sono minus da compensare, apre la pagina Fiscale.
+- [x] Ora dell'ultimo aggiornamento prezzi + pulsante Aggiorna (scarica di nuovo ignorando la cache).
 
 ## 3. Numeri chiave (vecchio: 12, v2: 4)
 

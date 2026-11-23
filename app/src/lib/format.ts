@@ -18,6 +18,12 @@ export const money = (n: number | null | undefined, currency: string) =>
     ? empty
     : nf({ style: 'currency', currency, maximumFractionDigits: n !== 0 && Math.abs(n) < 1 ? 4 : 2 }).format(n)
 
+/** Importo in una valuta qualsiasi, con segno se richiesto (es. tabella Posizioni in dollari). */
+export const cash = (n: number | null | undefined, currency: string, signed = false) =>
+  n === null || n === undefined || !Number.isFinite(n)
+    ? empty
+    : nf({ style: 'currency', currency, signDisplay: signed ? 'exceptZero' : 'auto' }).format(n)
+
 export const pct = (n: number | null | undefined) =>
   n === null || n === undefined || !Number.isFinite(n) ? empty : nf({ maximumFractionDigits: 2, minimumFractionDigits: 2, signDisplay: 'exceptZero' }).format(n) + '%'
 

@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { KIND_LABEL } from '../domain/engine/movements'
-import { KIND_TONE, Tag, type Tone } from './Tag'
+import { Tag } from './Tag'
+import { KIND_TONE, type Tone } from './tones'
 // @ts-expect-error: i tipi di Node non sono inclusi nel progetto del browser
 import { readFileSync } from 'node:fs'
 

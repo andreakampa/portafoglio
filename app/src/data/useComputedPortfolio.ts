@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { computeAllPortfolios, type PortfolioResult, type RawPortfolio } from '../domain/engine/portfolio.ts'
 import type { FxLookup } from '../domain/engine/types.ts'
 import { totals, valuePositions, type PortfolioTotals, type PositionRow, type QuoteLike, symbolOf } from '../domain/engine/valuation.ts'
@@ -6,6 +6,15 @@ import { loadFx, withRecentFallback } from '../lib/fxRates.ts'
 import { cachedQuotes, loadLatestFx, loadQuotes } from '../lib/prices.ts'
 import { useSelectedPortfolioId } from './selection.ts'
 import { usePortfolioState } from './usePortfolioState.ts'
+
+/** Simbolo Yahoo del cambio: prezzo = dollari per 1 euro. */
+export const EURUSD_SYMBOL = 'EURUSD=X'
+
+export interface LiveFx {
+  /** Dollari per 1 euro. */
+  rate: number
+  changePct: number | null
+}
 
 export interface PortfolioOption {
   id: string
@@ -30,6 +39,14 @@ export type Computed =
       /** Cambi storici e più recenti: servono al simulatore. */
       fx: FxLookup
       latestFx: Record<string, number>
+      /** Cambio EUR/USD in tempo reale (o quello del giorno se Yahoo non risponde). */
+      eurUsd: LiveFx | null
+      /** Quando sono stati scaricati i prezzi mostrati (ms), e il pulsante Aggiorna. */
+      pricesAt: number | null
+      refreshPrices: () => void
+      /** Tutti i portafogli e i loro risultati: servono per il peso su "Tutti". */
+      portfolios: Record<string, RawPortfolio>
+      allResults: Record<string, PortfolioResult>
     }
 
 /** Date (e valute) per cui servono i cambi storici: movimenti di titoli non in EUR o commissioni in valuta. */
@@ -85,13 +102,15 @@ export function useComputedPortfolio(): Computed {
   const result = selectedId && results ? results[selectedId] ?? null : null
 
   // 2. Prezzi: subito quelli in cache, poi aggiornati.
+  // Con i titoli si carica anche il cambio EUR/USD in tempo reale (Yahoo), mostrato nella barra prezzi.
   const symbols = useMemo(
-    () => Object.entries(portfolio?.assets ?? {}).map(([id, a]) => symbolOf(a, id)),
+    () => [...Object.entries(portfolio?.assets ?? {}).map(([id, a]) => symbolOf(a, id)), EURUSD_SYMBOL],
     [portfolio],
   )
-  const [quotes, setQuotes] = useState<Record<string, QuoteLike>>(() => cachedQuotes())
+  const [quotes, setQuotes] = useState<Record<string, QuoteLike & { at?: number }>>(() => cachedQuotes())
   const [loadedFor, setLoadedFor] = useState<string[] | null>(null)
-  const pricesLoading = loadedFor !== symbols
+  const [refreshing, setRefreshing] = useState(false)
+  const pricesLoading = loadedFor !== symbols || refreshing
   useEffect(() => {
     let alive = true
     Promise.all([loadQuotes(symbols), loadLatestFx()]).then(([q, fx]) => {
@@ -106,6 +125,26 @@ export function useComputedPortfolio(): Computed {
       clearInterval(timer)
     }
   }, [symbols])
+  const refreshPrices = useCallback(() => {
+    setRefreshing(true)
+    Promise.all([loadQuotes(symbols, true), loadLatestFx()])
+      .then(([q, fx]) => {
+        setQuotes(prev => ({ ...prev, ...q }))
+        if (Object.keys(fx).length) setLatestFx(fx)
+      })
+      .finally(() => setRefreshing(false))
+  }, [symbols])
+  // Ora dell'ultimo scaricamento dei prezzi (il più vecchio tra i titoli del portafoglio).
+  const pricesAt = useMemo(() => {
+    const ats = symbols.map(s => quotes[s]?.at).filter((x): x is number => typeof x === 'number')
+    return ats.length ? Math.min(...ats) : null
+  }, [symbols, quotes])
+  const fxQuote = quotes[EURUSD_SYMBOL]
+  const eurUsd: LiveFx | null = fxQuote
+    ? { rate: fxQuote.price, changePct: fxQuote.previousClose ? ((fxQuote.price - fxQuote.previousClose) / fxQuote.previousClose) * 100 : null }
+    : latestFx.USD
+      ? { rate: latestFx.USD, changePct: null }
+      : null
 
   const rows = useMemo(
     () => (result && portfolio ? valuePositions(portfolio.assets ?? {}, result.positions, quotes, latestFx) : []),
@@ -117,5 +156,8 @@ export function useComputedPortfolio(): Computed {
   if (fxError) return { status: 'error', message: `Cambi storici non disponibili: ${fxError}` }
   if (!portfolio || !selectedId) return { status: 'empty' }
   if (!result || !fx) return { status: 'loading' }
-  return { status: 'ready', options, selectedId, select, portfolio, result, rows, totals: totals(rows), pricesLoading, fx, latestFx }
+  return {
+    status: 'ready', options, selectedId, select, portfolio, result, rows, totals: totals(rows), pricesLoading, fx, latestFx,
+    eurUsd, pricesAt, refreshPrices, portfolios, allResults: results!,
+  }
 }
