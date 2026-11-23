@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AssetHistory } from '../components/AssetHistory'
 import { Issues } from '../components/Issues'
 import { Modal } from '../components/Modal'
 import { MovementForm, TransferFormCard } from '../components/MovementForms'
@@ -101,6 +102,11 @@ export function Positions() {
       {open?.action === 'transfer' && (
         <Modal title={`Trasferisci ${symbolOfId(open.assetId)}`} onClose={close}>
           <TransferFormCard c={c} presetAssetId={open.assetId} onClose={close} bare />
+        </Modal>
+      )}
+      {open?.action === 'history' && (
+        <Modal title={`Storico ${symbolOfId(open.assetId)}`} onClose={close} wide>
+          <AssetHistory c={c} assetId={open.assetId} />
         </Modal>
       )}
       {open?.action === 'sim' && (

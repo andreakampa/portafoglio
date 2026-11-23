@@ -6,10 +6,8 @@ import { PacPlansCard } from '../components/PacPlansCard'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { Tag, TagButton } from '../components/Tag'
 import { KIND_TONE } from '../components/tones'
-import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
-import { usePortfolioState } from '../data/usePortfolioState'
-import { findTransfer, type PortfolioLike } from '../domain/txEdit'
+import { isEditableMovement, isTransferMovement, useMovementRemove } from '../data/useMovementRemove'
 import { marginOnDate, type MarginOnDate, type MarginPortfolio } from '../domain/engine/margin'
 import { buildMovements, CASH_LABEL, cashflowsIn, cashTotalsEur, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
@@ -44,8 +42,7 @@ export function Movements() {
   useEffect(() => {
     if (wantsNew) navigate(location.pathname, { replace: true, state: null })
   }, [wantsNew, location.pathname, navigate])
-  const edit = usePortfolioEdit()
-  const state = usePortfolioState()
+  const removeMovement = useMovementRemove(c)
   const [delError, setDelError] = useState('')
 
   const all = useMemo(() => (c.status === 'ready' ? buildMovements(c.portfolio, c.result) : []), [c])
@@ -60,34 +57,12 @@ export function Movements() {
   const q = search.trim().toUpperCase()
   const list = all.filter(m => m.date >= from && m.date < to && kinds.includes(m.kind) && (!q || m.symbol.toUpperCase().includes(q)))
   const gain = list.reduce((s, m) => s + (m.gainEur ?? 0), 0)
-  const editable = (m: Movement) => m.kind === 'buy' || m.kind === 'sell' || m.kind === 'short_sell' || m.kind === 'buy_to_cover'
-  const isTransfer = (m: Movement) => m.kind === 'transfer_in' || m.kind === 'transfer_out'
-  const portfolios = (state.status === 'ready' ? state.data?.portfolios : undefined) as Record<string, PortfolioLike> | undefined
-  const removeTransfer = async (m: Movement) => {
-    const t = c.portfolio.assets?.[m.assetId]?.transactions?.[m.index]
-    if (!portfolios || !t?.transferId) return setDelError('Trasferimento non trovato: ricarica la pagina e riprova.')
-    const pair = findTransfer(portfolios, t.transferId)
-    const name = (pid?: string) => c.options.find(o => o.id === pid)?.name ?? 'altro portafoglio'
-    const both = pair.out && pair.in ? ` Si eliminano insieme l'uscita da ${name(pair.out.pid)} e l'entrata in ${name(pair.in.pid)}.` : ''
-    if (!confirm(`Eliminare il trasferimento di ${m.symbol} del ${fmtDate(m.date)}?${both}`)) return
-    setDelError('')
-    try {
-      await edit.changeTransfer(portfolios, t.transferId, { remove: true })
-    } catch (e) {
-      setDelError(e instanceof Error ? e.message : 'Eliminazione non riuscita.')
-    }
-  }
+  const editable = isEditableMovement
+  const isTransfer = isTransferMovement
   const remove = async (m: Movement) => {
-    if (isTransfer(m)) return removeTransfer(m)
-    const warn = m.fromBroker ? ' (È un movimento importato da IBKR: la sincronizzazione potrebbe riportarlo.)' : ''
-    if (!confirm(`Eliminare ${KIND_LABEL[m.kind].toLowerCase()} di ${m.symbol} del ${fmtDate(m.date)}?${warn}`)) return
     setDelError('')
-    const t = c.portfolio.assets?.[m.assetId]?.transactions?.[m.index]
-    try {
-      await edit.remove(c.selectedId, m.assetId, { id: m.txId, index: m.index, date: t?.date ?? m.date, type: String(t?.type ?? m.kind) })
-    } catch (e) {
-      setDelError(e instanceof Error ? e.message : 'Eliminazione non riuscita.')
-    }
+    const err = await removeMovement(m)
+    if (err) setDelError(err)
   }
   const actions = (m: Movement) =>
     editable(m) || isTransfer(m) ? (

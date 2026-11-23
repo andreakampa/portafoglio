@@ -24,6 +24,17 @@ export interface RealizedEvent {
   gainNative: number
 }
 
+/** Posizione subito dopo un movimento (per lo storico del titolo). Non entra in nessun calcolo. */
+export interface PositionStep {
+  /** Indice del movimento nei dati del titolo. */
+  index: number
+  qty: number
+  pmcNative: number
+  pmcEur: number
+  /** Cambio usato per il movimento (unità di valuta per 1 EUR). */
+  rate: number
+}
+
 export interface PositionResult {
   /** Quantità aperta: positiva se long, negativa se short. */
   qty: number
@@ -38,6 +49,8 @@ export interface PositionResult {
   realizedEur: number
   commissionsEur: number
   issues: Issue[]
+  /** Fotografia della posizione dopo ogni movimento, in ordine di data. */
+  steps?: PositionStep[]
 }
 
 /** Parte di costo che accompagna un titolo trasferito: data e costo dell'acquisto originale. */
@@ -167,6 +180,8 @@ export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLooku
   const longId = lotIdFactory()
   const shortId = lotIdFactory()
   let commissionsEur = 0
+  const steps: PositionStep[] = []
+  const all = asset.transactions ?? []
 
   const txs = [...(asset.transactions ?? [])].filter(t => t && t.date).sort(byDate)
 
@@ -278,6 +293,7 @@ export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLooku
         break
       }
     }
+    steps.push(snapshot(all.indexOf(tx), longLots, shortLots, a.rate))
   }
 
   const longQty = longLots.reduce((s, l) => s + l.qty, 0)
@@ -299,7 +315,19 @@ export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLooku
     realizedEur: realized.reduce((s, e) => s + e.gainEur, 0),
     commissionsEur,
     issues,
+    steps,
   }
+}
+
+function snapshot(index: number, longLots: Lot[], shortLots: Lot[], rate: number): PositionStep {
+  const longQty = longLots.reduce((s, l) => s + l.qty, 0)
+  const shortQty = shortLots.reduce((s, l) => s + l.qty, 0)
+  const isShort = shortQty > EPS && longQty <= EPS
+  const lots = isShort ? shortLots : longLots
+  const q = isShort ? shortQty : longQty
+  const cn = lots.reduce((s, l) => s + l.costNative, 0)
+  const ce = lots.reduce((s, l) => s + l.costEur, 0)
+  return { index, qty: isShort ? -shortQty : q > EPS ? q : 0, pmcNative: q > EPS ? cn / q : 0, pmcEur: q > EPS ? ce / q : 0, rate }
 }
 
 export const methodFor = (regime: string | undefined): CostMethod => (regime === 'dichiarativo' ? 'lifo' : 'average')

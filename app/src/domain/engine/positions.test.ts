@@ -214,3 +214,26 @@ describe('FIFO (solo per confronto con i broker)', () => {
     expect(p.costEur).toBeCloseTo(600, 8)
   })
 })
+
+describe('fotografie dopo ogni movimento (storico del titolo)', () => {
+  it('PMC e quantità dopo ogni movimento, in ordine di data, con l’indice nei dati', () => {
+    // Dati fuori ordine: lo storico segue la data, l'indice punta al movimento originale.
+    const a = asset('USD', [
+      { id: 'b2', date: '2026-02-10', type: 'buy', qty: 10, price: 20, commission: 0 },
+      { id: 'b1', date: '2026-01-10', type: 'buy', qty: 10, price: 10, commission: 0 },
+      { id: 's1', date: '2026-03-10', type: 'sell', qty: 5, price: 30, commission: 0 },
+    ])
+    const fx = fxTable({ 'USD:2026-01-10': 1.25, 'USD:2026-02-10': 1, 'USD:2026-03-10': 1.1 })
+    const p = computePosition(a, 'average', fx)
+    expect(p.steps!.map(s => s.index)).toEqual([1, 0, 2])
+    expect(p.steps!.map(s => s.qty)).toEqual([10, 20, 15])
+    expect(p.steps![0]!.pmcNative).toBeCloseTo(10)
+    expect(p.steps![0]!.pmcEur).toBeCloseTo(8)
+    expect(p.steps![1]!.pmcNative).toBeCloseTo(15)
+    expect(p.steps![1]!.pmcEur).toBeCloseTo(14) // (80 + 200) / 20
+    expect(p.steps![2]!.pmcNative).toBeCloseTo(15)
+    expect(p.steps![2]!.rate).toBe(1.1)
+    // L'ultima fotografia coincide con la posizione finale.
+    expect(p.steps![2]!.pmcEur).toBeCloseTo(p.pmcEur)
+  })
+})

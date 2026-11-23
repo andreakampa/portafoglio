@@ -119,14 +119,17 @@ Nella v2 le righe non sono cliccabili e tutto passa da Movimenti / Simulatore.
 - [x] Elimina titolo (con conferma; bloccato se il titolo ha trasferimenti collegati, `deleteAssetBlock`).
 - Storico sulla riga: arriva col blocco 6.
 
-## 6. Finestra Storico del titolo (vecchio: `ui/history.js`)
+## 6. Finestra Storico del titolo (vecchio: `ui/history.js`) — ✅ fatto (PR `storico-titolo`)
 
-- [ ] Selettore valuta, badge PAC.
-- [ ] Riepilogo: Q.tà, PMC (€ e nativo), P&L realizzato, commissioni tot.
-- [ ] Nota fiscale vs broker per i titoli in USD.
-- [ ] Colonne: Data (ordinabile), Tipo (badge colorati + "lotto" sulle vendite), Q.tà, Prezzo (nativo + €),
+`components/AssetHistory.tsx` + `domain/assetHistory.ts`; il motore registra la posizione dopo ogni movimento (`PositionResult.steps`, non usato nei calcoli).
+Si apre con il pulsante Storico sulla riga (anche per i titoli trasferiti). Badge "lotto" sulle vendite: non fatto (il motore non espone i lotti consumati; dire ad Andrea se serve).
+
+- [x] Selettore valuta, badge PAC.
+- [x] Riepilogo: Q.tà, PMC (€ e nativo), P&L realizzato, commissioni tot.
+- [x] Nota fiscale vs broker per i titoli in USD.
+- [x] Colonne: Data (ordinabile), Tipo (badge colorati + "lotto" sulle vendite), Q.tà, Prezzo (nativo + €),
       Comm., Totale, **Tasso €/USD**, PMC (€ + nativo), P&L lordo, P&L netto (fiscale, con tasse).
-- [ ] Triangolo di avviso sulle righe anomale, modifica ed eliminazione per riga.
+- [x] Triangolo di avviso sulle righe anomale, modifica ed eliminazione per riga.
 
 ## 7. Finestra Dividendi del titolo (vecchio: `ui/dividendi.js`)
 

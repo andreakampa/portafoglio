@@ -114,11 +114,12 @@ describe('pallino dividendi', () => {
 
 describe('azioni sulla riga', () => {
   it('come il sito vecchio: long, short, chiuso, trasferito', () => {
-    expect(rowActions('active', 10)).toEqual(['buy', 'sell', 'sim', 'transfer', 'delete'])
-    expect(rowActions('short', -5)).toEqual(['cover', 'delete'])
-    expect(rowActions('closed', 0)).toEqual(['buy', 'short', 'sim', 'delete'])
-    expect(rowActions('transferred', 0)).toEqual([])
-    // trasferito in parte: nel gruppo attivi ha le azioni, nei trasferiti no
-    expect(rowActions('transferred', 3)).toEqual([])
+    expect(rowActions('active', 10)).toEqual(['history', 'buy', 'sell', 'sim', 'transfer', 'delete'])
+    expect(rowActions('short', -5)).toEqual(['history', 'cover', 'delete'])
+    expect(rowActions('closed', 0)).toEqual(['history', 'buy', 'short', 'sim', 'delete'])
+    expect(rowActions('empty', 0)).toEqual(['buy', 'short', 'delete'])
+    expect(rowActions('transferred', 0)).toEqual(['history'])
+    // trasferito in parte: nel gruppo attivi ha le azioni, nei trasferiti solo lo storico
+    expect(rowActions('transferred', 3)).toEqual(['history'])
   })
 })
