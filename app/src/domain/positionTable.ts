@@ -200,3 +200,33 @@ export function sortRows<T extends { r: PositionRow; f: RowFigures }>(items: T[]
     return sign * (va - vb)
   })
 }
+
+// ── Pallino dei dividendi (come dividendoDot nel sito vecchio) ──────────
+
+/** Il sito vecchio stimava il pagamento 21 giorni dopo lo stacco. */
+export const PAY_DELAY_DAYS = 21
+
+export interface DividendDot {
+  /** Verde: dividendi già pagati (stacco + 21 giorni passati). */
+  paid: boolean
+  /** Arancione: staccato (si ha diritto) ma non ancora accreditato. */
+  pending: boolean
+}
+
+const addDays = (iso: string, n: number) => {
+  const d = new Date(iso + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Dividendi Yahoo del titolo e quantità posseduta al giorno prima dello stacco. */
+export function dividendDot(divs: { exDate: string }[], qtyAtExDate: (exDate: string) => number, today: string): DividendDot {
+  let paid = false
+  let pending = false
+  for (const d of divs) {
+    if (d.exDate > today || !(qtyAtExDate(d.exDate) > 0)) continue
+    if (addDays(d.exDate, PAY_DELAY_DAYS) <= today) paid = true
+    else pending = true
+  }
+  return { paid, pending }
+}

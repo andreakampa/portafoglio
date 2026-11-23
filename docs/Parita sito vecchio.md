@@ -90,18 +90,18 @@ Ripristinare, in due gruppi come nel vecchio:
       Market Value, % Costo, % Mercato, P&L Gross UNRL, P&L Net UNRL, P&L Gross REAL, P&L Net REAL, PMC EUR,
       Commissioni tot., Dividendi titolo, Trading tools.
 - [x] **Ordinamento cliccando l'intestazione** (crescente/decrescente, numeri e nomi), al posto del menu a tendina.
-- [ ] Sotto il prezzo: variazione % del giorno + **barra 52 settimane** (min–max, segno colorato secondo la posizione).
-- [ ] Sparkline intraday (vecchio: commento "Sparkline intraday minimale" in `render.js` ~r. 196).
+- [x] Sotto il prezzo: variazione % del giorno + **barra 52 settimane** (min–max, segno colorato secondo la posizione).
+- [x] Sparkline intraday (Yahoo `interval=5m`, nella stessa richiesta del prezzo) (vecchio: commento "Sparkline intraday minimale" in `render.js` ~r. 196).
 - [x] **Daily P&L in €** e %, non solo %.
 - [x] P&L non realizzato con **"di cui cambio"**; P&L netto con **tasse** della riga (colonna "Risultato netto").
 - [x] Logo del titolo accanto al simbolo, badge valuta (USD, EUR, CAD…).
-- [ ] **Pallino dividendi** accanto al simbolo (vecchio: `dividendoDot()` in `render.js` r. 233-251):
+- [x] **Pallino dividendi** accanto al simbolo (stima Yahoo come il vecchio: pagato 21 giorni dopo lo stacco; il clic sulla finestra Dividendi arriva col blocco 7) (vecchio: `dividendoDot()` in `render.js` r. 233-251):
       verde = dividendi già pagati, arancione = maturato dopo lo stacco ma non ancora accreditato, entrambi se ci sono
       tutti e due; **cliccabile → finestra Dividendi del titolo**.
 - [x] **Gruppi** come nel vecchio (`groupedSortedIds`): Titoli attivi (n), Short, Chiuse, Vuote, Trasferiti — sezioni
       apribili/chiudibili.
-- [ ] **Esporta** PDF / XLSX (vecchio: `js/modules/portfolio/export.js`).
-- [ ] Schede telefono: stesse informazioni principali + pulsanti azione.
+- [x] **Esporta** PDF / XLSX (jsPDF 4 + autotable, write-excel-file; caricati solo al primo uso) (vecchio: `js/modules/portfolio/export.js`).
+- [x] Schede telefono: stesse informazioni principali (i pulsanti azione arrivano col blocco 5).
 
 ## 5. Azioni sulla riga del titolo ("Trading tools")
 

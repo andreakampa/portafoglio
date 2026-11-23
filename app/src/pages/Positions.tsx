@@ -54,7 +54,7 @@ export function Positions() {
         onRefresh={c.refreshPrices}
       />
 
-      <PositionsTable c={c} shown={shown} weightOf={weightOf} />
+      <PositionsTable c={c} shown={shown} weightOf={weightOf} convert={x => toDisplay(x, currency, usdRate)} currency={currency} />
     </section>
   )
 }
