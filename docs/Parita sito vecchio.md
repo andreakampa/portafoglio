@@ -157,7 +157,45 @@ nota sul metodo (FIFO minus entro 4 anni, aliquote, fondi non compensabili). Ins
 
 ---
 
-## Funzioni del vecchio ancora da inventariare
-Prima di dichiarare la parità, scorrere anche: `ui/cart.js` (carrello simulazioni), `ui/pac.js`, `ui/storico.js`,
-`ui/transactions.js` (validazioni, MAX, anteprima live), `ui/ibkr.js`, `ui/ai.js`, `settings/index.js`, toast.
-Per ognuna: c'è nella v2? Se no, aggiungerla qui.
+## Funzioni minori del vecchio (inventario del 24/11/2026)
+Scorsi `ui/cart.js`, `ui/pac.js`, `ui/storico.js`, `ui/transactions.js`, `ui/ibkr.js`, `ui/ai.js`, `settings/index.js`,
+`core/toast.js`, `api/fiscale.js`, `api/search.js`. Non si rifanno (decisioni già prese): scelta dei lotti in vendita,
+campo quota a margine, cambio scritto a mano sul movimento (il motore usa i cambi storici).
+
+### 10. Inserimento movimenti (`transactions.js`, `api/search.js`)
+- [ ] Anteprima mentre scrivi: costo, nuova quantità e PMC; in vendita guadagno, imposta con minus compensate, incasso netto.
+- [ ] Blocco vendita/copertura oltre la quantità posseduta (oggi solo avviso dopo il salvataggio).
+- [ ] Ricerca del titolo su Yahoo (nome, valuta e tipo compilati da soli) per i titoli nuovi.
+- [ ] Valuta della commissione anche USD/CAD.
+
+### 11. Cassetto fiscale (`api/fiscale.js`) — insieme al punto 9
+- [ ] Riepilogo anno con "Imponibile netto".
+- [ ] Minus disponibili: barra e "scade tra N giorni".
+- [ ] Inserimento a mano di minus esterne (il motore le legge già).
+- [ ] Correzione a mano del compensato (✎).
+
+### 12. Movimenti (`storico.js`)
+- [ ] Periodo dal/al a scelta.
+- [ ] Colonna imposta stimata e totali (plus, minus, imposta) in fondo.
+- [ ] Esportazione PDF/Excel.
+- [ ] Interessi a margine: inserimento ed eliminazione a mano (oggi rimanda al sito vecchio).
+
+### 13. PAC (`pac.js`)
+- [ ] Modifica del piano, data di fine, commissione per rata.
+- [ ] Riepilogo: prossima rata, rate fatte, totale versato, commissioni, elenco rate.
+- [ ] Eliminare una rata senza che torni.
+- [ ] Titoli non in euro.
+
+### 14. Carrello simulazioni (`cart.js`)
+- [ ] Salvato per portafoglio (oggi si perde ricaricando).
+- [ ] Per riga: imposta e netto (vendite), nuovo PMC (acquisti); conferma su "Svuota".
+
+### 15. Impostazioni, avvisi, assistente
+- [ ] Cambio password; svuota cache prezzi/cambi.
+- [ ] Avvisi a comparsa (toast) dopo i salvataggi.
+- [ ] Assistente: risposte formattate (grassetto, elenchi), "Analizza portafoglio".
+
+### Da decidere con Andrea
+- **Assistente e privacy:** il vecchio non mandava a Gemini importi in euro, la v2 manda valori e PMC.
+- **IBKR dal browser:** impostazioni token/Query ID, "Scarica ora", revisione prima dell'import, annulla ultimo import.
+  Nella v2 la sincronizzazione è automatica (cron delle 06:00): servono ancora?
