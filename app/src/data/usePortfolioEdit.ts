@@ -2,6 +2,7 @@ import { ref, runTransaction, update } from 'firebase/database'
 import { useMemo } from 'react'
 import { useUser } from '../auth/context'
 import type { RawAsset, RawTx } from '../domain/engine/types'
+import type { StoredManualLoss } from '../domain/manualLosses'
 import { isRecorded } from '../domain/pac'
 import { addToList, buildTransferPair, findSameAsset, findTransfer, removeFromList, replaceInList, transferWrites, type PortfolioLike, type TransferForm, type TxRef } from '../domain/txEdit'
 import { db } from '../lib/firebase'
@@ -29,6 +30,17 @@ export function usePortfolioEdit() {
     }
 
     return {
+      /** Minus inserite a mano del portafoglio: rilette e cambiate in un colpo solo. `fn` torna undefined se sono cambiate nel frattempo. */
+      changeManualLosses: async (pid: string, fn: (list: StoredManualLoss[]) => StoredManualLoss[] | undefined) => {
+        const r = await runTransaction(ref(db, `${root}/${pid}/fiscal/manualLosses`), cur => {
+          const next = fn(Array.isArray(cur) ? (cur as StoredManualLoss[]) : Object.values((cur ?? {}) as Record<string, StoredManualLoss>))
+          // Primo giro con la copia locale vuota: si lascia che Firebase riprovi con i dati veri.
+          if (next === undefined) return cur == null ? null : undefined
+          return clean(next)
+        })
+        if (!r.committed) throw new Error('Le minus sono cambiate nel frattempo (forse da un altro dispositivo): riprova.')
+      },
+
       /**
        * Elimina un titolo con tutti i suoi movimenti. Solo se nel frattempo non è cambiato
        * (stesso numero di movimenti visti da chi ha confermato), altrimenti errore.

@@ -586,3 +586,7 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .ticker-hits button:hover, .ticker-hits button:focus-visible { background: var(--surface-2); }
 .ticker-hits button > :first-child { grid-row: span 2; }
 .ticker-hit-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Cassetto fiscale: quanto resta di ogni gruppo di minus */
+.loss-bar { display: block; width: min(220px, 100%); height: 6px; margin-top: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.loss-bar > span { display: block; height: 100%; background: var(--primary); }
