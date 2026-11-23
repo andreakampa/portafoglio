@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AssetDividends } from '../components/AssetDividends'
 import { AssetHistory } from '../components/AssetHistory'
 import { Issues } from '../components/Issues'
 import { Modal } from '../components/Modal'
@@ -107,6 +108,11 @@ export function Positions() {
       {open?.action === 'history' && (
         <Modal title={`Storico ${symbolOfId(open.assetId)}`} onClose={close} wide>
           <AssetHistory c={c} assetId={open.assetId} />
+        </Modal>
+      )}
+      {open?.action === 'dividends' && (
+        <Modal title={`Dividendi ${symbolOfId(open.assetId)}`} onClose={close} wide>
+          <AssetDividends c={c} assetId={open.assetId} />
         </Modal>
       )}
       {open?.action === 'sim' && (

@@ -563,3 +563,11 @@ a.kpi-link .kpi-label::after { content: ' ›'; }
 @media (min-width: 900px) and (pointer: fine), (min-width: 1200px) {
   .history-list { display: none; }
 }
+.badge-paid { background: var(--dividend-bg); color: var(--dividend); }
+.div-edit input { width: 90px; min-height: 32px; }
+button.div-dot { cursor: pointer; font: inherit; color: inherit; }
+.more-actions { position: relative; display: inline-block; }
+.more-actions summary { list-style: none; min-height: 28px; padding: 0 8px; }
+.more-actions summary::-webkit-details-marker { display: none; }
+.more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; display: grid; gap: 4px; padding: 8px; min-width: 150px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); }
+.more-menu .tag-btn { justify-content: flex-start; }

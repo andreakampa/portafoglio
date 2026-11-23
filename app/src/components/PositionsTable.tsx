@@ -41,18 +41,31 @@ interface Props {
   onAction: (action: RowAction, assetId: string) => void
 }
 
-const ACTION_TONE: Record<RowAction, Tone> = { history: 'history', buy: 'buy', sell: 'sell', short: 'short', cover: 'cover', sim: 'sim', transfer: 'transfer', delete: 'delete' }
+const ACTION_TONE: Record<RowAction, Tone> = { history: 'history', dividends: 'dividend', buy: 'buy', sell: 'sell', short: 'short', cover: 'cover', sim: 'sim', transfer: 'transfer', delete: 'delete' }
+
+/** Nella tabella si vedono le prime azioni come icone, le altre nel menu "⋯"; nelle schede tutte con il testo. */
+const VISIBLE_IN_TABLE = 3
 
 function RowButtons({ group, r, onAction, compact }: { group: GroupId; r: PositionRow; onAction: Props['onAction']; compact?: boolean }) {
   const list = rowActions(group, r.qty)
   if (!list.length) return null
+  const button = (a: RowAction, iconOnly: boolean) => (
+    <TagButton key={a} tone={ACTION_TONE[a]} onClick={() => onAction(a, r.assetId)} title={`${ROW_ACTION_LABEL[a]} ${r.symbol}`}>
+      {iconOnly ? <span className="sr-only">{ROW_ACTION_LABEL[a]} {r.symbol}</span> : ROW_ACTION_LABEL[a]}
+    </TagButton>
+  )
+  if (!compact) return <span className="row-actions">{list.map(a => button(a, false))}</span>
+  const shown = list.slice(0, VISIBLE_IN_TABLE)
+  const more = list.slice(VISIBLE_IN_TABLE)
   return (
-    <span className={`row-actions ${compact ? 'row-actions-compact' : ''}`}>
-      {list.map(a => (
-        <TagButton key={a} tone={ACTION_TONE[a]} onClick={() => onAction(a, r.assetId)} title={`${ROW_ACTION_LABEL[a]} ${r.symbol}`}>
-          {compact ? <span className="sr-only">{ROW_ACTION_LABEL[a]} {r.symbol}</span> : ROW_ACTION_LABEL[a]}
-        </TagButton>
-      ))}
+    <span className="row-actions row-actions-compact">
+      {shown.map(a => button(a, true))}
+      {more.length > 0 && (
+        <details className="more-actions">
+          <summary className="tag tag-btn tag-neutral" title={`Altre azioni per ${r.symbol}`} aria-label={`Altre azioni per ${r.symbol}`}>⋯</summary>
+          <span className="more-menu">{more.map(a => button(a, false))}</span>
+        </details>
+      )}
     </span>
   )
 }
@@ -146,7 +159,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
       <div>
         <b>{r.symbol}</b>
         {r.currency !== 'EUR' && <span className="ccy">{r.currency}</span>}
-        <DividendDotView {...dotOf(r)} />
+        <DividendDotView {...dotOf(r)} onOpen={() => onAction('dividends', r.assetId)} />
         {r.isShort && <Tag tone="short">short</Tag>}
         {r.qty !== 0 && <small className="cell-sub muted">{qty(Math.abs(r.qty))} {Math.abs(r.qty) === 1 ? 'azione' : 'azioni'}</small>}
       </div>
@@ -270,7 +283,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
           <Group key={g} id={g} count={groups[g].length}>
             <ul className="pos-cards">
               {sortRows(items(groups[g]), sort, costBase).map(it => (
-                <PositionCard key={it.r.assetId + g} it={it} shown={shown} weight={pctText(weightOf[it.r.assetId])} dot={dotOf(it.r)} actions={<RowButtons group={g} r={it.r} onAction={onAction} />} />
+                <PositionCard key={it.r.assetId + g} it={it} shown={shown} weight={pctText(weightOf[it.r.assetId])} dot={dotOf(it.r)} onDot={() => onAction('dividends', it.r.assetId)} actions={<RowButtons group={g} r={it.r} onAction={onAction} />} />
               ))}
             </ul>
           </Group>
@@ -349,7 +362,7 @@ function Group({ id, count, children }: { id: GroupId; count: number; children: 
   )
 }
 
-function PositionCard({ it: { r, f }, shown, weight, dot, actions }: { it: Item; shown: Shown; weight: string; dot: DividendDot; actions: ReactNode }) {
+function PositionCard({ it: { r, f }, shown, weight, dot, onDot, actions }: { it: Item; shown: Shown; weight: string; dot: DividendDot; onDot: () => void; actions: ReactNode }) {
   const open = r.qty !== 0
   return (
     <li className="card pos-card">
@@ -357,7 +370,7 @@ function PositionCard({ it: { r, f }, shown, weight, dot, actions }: { it: Item;
         <TickerLogo symbol={r.symbol} />
         <b>{r.symbol}</b>
         {r.currency !== 'EUR' && <span className="ccy">{r.currency}</span>}
-        <DividendDotView {...dot} />
+        <DividendDotView {...dot} onOpen={onDot} />
         {r.isShort && <Tag tone="short">short</Tag>}
         {open && <span className={`pos-day ${tone(f.dayEur)}`}>{shown(f.dayEur, true)} · {pct(r.dayChangePct)}</span>}
         {open && <Sparkline points={r.spark} previousClose={r.previousClose} />}
