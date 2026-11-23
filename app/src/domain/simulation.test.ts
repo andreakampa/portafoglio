@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RawPortfolio } from './engine/portfolio'
-import { opsToTxs, simulate, simulateExtras, trailingDividend, type SimOp } from './simulation'
+import { opsToTxs, qtyForBudget, simulate, simulateExtras, trailingDividend, type SimOp } from './simulation'
 
 const TODAY = '2026-11-21'
 const noFx = () => undefined
@@ -131,5 +131,19 @@ describe('bollo/IVAFE e dividendi nel simulatore', () => {
     expect(e.dividendsNetDeltaEur).toBeCloseTo(-18 * 0.74)
     expect(simulateExtras({ sim: sim(0, -5, 'EUR'), regime: 'amministrato', prices: { x: 100 }, latestFx: {}, dividendPerShare: {}, today: '2026-01-01' }).valueDeltaEur).toBe(0)
     expect(simulateExtras({ sim: sim(0, 5), regime: 'amministrato', prices: {}, latestFx: {}, dividendPerShare: {}, today: '2026-01-01' }).missing).toEqual(['X'])
+  })
+})
+
+describe('qtyForBudget', () => {
+  it('azioni intere comprabili con il budget, commissioni comprese', () => {
+    // 1.000 € con un titolo a 108 $ (1,08 $/€ → 100 €) e 5 € di commissioni: 9 azioni
+    expect(qtyForBudget(1000, 108, 1.08, 5)).toBe(9)
+    expect(qtyForBudget(1005, 100, 1, 5)).toBe(10)
+  })
+  it('budget, prezzo o cambio mancanti: zero', () => {
+    expect(qtyForBudget(0, 100, 1, 0)).toBe(0)
+    expect(qtyForBudget(1000, NaN, 1, 0)).toBe(0)
+    expect(qtyForBudget(1000, 100, NaN, 0)).toBe(0)
+    expect(qtyForBudget(3, 100, 1, 5)).toBe(0)
   })
 })

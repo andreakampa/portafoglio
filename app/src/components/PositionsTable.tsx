@@ -8,13 +8,14 @@ import { useYahooDividends } from '../data/useYahooDividends'
 import { qtyBefore } from '../domain/engine/dividends'
 import type { PositionRow } from '../domain/engine/valuation'
 import {
-  COLUMNS, dividendDot, GROUP_LABEL, GROUPS_OPEN_BY_DEFAULT, groupRows, moveColumn, rowFigures, sortRows, toggleColumn, visibleColumns,
-  type ColumnId, type DividendDot, type GroupId, type RowFigures, type SortKey, type SortState,
+  COLUMNS, dividendDot, GROUP_LABEL, ROW_ACTION_LABEL, rowActions, GROUPS_OPEN_BY_DEFAULT, groupRows, moveColumn, rowFigures, sortRows, toggleColumn, visibleColumns,
+  type ColumnId, type DividendDot, type RowAction, type GroupId, type RowFigures, type SortKey, type SortState,
 } from '../domain/positionTable'
 import { exportPdf, exportXlsx, type ExportTable } from '../lib/exportTable'
 import { eur, money, pct, qty, tone } from '../lib/format'
 import { DividendDotView, Range52, Sparkline } from './MiniCharts'
-import { Tag } from './Tag'
+import { Tag, TagButton } from './Tag'
+import type { Tone } from './tones'
 import { TickerLogo } from './TickerLogo'
 
 type Ready = Extract<Computed, { status: 'ready' }>
@@ -36,13 +37,31 @@ interface Props {
   /** Euro → valuta mostrata (per l'esportazione) e la sua sigla. */
   convert: (eur: number | null) => number | null
   currency: string
+  /** Pulsanti sulla riga: Compra, Vendi, Simula, Trasferisci, Elimina… */
+  onAction: (action: RowAction, assetId: string) => void
+}
+
+const ACTION_TONE: Record<RowAction, Tone> = { buy: 'buy', sell: 'sell', short: 'short', cover: 'cover', sim: 'sim', transfer: 'transfer', delete: 'delete' }
+
+function RowButtons({ group, r, onAction, compact }: { group: GroupId; r: PositionRow; onAction: Props['onAction']; compact?: boolean }) {
+  const list = rowActions(group, r.qty)
+  if (!list.length) return null
+  return (
+    <span className={`row-actions ${compact ? 'row-actions-compact' : ''}`}>
+      {list.map(a => (
+        <TagButton key={a} tone={ACTION_TONE[a]} onClick={() => onAction(a, r.assetId)} title={`${ROW_ACTION_LABEL[a]} ${r.symbol}`}>
+          {compact ? <span className="sr-only">{ROW_ACTION_LABEL[a]} {r.symbol}</span> : ROW_ACTION_LABEL[a]}
+        </TagButton>
+      ))}
+    </span>
+  )
 }
 
 const PER_ASSET_CCY: ColumnId[] = ['pmc', 'price', 'prevClose']
 const NO_UNIT: ColumnId[] = ['qty', 'weightCost', 'weightValue', 'pmcEur']
 const round = (x: number | null | undefined, d = 2) => (x == null || !Number.isFinite(x) ? null : Math.round(x * 10 ** d) / 10 ** d)
 
-export function PositionsTable({ c, shown, weightOf, convert, currency }: Props) {
+export function PositionsTable({ c, shown, weightOf, convert, currency, onAction }: Props) {
   const [cfg, saveCfg] = useColumnConfig()
   const [sortPref, setSortPref] = useViewPref('positionsSort', SORT_PREFS, 'value:desc')
   const [k, d] = sortPref.split(':') as [SortKey, 'asc' | 'desc']
@@ -251,7 +270,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency }: Props)
           <Group key={g} id={g} count={groups[g].length}>
             <ul className="pos-cards">
               {sortRows(items(groups[g]), sort, costBase).map(it => (
-                <PositionCard key={it.r.assetId + g} it={it} shown={shown} weight={pctText(weightOf[it.r.assetId])} dot={dotOf(it.r)} />
+                <PositionCard key={it.r.assetId + g} it={it} shown={shown} weight={pctText(weightOf[it.r.assetId])} dot={dotOf(it.r)} actions={<RowButtons group={g} r={it.r} onAction={onAction} />} />
               ))}
             </ul>
           </Group>
@@ -265,14 +284,16 @@ export function PositionsTable({ c, shown, weightOf, convert, currency }: Props)
             <tr>
               <SortTh label="Titolo" k="name" sort={sort} onSort={onSort} left />
               {cols.map(id => <SortTh key={id} label={LABEL[id]} k={id} sort={sort} onSort={onSort} />)}
+              <th className="num">Azioni</th>
             </tr>
           </thead>
           {visibleGroups.map(g => (
-            <GroupBody key={g} id={g} count={groups[g].length} span={cols.length + 1}>
+            <GroupBody key={g} id={g} count={groups[g].length} span={cols.length + 2}>
               {sortRows(items(groups[g]), sort, costBase).map(it => (
                 <tr key={it.r.assetId + g}>
                   <td>{titleCell(it)}</td>
                   {cols.map(id => <td key={id} className="num">{cell(id, it)}</td>)}
+                  <td className="num"><RowButtons group={g} r={it.r} onAction={onAction} compact /></td>
                 </tr>
               ))}
             </GroupBody>
@@ -328,7 +349,7 @@ function Group({ id, count, children }: { id: GroupId; count: number; children: 
   )
 }
 
-function PositionCard({ it: { r, f }, shown, weight, dot }: { it: Item; shown: Shown; weight: string; dot: DividendDot }) {
+function PositionCard({ it: { r, f }, shown, weight, dot, actions }: { it: Item; shown: Shown; weight: string; dot: DividendDot; actions: ReactNode }) {
   const open = r.qty !== 0
   return (
     <li className="card pos-card">
@@ -357,6 +378,12 @@ function PositionCard({ it: { r, f }, shown, weight, dot }: { it: Item; shown: S
           <span className="muted">Realizzato</span>
           <span className={tone(r.realizedEur)}>{shown(r.realizedEur, true)} · netto {shown(f.realizedNetEur, true)}</span>
         </div>
+      )}
+      {actions && (
+        <details className="card-actions">
+          <summary>Azioni</summary>
+          {actions}
+        </details>
       )}
     </li>
   )

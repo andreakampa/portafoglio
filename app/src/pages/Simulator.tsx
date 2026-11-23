@@ -4,7 +4,7 @@ import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { symbolOf } from '../domain/engine/valuation'
-import { opsToTxs, simulate, simulateExtras, trailingDividend, type SimOp } from '../domain/simulation'
+import { opsToTxs, qtyForBudget, simulate, simulateExtras, trailingDividend, type SimOp } from '../domain/simulation'
 import { loadDividends } from '../lib/dividends'
 import { EDITABLE_LABEL, type EditableType } from '../domain/txEdit'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
@@ -12,11 +12,17 @@ import { eur, money, qty as fmtQty, tone } from '../lib/format'
 const TODAY = new Date().toISOString().slice(0, 10)
 const num = (s: string) => Number(s.trim().replace(',', '.'))
 
-export function Simulator() {
+/**
+ * Pagina Simulatore. `embedded`: dentro la finestra aperta dai pulsanti sulla riga in Posizioni,
+ * già sul titolo e sull'operazione scelti (senza titolo di pagina e scelta del portafoglio).
+ */
+export function Simulator({ presetAssetId, presetType, embedded }: { presetAssetId?: string; presetType?: EditableType; embedded?: boolean } = {}) {
   const c = useComputedPortfolio()
   const [ops, setOps] = useState<SimOp[]>([])
-  const [assetId, setAssetId] = useState('')
-  const [type, setType] = useState<EditableType>('buy')
+  const [assetId, setAssetId] = useState(presetAssetId ?? '')
+  const [type, setType] = useState<EditableType>(presetType ?? 'buy')
+  const [mode, setMode] = useState<'qty' | 'budget'>('qty')
+  const [budget, setBudget] = useState('')
   const [qty, setQty] = useState('')
   const [price, setPrice] = useState('')
   const [commission, setCommission] = useState('')
@@ -59,11 +65,17 @@ export function Simulator() {
   /** Quantità massima sensata: tutto ciò che si ha (vendita) o tutto lo short (chiusura). */
   const max = type === 'sell' ? Math.max(held, 0) : type === 'buy_to_cover' ? Math.max(-held, 0) : 0
 
+  const rate = current ? (current.currency === 'EUR' ? 1 : c.latestFx[current.currency] ?? NaN) : NaN
+  const priceNow = price.trim() ? num(price) : quote ?? NaN
+  const commNow = commission.trim() ? num(commission) : 0
+  const budgetQty = mode === 'budget' ? qtyForBudget(num(budget), priceNow, rate, commNow) : 0
+
   function add() {
     if (!current) return
-    const q = num(qty)
-    const p = price.trim() ? num(price) : quote ?? NaN
-    const comm = commission.trim() ? num(commission) : 0
+    const q = mode === 'budget' ? budgetQty : num(qty)
+    const p = priceNow
+    const comm = commNow
+    if (mode === 'budget' && !(num(budget) > 0)) return setError('Scrivi il budget in euro.')
     if (!(q > 0)) return setError('La quantità deve essere maggiore di zero.')
     if (!Number.isFinite(p) || p < 0) return setError('Scrivi il prezzo: non c’è una quotazione da usare.')
     if (!Number.isFinite(comm) || comm < 0) return setError('Le commissioni non sono valide.')
@@ -114,8 +126,8 @@ export function Simulator() {
   }
 
   return (
-    <section className="page">
-      <header className="page-head">
+    <section className={embedded ? 'sim-embedded' : 'page'}>
+      {!embedded && <header className="page-head">
         <h1>Simulatore</h1>
         <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={id => { c.select(id); setOps([]); setAssetId('') }} />
         <p className="muted small">
@@ -123,10 +135,10 @@ export function Simulator() {
           Non salva nulla finché non tocchi "Registra come movimenti".
           {c.result.regime === 'dichiarativo' ? ' Dichiarativo: costo LIFO.' : ' Amministrato: costo medio.'}
         </p>
-      </header>
+      </header>}
 
       <form className="card note-form" onSubmit={e => { e.preventDefault(); add() }}>
-        <h2>Nuova operazione</h2>
+        {!embedded && <h2>Nuova operazione</h2>}
         <div className="pills" role="radiogroup" aria-label="Tipo">
           {(Object.keys(EDITABLE_LABEL) as EditableType[]).map(t => (
             <button key={t} type="button" role="radio" aria-checked={type === t} className={`pill small-pill ${type === t ? 'active' : ''}`} onClick={() => setType(t)}>
@@ -146,14 +158,28 @@ export function Simulator() {
             {quote !== null && <> · prezzo attuale {money(quote, current.currency)}</>}
           </p>
         )}
+        {type === 'buy' && (
+          <div className="pills" role="radiogroup" aria-label="Come scegliere la quantità">
+            <button type="button" role="radio" aria-checked={mode === 'qty'} className={`pill small-pill ${mode === 'qty' ? 'active' : ''}`} onClick={() => setMode('qty')}>Per quantità</button>
+            <button type="button" role="radio" aria-checked={mode === 'budget'} className={`pill small-pill ${mode === 'budget' ? 'active' : ''}`} onClick={() => setMode('budget')}>Per budget</button>
+          </div>
+        )}
         <div className="form-row">
-          <label>
-            Quantità
-            <span className="inline-pair">
-              <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} />
-              {max > 0 && <button type="button" className="btn btn-ghost" onClick={() => setQty(String(max))}>MAX</button>}
-            </span>
-          </label>
+          {type === 'buy' && mode === 'budget' ? (
+            <label>
+              Budget (€)
+              <input inputMode="decimal" value={budget} onChange={e => setBudget(e.target.value)} />
+              <small className="muted">{budgetQty > 0 ? `= ${fmtQty(budgetQty)} azioni` : 'quante azioni intere compri'}</small>
+            </label>
+          ) : (
+            <label>
+              Quantità
+              <span className="inline-pair">
+                <input inputMode="decimal" value={qty} onChange={e => setQty(e.target.value)} />
+                {max > 0 && <button type="button" className="btn btn-ghost" onClick={() => setQty(String(max))}>MAX</button>}
+              </span>
+            </label>
+          )}
           <label>
             Prezzo ({current?.currency ?? 'EUR'})
             <input inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} placeholder={quote !== null ? String(quote) : ''} />

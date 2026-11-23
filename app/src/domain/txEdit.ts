@@ -291,3 +291,12 @@ export function buildExercise(
     stock: { id: newId(), date: f.date, type: buys ? 'buy' : 'sell', qty: q, price: num(f.strike), commission: 0, exerciseId },
   }
 }
+
+/**
+ * Motivo per cui un titolo non si può eliminare dalla tabella, o null se si può.
+ * I trasferimenti sono legati a un movimento in un altro portafoglio: eliminarli da una parte sola romperebbe il costo dell'altra.
+ */
+export function deleteAssetBlock(asset: { transactions?: { type?: string; transferId?: string }[] } | undefined): string | null {
+  const linked = (asset?.transactions ?? []).some(t => t.type === 'transfer' || !!t.transferId)
+  return linked ? 'Questo titolo ha trasferimenti collegati a un altro portafoglio: elimina prima il trasferimento da Movimenti.' : null
+}

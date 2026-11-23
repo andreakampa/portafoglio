@@ -524,3 +524,22 @@ a.kpi-link .kpi-label::after { content: ' ›'; }
 .pos-card-head .spark { margin: 0; }
 .export-btns { display: inline-flex; gap: 6px; align-items: center; }
 .export-msg { justify-self: end; margin: 0; }
+
+/* ── Finestre (components/Modal.tsx) ── */
+.modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgb(0 0 0 / 35%); }
+.modal-wide { width: min(980px, calc(100vw - 24px)); }
+.modal::backdrop { background: rgb(0 0 0 / 45%); }
+.modal-body { display: grid; gap: 14px; padding: 18px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: -18px; margin: -18px -18px 0; padding: 14px 18px; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 1; }
+.sim-embedded { display: grid; gap: 14px; }
+.transfer-summary li { padding: 6px 0; }
+
+/* Pulsanti sulla riga: solo icone nella tabella, con testo nelle schede */
+.row-actions { display: inline-flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.row-actions-compact { flex-wrap: nowrap; }
+.row-actions-compact .tag-btn { min-height: 28px; padding: 0 6px; }
+.row-actions-compact .tag-ic { width: 1.1em; height: 1.1em; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.card-actions { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
+.card-actions summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: var(--muted); }
+.card-actions .row-actions { justify-content: flex-start; margin-top: 8px; }

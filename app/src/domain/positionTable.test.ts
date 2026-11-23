@@ -3,7 +3,7 @@ import type { FiscalLine } from './engine/fiscal.ts'
 import type { PositionResult } from './engine/positions.ts'
 import type { RawAsset } from './engine/types.ts'
 import type { PositionRow } from './engine/valuation.ts'
-import { COLUMNS, dividendDot, groupRows, moveColumn, reconcileColumns, rowFigures, sortRows, toggleColumn, visibleColumns } from './positionTable.ts'
+import { COLUMNS, dividendDot, groupRows, moveColumn, reconcileColumns, rowActions, rowFigures, sortRows, toggleColumn, visibleColumns } from './positionTable.ts'
 
 const row = (p: Partial<PositionRow>): PositionRow => ({
   assetId: 'a', symbol: 'A', currency: 'USD', qty: 10, isShort: false, pmcNative: 10, costEur: 100, costTodayFxEur: 90, price: 12,
@@ -109,5 +109,16 @@ describe('pallino dividendi', () => {
   it('senza azioni allo stacco: niente pallino', () => {
     expect(dividendDot(divs, () => 0, '2026-11-20')).toEqual({ paid: false, pending: false })
     expect(dividendDot(divs, d => (d === '2026-11-10' ? 5 : 0), '2026-11-20')).toEqual({ paid: false, pending: true })
+  })
+})
+
+describe('azioni sulla riga', () => {
+  it('come il sito vecchio: long, short, chiuso, trasferito', () => {
+    expect(rowActions('active', 10)).toEqual(['buy', 'sell', 'sim', 'transfer', 'delete'])
+    expect(rowActions('short', -5)).toEqual(['cover', 'delete'])
+    expect(rowActions('closed', 0)).toEqual(['buy', 'short', 'sim', 'delete'])
+    expect(rowActions('transferred', 0)).toEqual([])
+    // trasferito in parte: nel gruppo attivi ha le azioni, nei trasferiti no
+    expect(rowActions('transferred', 3)).toEqual([])
   })
 })

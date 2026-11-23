@@ -230,3 +230,24 @@ export function dividendDot(divs: { exDate: string }[], qtyAtExDate: (exDate: st
   }
   return { paid, pending }
 }
+
+// ── Azioni sulla riga (come "Trading tools" nel sito vecchio) ───────────
+
+export type RowAction = 'buy' | 'sell' | 'short' | 'cover' | 'sim' | 'transfer' | 'delete'
+export const ROW_ACTION_LABEL: Record<RowAction, string> = {
+  buy: 'Compra',
+  sell: 'Vendi',
+  short: 'Short',
+  cover: 'Chiudi short',
+  sim: 'Simula',
+  transfer: 'Trasferisci',
+  delete: 'Elimina',
+}
+
+/** Pulsanti di una riga secondo il gruppo: aperto long, short, chiuso o vuoto. I trasferiti non hanno azioni qui. */
+export function rowActions(group: GroupId, qty: number): RowAction[] {
+  if (group === 'transferred') return []
+  if (qty <= -EPS) return ['cover', 'delete']
+  if (qty >= EPS) return ['buy', 'sell', 'sim', 'transfer', 'delete']
+  return ['buy', 'short', 'sim', 'delete']
+}
