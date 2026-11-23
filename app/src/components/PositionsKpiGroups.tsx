@@ -7,9 +7,10 @@ import { positionsKpis } from '../domain/positionsKpis'
 import { simulate, type SimOp } from '../domain/simulation'
 import { eur, pct, THIS_YEAR, tone } from '../lib/format'
 import { Kpi } from './PortfolioPicker'
+import { localToday } from '../lib/today'
 
 type Ready = Extract<Computed, { status: 'ready' }>
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 
 export function PositionsKpiGroups({ c }: { c: Ready }) {
   const d = useDividends(c.portfolio, c.fx)

@@ -11,8 +11,9 @@ import { isEditableMovement, isTransferMovement, useMovementRemove } from '../da
 import { marginOnDate, type MarginOnDate, type MarginPortfolio } from '../domain/engine/margin'
 import { buildMovements, CASH_LABEL, cashflowsIn, cashTotalsEur, KIND_LABEL, marginInterest, periodRange, type Movement, type MovementKind, type Period } from '../domain/engine/movements'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
+import { localToday } from '../lib/today'
 
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 type Filter = 'all' | 'trades' | 'short' | 'transfer'
 const FILTERS: { key: Filter; label: string; kinds: MovementKind[] }[] = [
   { key: 'all', label: 'Tutti', kinds: ['buy', 'sell', 'short_sell', 'buy_to_cover', 'transfer_in', 'transfer_out'] },

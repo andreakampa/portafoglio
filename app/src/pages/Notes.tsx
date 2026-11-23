@@ -2,8 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { useNotes, type NoteDraft } from '../data/useNotes'
 import { NOTE_KINDS, parseTickers, sortNotes, upcoming, type Note, type NoteKind } from '../domain/notes'
 import { TagButton } from '../components/Tag'
+import { localToday } from '../lib/today'
 
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })
 const kindLabel = (k: NoteKind) => NOTE_KINDS.find(x => x.key === k)!.label
 

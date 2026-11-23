@@ -530,6 +530,9 @@ a.kpi-link .kpi-label::after { content: ' ›'; }
 .modal-wide { width: min(980px, calc(100vw - 24px)); }
 .modal::backdrop { background: rgb(0 0 0 / 45%); }
 .modal-body { display: grid; gap: 14px; padding: 18px; }
+.modal-body > *, .note-form > * { min-width: 0; }
+.preview-box li { flex-wrap: wrap; padding: 6px 0; }
+.preview-box li b { margin-left: auto; text-align: right; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: -18px; margin: -18px -18px 0; padding: 14px 18px; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 1; }
 .sim-embedded { display: grid; gap: 14px; }
 .transfer-summary li { padding: 6px 0; }

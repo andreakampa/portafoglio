@@ -10,9 +10,10 @@ import { symbolOf } from '../domain/engine/valuation'
 import { loadFx } from '../lib/fxRates'
 import { eur, money, qty as fmtQty } from '../lib/format'
 import { Kpi } from './PortfolioPicker'
+import { localToday } from '../lib/today'
 
 type Ready = Extract<Computed, { status: 'ready' }>
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
 const num = (s: string) => Number(s.trim().replace(',', '.'))
 

@@ -18,6 +18,7 @@ import { DividendDotView, Range52, Sparkline } from './MiniCharts'
 import { Tag, TagButton } from './Tag'
 import type { Tone } from './tones'
 import { TickerLogo } from './TickerLogo'
+import { localToday } from '../lib/today'
 
 type Ready = Extract<Computed, { status: 'ready' }>
 type Shown = (x: number | null, signed?: boolean) => string
@@ -27,7 +28,7 @@ const GROUP_ORDER: GroupId[] = ['active', 'short', 'closed', 'transferred', 'emp
 const SORT_KEYS: SortKey[] = ['name', ...COLUMNS.map(c => c.id)]
 const SORT_PREFS = SORT_KEYS.flatMap(k => [`${k}:asc`, `${k}:desc`])
 const LABEL: Record<ColumnId, string> = Object.fromEntries(COLUMNS.map(c => [c.id, c.label])) as Record<ColumnId, string>
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 const pctText = (x: number | undefined | null) => (x == null || !Number.isFinite(x) ? '—' : `${x.toFixed(1).replace('.', ',')}%`)
 
 interface Props {

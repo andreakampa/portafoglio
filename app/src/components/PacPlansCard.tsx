@@ -3,9 +3,10 @@ import { usePacPlans } from '../data/usePacPlans'
 import type { Computed } from '../data/useComputedPortfolio'
 import { symbolOf } from '../domain/engine/valuation'
 import { describePlan, parsePlan, WEEKDAYS, type PlanForm } from '../domain/pac'
+import { localToday } from '../lib/today'
 
 type Ready = Extract<Computed, { status: 'ready' }>
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => localToday()
 const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
 
 /** Piani di accumulo del portafoglio: le rate maturate si aggiungono da sole (vedi PacRunner). */

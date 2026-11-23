@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type { Computed } from '../data/useComputedPortfolio'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { usePortfolioState } from '../data/usePortfolioState'
@@ -10,10 +10,12 @@ import {
   type PortfolioLike,
   type EditableType, type NewAssetForm, type TxForm,
 } from '../domain/txEdit'
-import { money, qty as fmtQty } from '../lib/format'
+import { previewMovement, type MovementPreview } from '../domain/movementPreview'
+import { eur, money, qty as fmtQty, tone } from '../lib/format'
+import { localToday } from '../lib/today'
 
 type Ready = Extract<Computed, { status: 'ready' }>
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => localToday()
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 const NEW = '__new__'
 
@@ -60,12 +62,30 @@ export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const gross = Number(f.qty.replace(',', '.')) * Number(f.price.replace(',', '.'))
+  // Anteprima con il motore vero (prezzo attuale se il prezzo non è ancora scritto).
+  const priced = f.price.trim() || quote === null || editing ? f : { ...f, price: String(quote) }
+  const previewKey = JSON.stringify([priced, assetId, isNew && na])
+  const preview = useMemo(() => {
+    if (validateTx(priced, '9999-12-31')) return null
+    try {
+      return previewMovement({
+        portfolio: c.portfolio, fx: c.fx, latestFx: c.latestFx,
+        assetId: isNew ? assetKey(na.ticker || 'nuovo') : assetId,
+        tx: buildTx(priced, () => 'nuovo', prev),
+        replaceIndex: editing?.index,
+        newAsset: isNew ? buildAsset(na) : undefined,
+      })
+    } catch {
+      return null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewKey, c.portfolio, c.fx, c.latestFx])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     const problem = validateTx(f, today()) ?? (isNew ? validateNewAsset(na) : null)
     if (problem) return setError(problem)
+    if (preview?.overLimit) return setError(overLimitText(preview.overLimit, f.type))
     setBusy(true)
     try {
       if (editing && prev) {
@@ -140,7 +160,7 @@ export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; 
           <span className="inline-pair">
             <input inputMode="decimal" value={f.commission} onChange={e => set('commission', e.target.value)} placeholder="0" />
             <select value={f.commissionCurrency} onChange={e => set('commissionCurrency', e.target.value)} aria-label="Valuta delle commissioni">
-              {[...new Set(['EUR', currency])].map(x => <option key={x} value={x}>{x}</option>)}
+              {[...new Set(['EUR', currency, 'USD', 'CAD'])].map(x => <option key={x} value={x}>{x}</option>)}
             </select>
           </span>
         </label>
@@ -148,7 +168,7 @@ export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; 
       {f.type === 'buy' && (
         <label className="check"><input type="checkbox" checked={f.pac} onChange={e => set('pac', e.target.checked)} /> Rata di un PAC</label>
       )}
-      {Number.isFinite(gross) && gross > 0 && <p className="muted small">Controvalore: {money(gross, currency)}. Il cambio storico lo applica il calcolo da solo.</p>}
+      {preview && <PreviewBox p={preview} type={f.type} currency={currency} atQuote={priced !== f} regime={c.result.regime} />}
       <p className="auth-error" role="alert">{error}</p>
       <div className="form-actions">
         <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Salvo…' : 'Salva'}</button>
@@ -303,5 +323,37 @@ export function TransferEditCard({ c, movement, onClose }: { c: Ready; movement:
         <button type="button" className="btn btn-ghost" onClick={onClose}>Annulla</button>
       </div>
     </form>
+  )
+}
+
+const overLimitText = (o: NonNullable<MovementPreview['overLimit']>, type: EditableType) =>
+  o.own
+    ? `Puoi ${type === 'buy_to_cover' ? 'ricoprire' : 'vendere'} al massimo ${fmtQty(o.available)} (quanti ne avevi in quella data).`
+    : `Con questo movimento la chiusura del ${new Date(o.date + 'T12:00:00').toLocaleDateString('it-IT')} supererebbe i titoli posseduti (ne resterebbero ${fmtQty(o.available)}).`
+
+/** Cosa succede salvando il movimento: come l'anteprima del sito vecchio. */
+function PreviewBox({ p, type, currency, atQuote, regime }: { p: MovementPreview; type: EditableType; currency: string; atQuote: boolean; regime: string }) {
+  const closes = type === 'sell' || type === 'buy_to_cover'
+  const row = (label: string, value: ReactNode, cls = '') => <li><span>{label}</span><b className={cls}>{value}</b></li>
+  if (p.overLimit) return <p className="auth-error" role="alert">{overLimitText(p.overLimit, type)}</p>
+  const pmc = (s: MovementPreview['before']) => (currency === 'EUR' ? eur(s.pmcEur) : `${money(s.pmcNative, currency)} · ${eur(s.pmcEur)}`)
+  return (
+    <div className="preview-box" aria-live="polite">
+
+      <ul className="plain-list transfer-summary">
+        {row(type === 'buy' || type === 'buy_to_cover' ? 'Spesa' : 'Incasso lordo', currency === 'EUR' ? eur(p.grossEur) : `${money(p.grossNative, currency)} · ${eur(p.grossEur)}`)}
+        {p.commissionEur > 0 && row('Commissioni', eur(p.commissionEur))}
+        {closes && p.gainEur !== null && row(p.gainEur >= 0 ? 'Plus' : 'Minus', eur(p.gainEur, true), tone(p.gainEur))}
+        {closes && p.lossesUsedEur > 0.005 && row('Minus compensate', eur(p.lossesUsedEur))}
+        {closes && Math.abs(p.taxEur) > 0.005 && row(regime === 'dichiarativo' ? 'Imposta (da dichiarare)' : 'Imposta trattenuta', eur(p.taxEur))}
+        {row(p.cashEur >= 0 ? 'Incasso netto' : 'Uscita netta', eur(Math.abs(p.cashEur)))}
+        {row('Quantità', `${fmtQty(p.before.qty)} → ${fmtQty(p.after.qty)}`)}
+        {Math.abs(p.after.qty) > 1e-9 && row(p.after.qty < 0 ? 'Prezzo medio short' : 'PMC', Math.abs(p.before.qty) > 1e-9 && Math.abs(p.before.pmcEur - p.after.pmcEur) > 0.0005 ? <>{pmc(p.before)} → {pmc(p.after)}</> : pmc(p.after))}
+      </ul>
+      <p className="muted small">
+        {atQuote ? 'Calcolato al prezzo attuale. ' : ''}
+        {p.fxEstimated ? "Cambio di quel giorno non ancora noto: stima con l'ultimo disponibile." : currency !== 'EUR' ? "Cambio Banca d'Italia del giorno." : ''}
+      </p>
+    </div>
   )
 }

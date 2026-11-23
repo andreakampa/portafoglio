@@ -5,6 +5,7 @@ import type { FxLookup } from '../domain/engine/types.ts'
 import { symbolOf } from '../domain/engine/valuation.ts'
 import { loadDividends } from '../lib/dividends.ts'
 import { loadFx } from '../lib/fxRates.ts'
+import { localToday } from '../lib/today'
 
 export interface DividendsState {
   status: 'loading' | 'ready'
@@ -23,7 +24,7 @@ export function useDividends(portfolio: RawPortfolio, fx: FxLookup): DividendsSt
   useEffect(() => {
     if (hasFlows) return
     let alive = true
-    const today = new Date().toISOString().slice(0, 10)
+    const today = localToday()
     const assets = Object.entries(portfolio.assets ?? {})
     loadDividends(assets.map(([id, a]) => symbolOf(a, id)))
       .then(async byTicker => {

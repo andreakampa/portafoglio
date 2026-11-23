@@ -3,10 +3,11 @@ import { PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { buildAiContext } from '../domain/aiContext'
 import { PROXY } from '../lib/proxy'
+import { localToday } from '../lib/today'
 
 // Stessa chiave del sito attuale (stesso dominio): chi l'ha già inserita là non la deve rimettere.
 const KEY_STORAGE = 'gemini_api_key'
-const TODAY = new Date().toISOString().slice(0, 10)
+const TODAY = localToday()
 const readKey = () => {
   try {
     return localStorage.getItem(KEY_STORAGE) ?? ''
