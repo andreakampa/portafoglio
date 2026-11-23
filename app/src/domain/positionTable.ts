@@ -233,9 +233,10 @@ export function dividendDot(divs: { exDate: string }[], qtyAtExDate: (exDate: st
 
 // ── Azioni sulla riga (come "Trading tools" nel sito vecchio) ───────────
 
-export type RowAction = 'history' | 'buy' | 'sell' | 'short' | 'cover' | 'sim' | 'transfer' | 'delete'
+export type RowAction = 'history' | 'dividends' | 'buy' | 'sell' | 'short' | 'cover' | 'sim' | 'transfer' | 'delete'
 export const ROW_ACTION_LABEL: Record<RowAction, string> = {
   history: 'Storico',
+  dividends: 'Dividendi',
   buy: 'Compra',
   sell: 'Vendi',
   short: 'Short',

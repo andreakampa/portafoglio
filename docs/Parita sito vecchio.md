@@ -131,10 +131,14 @@ Si apre con il pulsante Storico sulla riga (anche per i titoli trasferiti). Badg
       Comm., Totale, **Tasso €/USD**, PMC (€ + nativo), P&L lordo, P&L netto (fiscale, con tasse).
 - [x] Triangolo di avviso sulle righe anomale, modifica ed eliminazione per riga.
 
-## 7. Finestra Dividendi del titolo (vecchio: `ui/dividendi.js`)
+## 7. Finestra Dividendi del titolo (vecchio: `ui/dividendi.js`) — ✅ fatto (PR `dividendi-titolo`)
 
-- [ ] Riquadri: Dividendi maturati (n, ultimo ex-date), Totale pagato (€ e $), Ultimo pagamento.
-- [ ] Tabella: Ex-date, Pagamento, Stato (Maturato / Pagato), Div/azione, Quantità, Importo totale, Importo €,
+Si apre toccando il pallino dei dividendi. `components/AssetDividends.tsx` + `domain/assetDividends.ts`. Per IBKR il netto reale arriva dagli accrediti veri
+(movimenti di cassa, entro 45 giorni dallo stacco); altrimenti si scrive a mano, salvato in `settings/dividendActuals/{pid}/{assetId}/{stacco}`
+(nel sito vecchio la chiave conteneva "#", vietato da Firebase: non risultano valori salvati da recuperare).
+
+- [x] Riquadri: Dividendi maturati (n, ultimo ex-date), Totale pagato (€ e $), Ultimo pagamento.
+- [x] Tabella: Ex-date, Pagamento, Stato (Maturato / Pagato), Div/azione, Quantità, Importo totale, Importo €,
       Netto atteso, **Netto reale inseribile a mano** con avviso anomalia oltre il 3% (logica già in `current-work`).
 
 ## 8. Posizioni chiuse

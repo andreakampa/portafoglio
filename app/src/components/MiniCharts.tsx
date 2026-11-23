@@ -36,13 +36,13 @@ export function Range52({ price, low, high, currency }: { price: number | null; 
 }
 
 /** Pallino dei dividendi: verde = pagati, arancione = maturati non ancora pagati. */
-export function DividendDotView({ paid, pending }: { paid: boolean; pending: boolean }) {
+export function DividendDotView({ paid, pending, onOpen }: { paid: boolean; pending: boolean; onOpen?: () => void }) {
   if (!paid && !pending) return null
   const title = paid && pending ? 'Dividendi pagati e in maturazione' : paid ? 'Dividendi pagati' : 'Dividendo maturato, non ancora pagato'
   return (
-    <span className="div-dot" title={title} aria-label={title} role="img">
+    <button type="button" className="div-dot" title={`${title}: apri i dividendi`} aria-label={`${title}: apri i dividendi`} onClick={onOpen}>
       {paid && <span className="div-dot-paid" />}
       {pending && <span className="div-dot-pending" />}
-    </span>
+    </button>
   )
 }
