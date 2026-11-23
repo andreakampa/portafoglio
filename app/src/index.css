@@ -577,3 +577,12 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 /* Celle un po' più strette anche sugli schermi grandi: più colonne prima di passare alle schede. */
 .pos-table-wrap .pos-table th, .pos-table-wrap .pos-table td { padding-left: 10px; padding-right: 10px; }
 @media (max-width: 1299px) { .pos-table-wrap .pos-table th, .pos-table-wrap .pos-table td { padding: 8px 8px; } }
+
+/* Ricerca del titolo su Yahoo */
+.ticker-search { display: grid; gap: 6px; }
+.ticker-hits { list-style: none; margin: 0; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); max-height: 280px; overflow-y: auto; }
+.ticker-hits li.muted { padding: 8px; }
+.ticker-hits button { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: center; width: 100%; padding: 8px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ticker-hits button:hover, .ticker-hits button:focus-visible { background: var(--surface-2); }
+.ticker-hits button > :first-child { grid-row: span 2; }
+.ticker-hit-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

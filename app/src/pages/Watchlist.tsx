@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useUser } from '../auth/context'
 import { useWatchlist } from '../data/useWatchlist'
 import { listCounts, parseWatchlistCsv, type WatchItem } from '../domain/watchlist'
+import { TickerSearch } from '../components/TickerSearch'
 import { pct } from '../lib/format'
 import { loadQuotes, type Quote } from '../lib/prices'
 import { disablePush, enablePush, pushState, type PushState } from '../lib/push'
@@ -97,6 +98,7 @@ export function Watchlist() {
 
       <form className="card note-form" onSubmit={e => { e.preventDefault(); void add() }}>
         <h2>Aggiungi</h2>
+        <TickerSearch label="Cerca per nome" onPick={h => setSymbol(s => [...s.split(/[\s,;]+/).filter(Boolean), h.ticker].join(' '))} />
         <div className="inline-pair">
           <input value={symbol} onChange={e => setSymbol(e.target.value)} placeholder="Simbolo Yahoo, es. NVDA o RACE.MI (anche più di uno)" autoCapitalize="characters" aria-label="Simbolo" />
           <button type="submit" className="btn btn-primary">Aggiungi</button>

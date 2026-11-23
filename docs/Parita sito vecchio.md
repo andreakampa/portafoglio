@@ -165,7 +165,7 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 ### 10. Inserimento movimenti (`transactions.js`, `api/search.js`) — anteprima e blocco fatti (PR `inserimento-anteprima`)
 - [x] Anteprima mentre scrivi: costo, nuova quantità e PMC; in vendita guadagno, imposta con minus compensate, incasso netto.
 - [x] Blocco vendita/copertura oltre la quantità posseduta (oggi solo avviso dopo il salvataggio).
-- [ ] Ricerca del titolo su Yahoo (nome, valuta e tipo compilati da soli) per i titoli nuovi.
+- [x] Ricerca del titolo su Yahoo (nome, valuta e tipo compilati da soli) per i titoli nuovi; anche nella Watchlist (PR `ricerca-titolo`).
 - [x] Valuta della commissione anche USD/CAD. (In più: la data di oggi ora segue il fuso locale, prima dopo mezzanotte risultava ieri.)
 
 ### 11. Cassetto fiscale (`api/fiscale.js`) — insieme al punto 9
