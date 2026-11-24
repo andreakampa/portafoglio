@@ -1,5 +1,6 @@
 // Tabella Posizioni (PC) e schede (telefono), con colonne configurabili, ordinamento e gruppi come nel sito vecchio.
-// Se le colonne scelte non ci stanno nella larghezza disponibile si passa alle schede: mai scorrimento laterale nascosto.
+// Sul PC resta sempre la tabella: se le colonne scelte non ci stanno si scorre di lato (barra visibile, avviso
+// e colonna Titolo fissa a sinistra), così non si perdono informazioni. Le schede restano solo per il telefono.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useColumnConfig } from '../data/useColumnConfig'
 import type { Computed } from '../data/useComputedPortfolio'
@@ -110,7 +111,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
     setSortPref(`${key}:${dir}`)
   }
 
-  // Tabella o schede: si misura se la tabella entra nella larghezza disponibile.
+  // Si misura se la tabella entra nella larghezza disponibile: se no, compare l'avviso di scorrere.
   const wrapRef = useRef<HTMLDivElement>(null)
   const [fits, setFits] = useState(true)
   useLayoutEffect(() => {
@@ -119,7 +120,13 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
     const check = () => {
       const table = wrap.querySelector('table')
       if (!table || !table.offsetWidth) return
+      // Si misura sempre la tabella nella forma normale (senza colonna fissa e senza riquadro scorrevole),
+      // altrimenti una volta passata allo scorrimento non tornerebbe più normale.
+      const view = wrap.parentElement
+      const wasWide = view?.classList.contains('too-wide') ?? false
+      view?.classList.remove('too-wide')
       setFits(table.scrollWidth <= wrap.clientWidth + 1)
+      if (wasWide) view?.classList.add('too-wide')
     }
     check()
     const ro = new ResizeObserver(check)
@@ -263,7 +270,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
   }
 
   return (
-    <div className={`pos-view ${fits ? '' : 'use-cards'}`}>
+    <div className={`pos-view ${fits ? '' : 'too-wide'}`}>
       <div className="pos-tools">
         <label className="inline cards-sort">
           Ordina per
@@ -307,7 +314,9 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
         </div>
       )}
 
-      {/* Telefono (o tabella troppo larga): schede. */}
+      {!fits && <p className="muted small scroll-hint table-only">Le colonne scelte non entrano tutte: scorri la tabella verso destra →</p>}
+
+      {/* Telefono: schede. */}
       <div className="pos-cards-wrap">
         {visibleGroups.map(g => (
           <Group key={g} id={g} count={groups[g].length}>
