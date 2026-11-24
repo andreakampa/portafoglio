@@ -14,6 +14,7 @@ import { buildMovements, CASH_LABEL, cashflowsIn, cashTotalsEur, KIND_LABEL, mar
 import { buildInterest, customRange, isManualInterest, periodTotals, taxByMovement, validateInterest, type InterestForm } from '../domain/movementsView'
 import { exportPdf, exportXlsx, type ExportTable } from '../lib/exportTable'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
+import { toast } from '../lib/toast'
 import { localToday } from '../lib/today'
 
 const TODAY = localToday()
@@ -314,6 +315,7 @@ function InterestList({ pid, rows }: { pid: string; rows: ReturnType<typeof marg
     try {
       const row = buildInterest(f, Date.now().toString(36))
       await edit.changeMarginInterest(pid, cur => [...cur, row])
+      toast('Interesse aggiunto')
       setF({ ...f, amount: '' })
       setError('')
     } catch (err) {

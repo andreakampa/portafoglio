@@ -2,6 +2,7 @@ import { useAuth, useUser } from '../auth/context'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { readTheme, saveTheme, type ThemePref } from '../lib/theme'
+import { CacheCard, PasswordCard } from '../components/AccountCards'
 import { InvitesCard, PortfoliosCard } from '../components/PortfolioAdmin'
 
 export function Settings() {
@@ -23,6 +24,7 @@ export function Settings() {
           Esci
         </button>
       </div>
+      <PasswordCard />
       <ThemeCard />
       <div className="card">
         <h2>Strumenti</h2>
@@ -34,6 +36,7 @@ export function Settings() {
       </div>
       <PortfoliosCard />
       {isAdmin && <InvitesCard />}
+      <CacheCard />
       <div className="card">
         <h2>Versione</h2>
         <p className="muted">

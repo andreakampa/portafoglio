@@ -610,3 +610,22 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .cart-row > span:first-child { min-width: 0; }
 .cart-detail { display: block; margin-top: 2px; }
 .cart-row .linklike:disabled { opacity: .35; cursor: default; }
+
+/* Avvisi a comparsa */
+.toaster { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 1000; display: grid; gap: 8px; width: min(420px, calc(100vw - 32px)); pointer-events: none; }
+@media (min-width: 900px) and (pointer: fine), (min-width: 1200px) { .toaster { bottom: 24px; } }
+.toast { padding: 10px 14px; border-radius: 10px; background: var(--text); color: var(--bg); box-shadow: 0 8px 24px rgb(0 0 0 / 25%); font-weight: 550; animation: toast-in .18s ease-out; }
+.toast-error { background: #b42318; color: #fff; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* Risposte formattate dell'assistente */
+.chat-model .md { white-space: normal; }
+.md > * { margin: 0 0 8px; }
+.md > :last-child { margin-bottom: 0; }
+.md h3, .md h4 { font-size: 1rem; margin-top: 12px; }
+.md ul, .md ol { padding-left: 20px; }
+.md code { font-size: .9em; padding: 1px 4px; border-radius: 4px; background: var(--surface-2); }
+.md-table { overflow-x: auto; }
+.md-table table { border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.md-table th, .md-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; }

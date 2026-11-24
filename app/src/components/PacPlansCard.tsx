@@ -5,6 +5,7 @@ import { symbolOf } from '../domain/engine/valuation'
 import { describePlan, formFromPlan, parsePlan, planSummary, scheduledDates, WEEKDAYS, type PacPlan, type PlanForm } from '../domain/pac'
 import { eur, money, qty as fmtQty } from '../lib/format'
 import { localToday } from '../lib/today'
+import { toast } from '../lib/toast'
 
 type Ready = Extract<Computed, { status: 'ready' }>
 const today = () => localToday()
@@ -38,6 +39,7 @@ export function PacPlansCard({ c }: { c: Ready }) {
     setError('')
     try {
       await save(plan)
+      toast(previous ? 'Piano modificato' : 'Piano creato')
       setEditing(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Salvataggio non riuscito.')

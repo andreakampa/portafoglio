@@ -4,6 +4,7 @@ import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { buildManualLoss, removeManualLoss, validateManualLoss, type ManualLossForm, type StoredManualLoss } from '../domain/manualLosses'
 import { eur } from '../lib/format'
 import { localToday } from '../lib/today'
+import { toast } from '../lib/toast'
 
 const fmtDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
 const empty = (): ManualLossForm => ({ date: localToday(), amount: '', title: '', categoria: 'strumenti' })
@@ -23,6 +24,7 @@ export function ManualLossesCard({ pid, list }: { pid: string; list: StoredManua
     try {
       const loss = buildManualLoss(f)
       await edit.changeManualLosses(pid, cur => [...cur, loss])
+      toast('Minus aggiunta')
       setF(empty())
       setOpen(false)
       setError('')
@@ -37,6 +39,7 @@ export function ManualLossesCard({ pid, list }: { pid: string; list: StoredManua
     if (!confirm(`Eliminare la minus di ${eur(Number(m.amount))} del ${fmtDate(m.date)}?`)) return
     try {
       await edit.changeManualLosses(pid, cur => removeManualLoss(cur, i, m))
+      toast('Minus eliminata')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Eliminazione non riuscita.')
     }

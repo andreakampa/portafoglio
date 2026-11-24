@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { BonusRunner } from '../components/BonusRunner'
 import { PacRunner } from '../components/PacRunner'
+import { Toaster } from '../components/Toaster'
 import { usingEmulator } from '../lib/firebase'
 import { IconChat, IconHome, IconMore, IconMovements, IconNotes, IconPositions, IconSettings, IconSimulator, IconTax, IconWatch } from './icons'
 
@@ -53,6 +54,7 @@ export function AppShell() {
       <main className="content">
         {usingEmulator && <div className="banner">Emulatore attivo: dati di prova</div>}
         <PacRunner />
+        <Toaster />
         <BonusRunner />
         <Outlet />
       </main>

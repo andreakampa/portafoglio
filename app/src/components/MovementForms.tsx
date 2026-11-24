@@ -13,6 +13,7 @@ import {
 import { TickerSearch } from './TickerSearch'
 import { previewMovement, type MovementPreview } from '../domain/movementPreview'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
+import { toast } from '../lib/toast'
 import { localToday } from '../lib/today'
 
 type Ready = Extract<Computed, { status: 'ready' }>
@@ -97,6 +98,7 @@ export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; 
       } else {
         await edit.add(c.selectedId, assetId, buildTx(f, newId))
       }
+      toast(editing ? 'Movimento modificato' : 'Movimento salvato')
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Salvataggio non riuscito: controlla la connessione e riprova.')

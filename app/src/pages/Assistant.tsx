@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Markdown } from '../components/Markdown'
 import { PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { buildAiContext } from '../domain/aiContext'
@@ -35,6 +36,18 @@ interface Msg {
   text: string
 }
 
+const ANALYSIS_PROMPT =
+  'Analizza il portafoglio: diversificazione e concentrazione, posizioni con i risultati migliori e peggiori, situazione fiscale (minus da usare e scadenze), rischi principali. Chiudi con 3 spunti concreti. Usa titoli brevi ed elenchi.'
+/** Ultima analisi per portafoglio, su questo dispositivo: si rilegge senza rifare la richiesta. */
+const analysisKey = (pid: string) => `ptpro_v2_ai_analysis_${pid}`
+const readAnalysis = (pid: string): { date: string; text: string } | null => {
+  try {
+    return JSON.parse(localStorage.getItem(analysisKey(pid)) || 'null') as { date: string; text: string } | null
+  } catch {
+    return null
+  }
+}
+
 /** Assistente AI (Gemini, con la chiave personale dell'utente) che risponde sui dati del portafoglio scelto. */
 export function Assistant() {
   const c = useComputedPortfolio()
@@ -55,7 +68,7 @@ export function Assistant() {
     setKey(k)
   }
 
-  async function ask(text: string) {
+  async function ask(text: string, saveAs?: string) {
     if (c.status !== 'ready' || !text.trim() || busy) return
     setBusy(true)
     setError('')
@@ -73,6 +86,13 @@ export function Assistant() {
       const j = (await r.json()) as { answer?: string; error?: string }
       if (!r.ok || !j.answer) throw new Error(ERRORS[j.error ?? ''] ?? 'Risposta non arrivata: riprova.')
       setChat(m => [...m, { role: 'model', text: j.answer! }])
+      if (saveAs) {
+        try {
+          localStorage.setItem(analysisKey(saveAs), JSON.stringify({ date: TODAY, text: j.answer }))
+        } catch {
+          /* storage non disponibile */
+        }
+      }
     } catch (e) {
       setError(e instanceof Error && e.name !== 'TimeoutError' ? e.message : 'Gemini ci mette troppo: riprova.')
       setChat(m => m.slice(0, -1))
@@ -80,6 +100,17 @@ export function Assistant() {
     } finally {
       setBusy(false)
     }
+  }
+
+  const pid = c.status === 'ready' ? c.selectedId : ''
+  const last = pid ? readAnalysis(pid) : null
+  const analyze = (fresh: boolean) => {
+    if (!fresh && last) {
+      setChat(m => [...m, { role: 'user', text: 'Analizza portafoglio' }, { role: 'model', text: `*Analisi del ${new Date(last.date + 'T12:00:00').toLocaleDateString('it-IT')}*\n\n${last.text}` }])
+      return
+    }
+    if (fresh && last && !confirm('Rifare l’analisi? Usa una richiesta Gemini.')) return
+    void ask(ANALYSIS_PROMPT, pid)
   }
 
   const submit = (e: FormEvent) => {
@@ -108,13 +139,24 @@ export function Assistant() {
       ) : (
         <>
           <div className="card chat">
+            <div className="form-actions">
+              <button type="button" className="btn btn-primary" onClick={() => analyze(false)} disabled={busy || c.status !== 'ready'}>
+                Analizza portafoglio
+              </button>
+              {last && (
+                <button type="button" className="btn btn-ghost" onClick={() => analyze(true)} disabled={busy || c.status !== 'ready'}>
+                  Rifai l'analisi
+                </button>
+              )}
+              {last && <span className="muted small">ultima del {new Date(last.date + 'T12:00:00').toLocaleDateString('it-IT')}</span>}
+            </div>
             {chat.length === 0 && (
               <div className="chat-suggestions">
                 {SUGGESTIONS.map(s => <button key={s} type="button" className="pill small-pill" onClick={() => void ask(s)} disabled={busy || c.status !== 'ready'}>{s}</button>)}
               </div>
             )}
             {chat.map((m, i) => (
-              <div key={i} className={`chat-msg chat-${m.role}`}>{m.text}</div>
+              <div key={i} className={`chat-msg chat-${m.role}`}>{m.role === 'model' ? <Markdown text={m.text} /> : m.text}</div>
             ))}
             {busy && <div className="chat-msg chat-model muted">Sto pensando…</div>}
             {error && <p className="neg small" role="alert">{error}</p>}
