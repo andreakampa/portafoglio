@@ -1,4 +1,4 @@
-import type { RealizedEvent } from './positions.ts'
+import type { RealizedDetail, RealizedEvent } from './positions.ts'
 import type { AssetType, TaxRegime } from './types.ts'
 
 /** Le minus si possono usare fino al 31/12 del quarto anno successivo a quello di realizzo. */
@@ -50,6 +50,11 @@ export interface FiscalLine {
   date: string
   year: number
   side: 'long' | 'short' | 'manuale'
+  /** Quantità chiusa e come si arriva al risultato (assenti per le minus inserite a mano). */
+  qty?: number
+  proceedsEur?: number
+  costEur?: number
+  detail?: RealizedDetail
   gainEur: number
   /** Minus usate per compensare questa plus (per i titoli di Stato: sulla base al 48,08%). */
   compensatedEur: number
@@ -150,7 +155,10 @@ export function computeFiscal(
     const e = it.e
     const year = yearOf(e.date)
     const category = categoryFor(e.assetType)
-    const base = { key: it.key, assetId: e.assetId, assetName: e.assetName, assetType: e.assetType, date: e.date, year, side: e.side }
+    const base = {
+      key: it.key, assetId: e.assetId, assetName: e.assetName, assetType: e.assetType, date: e.date, year, side: e.side,
+      qty: e.qty, proceedsEur: e.proceedsEur, costEur: e.costEur, detail: e.detail,
+    }
 
     if (e.gainEur < -0.005) {
       addLoss(category, year, -e.gainEur * baseWeight(e.assetType))

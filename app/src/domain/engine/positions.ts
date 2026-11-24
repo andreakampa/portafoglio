@@ -22,6 +22,31 @@ export interface RealizedEvent {
   costEur: number // costo fiscale dei lotti chiusi
   gainEur: number // plus (>0) o minus (<0)
   gainNative: number
+  /** Come si arriva al risultato (per mostrarlo): non entra in nessun calcolo. */
+  detail?: RealizedDetail
+}
+
+/** Dettaglio di una chiusura: il movimento che chiude e i lotti che chiude, in valuta e in EUR. */
+export interface RealizedDetail {
+  currency: string
+  method: CostMethod
+  /** Prezzo unitario del movimento che chiude (vendita, o ricopertura per gli short). */
+  price: number
+  /** Cambio del movimento: unità di valuta per 1 EUR. */
+  rate: number
+  /** Controvalore lordo (quantità chiusa × prezzo) e commissioni, per la quota chiusa. */
+  grossNative: number
+  grossEur: number
+  commissionNative: number
+  commissionEur: number
+  /** Premio di un'opzione esercitata che entra nel prezzo (0 se non c'è). */
+  premiumNative: number
+  premiumEur: number
+  /** Totale in valuta: incasso netto e costo (per vedere quanto è effetto del cambio). */
+  proceedsNative: number
+  costNative: number
+  /** Lotti chiusi: acquisti per i long, vendite allo scoperto per gli short. */
+  lots: TransferPiece[]
 }
 
 /** Posizione subito dopo un movimento (per lo storico del titolo). Non entra in nessun calcolo. */
@@ -86,6 +111,22 @@ export interface OptionPremium {
 }
 
 const byDate = (a: RawTx, b: RawTx) => a.date.localeCompare(b.date)
+
+/** Importi del movimento che chiude, in proporzione alla quantità davvero chiusa. */
+function closeDetail(
+  a: ReturnType<typeof amounts>, consumed: number, currency: string, method: CostMethod,
+  proceedsNative: number, costNative: number, lots: TransferPiece[],
+): RealizedDetail {
+  const share = a.qty > 0 ? consumed / a.qty : 0
+  const plainNative = consumed * a.price
+  return {
+    currency, method, price: a.price, rate: a.rate,
+    grossNative: plainNative, grossEur: plainNative / a.rate,
+    commissionNative: a.commissionNative * share, commissionEur: a.commissionEur * share,
+    premiumNative: a.grossNative * share - plainNative, premiumEur: a.grossEur * share - plainNative / a.rate,
+    proceedsNative, costNative, lots,
+  }
+}
 
 /** Consuma `qty` dai lotti secondo il metodo; restituisce il costo consumato. */
 function consume(
@@ -251,7 +292,9 @@ export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLooku
         const c = consume(longLots, a.qty, method, tx, issues)
         const proceedsNative = (a.grossNative - a.commissionNative) * (c.consumed / a.qty)
         const proceedsEur = (a.grossEur - a.commissionEur) * (c.consumed / a.qty)
+        const detail = closeDetail(a, c.consumed, currency, method, proceedsNative, c.costNative, c.pieces)
         realized.push({
+          detail,
           txId: tx.id,
           date: tx.date,
           side: 'long',
@@ -280,7 +323,9 @@ export function computePosition(asset: RawAsset, method: CostMethod, fx: FxLooku
         const share = c.consumed / a.qty
         const coverEur = (a.grossEur + a.commissionEur) * share
         const coverNative = (a.grossNative + a.commissionNative) * share
+        const detail = closeDetail(a, c.consumed, currency, method, c.costNative, coverNative, c.pieces)
         realized.push({
+          detail,
           txId: tx.id,
           date: tx.date,
           side: 'short',
