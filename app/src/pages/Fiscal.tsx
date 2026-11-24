@@ -9,7 +9,8 @@ import { availableLosses } from '../domain/engine/fiscal'
 import { daysToExpiry, type StoredManualLoss } from '../domain/manualLosses'
 import { localToday } from '../lib/today'
 import { wealthTax, wealthTaxKindFor } from '../domain/engine/wealthTax'
-import { eur, THIS_YEAR, tone } from '../lib/format'
+import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
+import { FiscalLineDetail } from '../components/FiscalLineDetail'
 import { Tag } from '../components/Tag'
 
 export function Fiscal() {
@@ -106,27 +107,46 @@ export function Fiscal() {
 
       <div className="card">
         <h2>Movimenti {year}</h2>
+        {lines.some(l => l.detail) && <p className="muted small">Tocca una riga per vedere come si arriva alla plus o alla minus: vendita, acquisti chiusi, cambio, commissioni e tasse.</p>}
         {lines.length === 0 ? (
           <p className="muted">Nessuna vendita nel {year}.</p>
         ) : (
           <ul className="fiscal-lines">
-            {lines.map(l => (
-              <li key={l.key}>
-                <div>
-                  <b>{l.assetName}</b>
-                  {l.side === 'short' && <Tag tone="short">short</Tag>}
-                  {l.side === 'manuale' && <span className="badge">a mano</span>}
-                  {l.excluded && <span className="badge">ETF/fondo: non compensabile</span>}
-                  <br />
-                  <small className="muted">{new Date(l.date + 'T12:00:00').toLocaleDateString('it-IT')}</small>
-                </div>
-                <div className="num">
-                  <span className={tone(l.gainEur)}>{eur(l.gainEur, true)}</span>
-                  {l.compensatedEur > 0.005 && <small className="muted">minus usate {eur(l.compensatedEur)}</small>}
-                  {l.taxEur > 0.005 && <small className="muted">imposta {eur(l.taxEur)}</small>}
-                </div>
-              </li>
-            ))}
+            {lines.map(l => {
+              const row = (
+                <>
+                  <div>
+                    <b>{l.assetName}</b>
+                    {l.side === 'short' && <Tag tone="short">short</Tag>}
+                    {l.side === 'manuale' && <span className="badge">a mano</span>}
+                    {l.excluded && <span className="badge">ETF/fondo: non compensabile</span>}
+                    <br />
+                    <small className="muted">
+                      {new Date(l.date + 'T12:00:00').toLocaleDateString('it-IT')}
+                      {l.qty != null && l.detail && <> · {l.side === 'short' ? 'ricoperte' : 'vendute'} {qty(l.qty)} a {money(l.detail.price, l.detail.currency)}</>}
+                    </small>
+                  </div>
+                  <div className="num">
+                    <span className={tone(l.gainEur)}>{eur(l.gainEur, true)}</span>
+                    {l.compensatedEur > 0.005 && <small className="muted">minus usate {eur(l.compensatedEur)}</small>}
+                    {l.taxEur > 0.005 && <small className="muted">imposta {eur(l.taxEur)}</small>}
+                  </div>
+                </>
+              )
+              // Con il dettaglio: si apre con un clic e mostra come si arriva alla plus o minus.
+              return (
+                <li key={l.key}>
+                  {l.detail ? (
+                    <details className="fiscal-line">
+                      <summary title="Mostra come si arriva a questo risultato">{row}</summary>
+                      <FiscalLineDetail l={l} />
+                    </details>
+                  ) : (
+                    <div className="fiscal-line-plain">{row}</div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

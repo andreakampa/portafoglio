@@ -232,9 +232,10 @@ select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .plain-list li:last-child { border-bottom: none; }
 .linklike { background: none; border: none; padding: 0; color: var(--text); font: inherit; font-weight: 650; cursor: pointer; text-align: left; }
 .fiscal-lines { list-style: none; margin: 0; padding: 0; }
-.fiscal-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.fiscal-lines li { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.fiscal-line > summary, .fiscal-line-plain { display: flex; justify-content: space-between; gap: 12px; }
 .fiscal-lines li:last-child { border-bottom: none; }
-.fiscal-lines .num { display: grid; justify-items: end; align-content: start; gap: 2px; }
+.fiscal-line > summary > .num, .fiscal-line-plain > .num { display: grid; justify-items: end; align-content: start; gap: 2px; }
 
 /* ── Movimenti ───────────────────────────────────── */
 .small-pill { min-height: 32px; padding: 0 12px; font-size: .85rem; }
@@ -668,3 +669,33 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 /* Telefono: le schede restano dentro lo schermo; la variazione del giorno va a capo se non c'è posto. */
 .pos-cards-wrap, .pos-group, .pos-cards { grid-template-columns: minmax(0, 1fr); }
 .pos-card-head { flex-wrap: wrap; }
+
+/* Fiscale: dettaglio di come si arriva a una plus o minus (components/FiscalLineDetail.tsx) */
+.fiscal-line > summary { cursor: pointer; list-style: none; border-radius: 8px; }
+.fiscal-line > summary::-webkit-details-marker { display: none; }
+.fiscal-line > summary > div:first-child b::before { content: '▸ '; color: var(--muted); font-weight: 400; }
+.fiscal-line[open] > summary > div:first-child b::before { content: '▾ '; }
+.fiscal-line > summary:hover b { color: var(--primary); }
+.fiscal-detail { display: grid; gap: 14px; margin-top: 10px; padding: 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.fiscal-detail section { display: grid; gap: 6px; min-width: 0; }
+.fiscal-detail h3 { margin: 0; font-size: .95rem; }
+.fiscal-detail p { margin: 0; }
+.fiscal-detail dl { margin: 0; display: grid; gap: 4px; }
+.fiscal-detail dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+.fiscal-detail dd { margin: 0; text-align: right; white-space: nowrap; }
+.fiscal-detail dl > .total { border-top: 1px solid var(--border); padding-top: 4px; }
+.fiscal-lots { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; }
+.fiscal-lots th, .fiscal-lots td { padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+.fiscal-lots th { color: var(--muted); font-weight: 600; font-size: .78rem; }
+.fiscal-lots .num { text-align: right; }
+.fiscal-lots .cell-sub { display: block; font-size: .72rem; }
+.fiscal-lots tfoot td { border-bottom: 0; font-weight: 600; }
+@media (max-width: 599px) {
+  .fiscal-detail { padding: 8px; }
+  .fiscal-lots th, .fiscal-lots td { padding: 4px 2px; }
+  .fiscal-detail dd { white-space: normal; }
+}
+.fiscal-detail { grid-template-columns: minmax(0, 1fr); }
+.fiscal-lots-wrap { overflow-x: auto; }
+@media (max-width: 599px) { .fiscal-lots .col-native { display: none; } }
+@media (max-width: 599px) { .fiscal-lots { font-size: .8rem; } .fiscal-lots th { white-space: normal; } }

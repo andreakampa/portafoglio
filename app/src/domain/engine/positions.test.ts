@@ -237,3 +237,27 @@ describe('fotografie dopo ogni movimento (storico del titolo)', () => {
     expect(p.steps![2]!.pmcEur).toBeCloseTo(p.pmcEur)
   })
 })
+
+describe('dettaglio della chiusura (per mostrare come si arriva alla plus)', () => {
+  it('vendita in USD: prezzo, cambio, commissioni e lotti chiusi', () => {
+    const fx = fxTable({ 'USD:2026-01-10': 1.1, 'USD:2026-02-10': 1.2, 'USD:2026-03-10': 1.25 })
+    const a = asset('USD', [
+      { id: 'b1', date: '2026-01-10', type: 'buy', qty: 10, price: 100, commission: 1.1, commissionCurrency: 'USD' },
+      { id: 'b2', date: '2026-02-10', type: 'buy', qty: 10, price: 120 },
+      { id: 's1', date: '2026-03-10', type: 'sell', qty: 15, price: 150, commission: 2.5, commissionCurrency: 'USD' },
+    ])
+    const r = computePosition(a, 'fifo', fx).realized[0]!
+    const d = r.detail!
+    expect(d).toMatchObject({ currency: 'USD', method: 'fifo', price: 150, rate: 1.25 })
+    expect(d.grossNative).toBeCloseTo(2250, 8)
+    expect(d.commissionEur).toBeCloseTo(2, 8)
+    expect(d.premiumNative).toBeCloseTo(0, 8)
+    // FIFO: tutto il primo lotto (10) e metà del secondo (5)
+    expect(d.lots.map(l => [l.date, l.qty])).toEqual([['2026-01-10', 10], ['2026-02-10', 5]])
+    expect(d.lots[0]!.costEur).toBeCloseTo(1001.1 / 1.1, 8)
+    // i lotti sommano al costo fiscale, incasso netto e costo tornano con il risultato
+    expect(d.lots.reduce((s, l) => s + l.costEur, 0)).toBeCloseTo(r.costEur, 8)
+    expect(d.grossEur - d.commissionEur + d.premiumEur).toBeCloseTo(r.proceedsEur, 8)
+    expect(r.proceedsEur - r.costEur).toBeCloseTo(r.gainEur, 8)
+  })
+})
