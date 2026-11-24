@@ -390,6 +390,8 @@ textarea {
 .top-list .num { text-align: right; }
 @media (min-width: 1100px) {
   .content { max-width: 1400px; }
+  /* Posizioni: la tabella usa tutto lo schermo (monitor grandi), così ci stanno molte più colonne. */
+  .content:has(.pos-view) { max-width: none; padding-left: 24px; padding-right: 24px; }
   .overview-head { grid-template-columns: auto 1fr auto; gap: 16px; }
   .overview-head .pills { justify-self: center; }
   .overview-add { display: inline-flex; }
@@ -491,6 +493,13 @@ a.kpi-link .kpi-label::after { content: ' ›'; }
     left: 0; z-index: 4; box-shadow: 1px 0 0 var(--border), 6px 0 8px -6px rgb(0 0 0 / 25%);
   }
   .too-wide .pos-table-wrap .pos-table tbody tr:not(.group-row):hover > td:first-child { background: var(--surface-2); }
+  /* Intestazioni lunghe ("Realizzato netto") su due righe: le colonne restano larghe quanto i numeri. */
+  .pos-table-wrap .th-sort { white-space: normal; text-align: right; }
+  .pos-table-wrap th:first-child .th-sort { text-align: left; }
+  .pos-table-wrap th { vertical-align: bottom; }
+  /* Il nome del titolo non va mai spezzato lettera per lettera. */
+  .pos-table-wrap tbody tr:not(.group-row) > td:first-child { min-width: 150px; }
+  .pos-table-wrap .ccy { white-space: nowrap; }
   .scroll-hint { margin: 0; justify-self: end; }
 }
 .pos-table .group-row td { background: var(--surface-2); font-size: .85rem; padding-top: 6px; padding-bottom: 6px; }
