@@ -77,7 +77,7 @@ Checklist: [Parita sito vecchio.md](Parita%20sito%20vecchio.md). **Il sito vecch
 Fatti e pubblicati (PR #34-#42): 0 colori con icona (tema giorno verde acqua scuro), 1 telefono/layout, 2 barra prezzi (EUR/USD, €/$, peso, cassetto,
 Aggiorna), 3 dodici numeri chiave, 4 tabella Posizioni (colonne su Firebase `settings/positionColumns`, ordinamento, gruppi, logo, 52 settimane,
 grafico del giorno, pallino dividendi, PDF/Excel), 5 azioni sulla riga in finestra, 6 Storico del titolo, 7 Dividendi del titolo
-(netto reale in `settings/dividendActuals`), 8 posizioni chiuse. **Resta:** 9 cassetto fiscale (da verificare con Andrea) e le funzioni minori trovate nell'inventario (blocchi 10-15, più due decisioni per Andrea).
+(netto reale in `settings/dividendActuals`), 8 posizioni chiuse. Poi (PR #44-#50, 24/11/2026): 10 anteprima del movimento, blocco vendite oltre la quantità, ricerca titolo Yahoo; 11 minus a mano e scadenze nel Fiscale; 12 Movimenti con periodo dal/al, imposta, export, interessi a mano; 13 PAC completo (modifica, riepilogo, rate saltate `skipDates`, titoli non in euro); 14 carrello salvato in `settings/simCart`; 15 cambio password, svuota cache, avvisi a comparsa, assistente formattato. **Resta:** 9 cassetto fiscale da verificare con Andrea, le decisioni in fondo alla checklist (privacy assistente, comandi IBKR dal browser) e la correzione a mano del compensato (solo se serve).
 Prove nel browser: Chrome headless + emulatori con la copia del backup (script in scratchpad di sessione, non salvato nel repo).
 
 ## Stato al 21/11/2026 (fine sessione)
