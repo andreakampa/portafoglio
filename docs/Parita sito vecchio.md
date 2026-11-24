@@ -186,9 +186,9 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Eliminare una rata senza che torni (`skipDates` del piano).
 - [x] Titoli non in euro (importo convertito al cambio Banca d'Italia del giorno).
 
-### 14. Carrello simulazioni (`cart.js`)
-- [ ] Salvato per portafoglio (oggi si perde ricaricando).
-- [ ] Per riga: imposta e netto (vendite), nuovo PMC (acquisti); conferma su "Svuota".
+### 14. Carrello simulazioni (`cart.js`) — fatto (PR `carrello`)
+- [x] Salvato per portafoglio su Firebase (`settings/simCart`), condiviso tra pagina Simulatore e finestra "Simula" di Posizioni.
+- [x] Per riga: imposta e netto (vendite), nuovo PMC (acquisti); conferma su "Svuota"; righe spostabili ↑↓ (ordine di uso delle minus).
 
 ### 15. Impostazioni, avvisi, assistente
 - [ ] Cambio password; svuota cache prezzi/cambi.

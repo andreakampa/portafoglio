@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RawPortfolio } from './engine/portfolio'
-import { opsToTxs, qtyForBudget, simulate, simulateExtras, trailingDividend, type SimOp } from './simulation'
+import { opsToTxs, qtyForBudget, simulate, simulateExtras, simulateSteps, trailingDividend, type SimOp } from './simulation'
 
 const TODAY = '2026-11-21'
 const noFx = () => undefined
@@ -145,5 +145,27 @@ describe('qtyForBudget', () => {
     expect(qtyForBudget(1000, NaN, 1, 0)).toBe(0)
     expect(qtyForBudget(1000, 100, NaN, 0)).toBe(0)
     expect(qtyForBudget(3, 100, 1, 5)).toBe(0)
+  })
+})
+
+describe('righe del carrello', () => {
+  it('imposta, netto e PMC dopo ogni riga, con le minus usate nell’ordine del carrello', () => {
+    const p = eurPortfolio('amministrato')
+    const ops = [
+      op({ id: '1', type: 'sell', qty: 5, price: 80 }), // minus 100
+      op({ id: '2', type: 'sell', qty: 5, price: 140, commissionEur: 2 }), // plus 198, ne compensa 100
+      op({ id: '3', assetId: 'y', type: 'buy', qty: 5, price: 120 }),
+    ]
+    const s = simulateSteps({ portfolio: p, fx: noFx, latestFx: {}, ops, today: TODAY })
+    expect(s.get('1')!.taxEur).toBe(0)
+    expect(s.get('1')!.netEur).toBeCloseTo(400, 8)
+    expect(s.get('2')!.taxEur).toBeCloseTo(98 * 0.26, 8)
+    expect(s.get('2')!.netEur).toBeCloseTo(700 - 2 - 98 * 0.26, 8)
+    expect(s.get('3')!.after.qty).toBe(15)
+    expect(s.get('3')!.after.pmcEur).toBeCloseTo((1000 + 600) / 15, 8)
+    // in ordine inverso la minus arriva dopo: in amministrato non compensa la plus già fatta
+    const rev = simulateSteps({ portfolio: p, fx: noFx, latestFx: {}, ops: [ops[1]!, ops[0]!], today: TODAY })
+    expect(rev.get('2')!.taxEur).toBeCloseTo(198 * 0.26, 8)
+    expect(rev.get('1')!.taxEur).toBe(0)
   })
 })
