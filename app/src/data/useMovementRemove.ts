@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { KIND_LABEL, type Movement } from '../domain/engine/movements'
 import { pacSkipsFor } from '../domain/pac'
 import { findTransfer, type PortfolioLike } from '../domain/txEdit'
+import { toast } from '../lib/toast'
 import { usePacPlans, usePacSkip } from './usePacPlans'
 import type { Computed } from './useComputedPortfolio'
 import { usePortfolioEdit } from './usePortfolioEdit'
@@ -34,6 +35,7 @@ export function useMovementRemove(c: Computed): (m: Movement) => Promise<string 
         if (!confirm(`Eliminare il trasferimento di ${m.symbol} del ${fmtDate(m.date)}?${both}`)) return null
         try {
           await edit.changeTransfer(portfolios, t.transferId, { remove: true })
+          toast('Trasferimento eliminato')
           return null
         } catch (e) {
           return e instanceof Error ? e.message : 'Eliminazione non riuscita.'
@@ -50,6 +52,7 @@ export function useMovementRemove(c: Computed): (m: Movement) => Promise<string 
         // Prima si segna la rata come saltata, poi si elimina: così il PAC non la ricrea nel frattempo.
         for (const s of pac) await skipPac(s.planId, s.date)
         await edit.remove(c.selectedId, m.assetId, { id: m.txId, index: m.index, date: t?.date ?? m.date, type: String(t?.type ?? m.kind) })
+        toast('Movimento eliminato')
         return null
       } catch (e) {
         return e instanceof Error ? e.message : 'Eliminazione non riuscita.'

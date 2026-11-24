@@ -190,10 +190,10 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Salvato per portafoglio su Firebase (`settings/simCart`), condiviso tra pagina Simulatore e finestra "Simula" di Posizioni.
 - [x] Per riga: imposta e netto (vendite), nuovo PMC (acquisti); conferma su "Svuota"; righe spostabili ↑↓ (ordine di uso delle minus).
 
-### 15. Impostazioni, avvisi, assistente
-- [ ] Cambio password; svuota cache prezzi/cambi.
-- [ ] Avvisi a comparsa (toast) dopo i salvataggi.
-- [ ] Assistente: risposte formattate (grassetto, elenchi), "Analizza portafoglio".
+### 15. Impostazioni, avvisi, assistente — fatto (PR `impostazioni-avvisi`)
+- [x] Cambio password; svuota cache prezzi/cambi/dividendi (le preferenze restano).
+- [x] Avvisi a comparsa (toast) dopo salvataggi ed eliminazioni.
+- [x] Assistente: risposte formattate (grassetto, elenchi, tabelle), "Analizza portafoglio" con l'ultima analisi salvata sul dispositivo.
 
 ### Da decidere con Andrea
 - **Assistente e privacy:** il vecchio non mandava a Gemini importi in euro, la v2 manda valori e PMC.
