@@ -652,3 +652,10 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .md-table { overflow-x: auto; }
 .md-table table { border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
 .md-table th, .md-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+
+/* Ricerca dei titoli nelle Posizioni (components/PositionsTable.tsx) */
+.pos-search { display: inline-flex; align-items: center; gap: 8px; margin-right: auto; position: relative; flex: 1 1 220px; max-width: 360px; }
+.pos-search-icon { position: absolute; left: 10px; font-size: .85rem; opacity: .6; pointer-events: none; }
+.pos-search input { width: 100%; min-height: 36px; padding-left: 32px; }
+.th-search { margin-left: 6px; border: 0; background: none; padding: 0 2px; cursor: pointer; font-size: .8rem; opacity: .6; }
+.th-search:hover, .th-search:focus-visible { opacity: 1; }

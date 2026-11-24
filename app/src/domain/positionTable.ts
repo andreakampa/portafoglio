@@ -275,3 +275,20 @@ export function rowActions(group: GroupId, qty: number): RowAction[] {
   if (qty >= EPS) return ['history', 'buy', 'sell', 'sim', 'transfer', 'delete']
   return ['history', 'buy', 'short', 'sim', 'delete']
 }
+
+// ── Ricerca per nome ───────────────────────────────
+
+/** Testo senza maiuscole, accenti e spazi in più, per confrontare quello che si digita con i nomi. */
+const plain = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+
+/**
+ * Il titolo corrisponde a quello che si sta digitando? Si cerca nel simbolo (GOOGL, RACE.MI), nel nome
+ * (Alphabet) e nell'ISIN. Più parole devono esserci tutte ("tesla usd" non serve, "alpha" sì).
+ * Ricerca vuota: tutti i titoli.
+ */
+export function matchesSearch(r: PositionRow, asset: (RawAsset & { isin?: string }) | undefined, query: string): boolean {
+  const words = plain(query).split(' ').filter(Boolean)
+  if (!words.length) return true
+  const text = plain([r.symbol, asset?.ticker, asset?.nome, asset?.isin].filter(Boolean).join(' '))
+  return words.every(w => text.includes(w))
+}

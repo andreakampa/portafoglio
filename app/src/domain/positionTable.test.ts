@@ -3,7 +3,7 @@ import type { FiscalLine } from './engine/fiscal.ts'
 import type { PositionResult } from './engine/positions.ts'
 import type { RawAsset } from './engine/types.ts'
 import type { PositionRow } from './engine/valuation.ts'
-import { COLUMNS, dividendDot, groupRows, moveColumn, reconcileColumns, rowActions, rowFigures, sortRows, toggleColumn, visibleColumns } from './positionTable.ts'
+import { COLUMNS, dividendDot, groupRows, matchesSearch, moveColumn, reconcileColumns, rowActions, rowFigures, sortRows, toggleColumn, visibleColumns } from './positionTable.ts'
 
 const row = (p: Partial<PositionRow>): PositionRow => ({
   assetId: 'a', symbol: 'A', currency: 'USD', qty: 10, isShort: false, pmcNative: 10, costEur: 100, costTodayFxEur: 90, price: 12,
@@ -133,5 +133,33 @@ describe('posizioni chiuse', () => {
     const open = rowFigures(row({ qty: 5 }), asset, undefined, [], null)
     expect(open.closedOn).toBeNull()
     expect(open.dividendsEur).toBeNull()
+  })
+})
+
+describe('ricerca per nome', () => {
+  const r = row({ symbol: 'RACE.MI' })
+  const a = { nome: 'Ferrari N.V.', ticker: 'RACE.MI', isin: 'NL0011585146' }
+  it('vuota: tutti', () => {
+    expect(matchesSearch(r, a, '')).toBe(true)
+    expect(matchesSearch(r, a, '   ')).toBe(true)
+  })
+  it('mentre si digita: bastano le prime lettere, maiuscole o minuscole', () => {
+    expect(matchesSearch(r, a, 'r')).toBe(true)
+    expect(matchesSearch(r, a, 'ra')).toBe(true)
+    expect(matchesSearch(r, a, 'race')).toBe(true)
+    expect(matchesSearch(r, a, 'rx')).toBe(false)
+  })
+  it('anche per nome, pezzo di nome, ISIN, senza badare agli accenti', () => {
+    expect(matchesSearch(r, a, 'ferr')).toBe(true)
+    expect(matchesSearch(r, a, 'NL00115')).toBe(true)
+    expect(matchesSearch(row({ symbol: 'X' }), { nome: 'Société Générale' }, 'societe gen')).toBe(true)
+  })
+  it('più parole: devono esserci tutte', () => {
+    expect(matchesSearch(r, a, 'ferrari mi')).toBe(true)
+    expect(matchesSearch(r, a, 'ferrari googl')).toBe(false)
+  })
+  it('senza dati del titolo: cerca nel simbolo', () => {
+    expect(matchesSearch(row({ symbol: 'GOOGL' }), undefined, 'goo')).toBe(true)
+    expect(matchesSearch(row({ symbol: 'GOOGL' }), undefined, 'amz')).toBe(false)
   })
 })
