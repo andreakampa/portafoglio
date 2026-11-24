@@ -11,7 +11,18 @@ export interface Quote {
   high52?: number | null
   /** Prezzi della giornata (ogni 5 minuti, al massimo ~40 punti) per il grafichino. */
   spark?: number[]
+  /** Pre-market o after-market (borse USA): ultimo prezzo fuori orario e variazione sul prezzo di chiusura. */
+  ext?: ExtendedQuote | null
 }
+
+export interface ExtendedQuote {
+  kind: 'pre' | 'post'
+  price: number
+  /** Variazione % rispetto al prezzo della seduta (regularMarketPrice), come nel sito vecchio. */
+  pct: number
+}
+
+interface Period { start?: number; end?: number }
 
 interface YahooChart {
   chart?: {
@@ -19,7 +30,9 @@ interface YahooChart {
       meta?: {
         symbol?: string; regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number; currency?: string; regularMarketTime?: number
         fiftyTwoWeekLow?: number; fiftyTwoWeekHigh?: number
+        currentTradingPeriod?: { pre?: Period; regular?: Period; post?: Period }
       }
+      timestamp?: number[]
       indicators?: { quote?: { close?: (number | null)[] }[] }
     }[]
   }
@@ -36,19 +49,40 @@ export function parseYahoo(json: YahooChart): Quote | null {
   const res = json.chart?.result?.[0]
   const m = res?.meta
   if (!m?.symbol || !(Number(m.regularMarketPrice) > 0)) return null
+  const price = Number(m.regularMarketPrice)
+  const closes = res?.indicators?.quote?.[0]?.close ?? []
+  const times = res?.timestamp ?? []
+  const reg = m.currentTradingPeriod?.regular
+  const pre = m.currentTradingPeriod?.pre
+  const post = m.currentTradingPeriod?.post
+  const points = closes
+    .map((c, i) => ({ t: times[i], c }))
+    .filter((p): p is { t: number | undefined; c: number } => typeof p.c === 'number' && p.c > 0)
+  // Grafichino: solo la seduta normale (se si conoscono gli orari); il fuori orario si mostra a parte.
+  const inRegular = (t: number | undefined) => t === undefined || !reg?.start || !reg.end || (t >= reg.start && t <= reg.end)
+  // Fuori orario: l'ultimo prezzo è prima dell'apertura (pre-market) o dopo la chiusura (after-market).
+  // L'asta di chiusura delle borse europee cade proprio sull'orario di chiusura: è seduta normale, non after-market.
+  let ext: ExtendedQuote | null = null
+  const last = points.at(-1)
+  if (last?.t !== undefined && reg?.start && reg.end) {
+    const kind = last.t > reg.end && (!post?.start || last.t >= post.start) ? 'post'
+      : last.t < reg.start && (!pre?.start || last.t >= pre.start) ? 'pre' : null
+    if (kind) ext = { kind, price: Number(last.c.toPrecision(6)), pct: ((last.c - price) / price) * 100 }
+  }
   return {
     symbol: m.symbol,
-    price: Number(m.regularMarketPrice),
+    price,
     previousClose: Number(m.previousClose ?? m.chartPreviousClose) || null,
     currency: (m.currency || 'EUR').toUpperCase(),
     time: (m.regularMarketTime ?? 0) * 1000,
     low52: Number(m.fiftyTwoWeekLow) || null,
     high52: Number(m.fiftyTwoWeekHigh) || null,
-    spark: downsample((res?.indicators?.quote?.[0]?.close ?? []).filter((x): x is number => typeof x === 'number' && x > 0)).map(x => Number(x.toPrecision(6))),
+    spark: downsample(points.filter(p => inRegular(p.t)).map(p => p.c)).map(x => Number(x.toPrecision(6))),
+    ext,
   }
 }
 
-const CACHE_KEY = 'ptpro_v2_quotes_3' // _3: con 52 settimane e prezzi del giorno
+const CACHE_KEY = 'ptpro_v2_quotes_4' // _4: con pre-market e after-market
 const TTL = 5 * 60 * 1000
 
 /** Ultimi prezzi (Yahoo, via Worker). Cache di 5 minuti: si apre subito anche offline. `force`: ignora la cache (pulsante Aggiorna). */
@@ -66,7 +100,8 @@ export async function loadQuotes(symbols: string[], force = false): Promise<Reco
       const q = parseYahoo(
         // range=1d: così chartPreviousClose è la chiusura di ieri (con 5d sarebbe di 5 giorni fa).
         // interval=5m: nella stessa risposta ci sono i prezzi della giornata per il grafichino.
-        await proxiedJson<YahooChart>(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?interval=5m&range=1d`),
+        // includePrePost: anche i prezzi di pre-market e after-market (borse USA).
+        await proxiedJson<YahooChart>(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?interval=5m&range=1d&includePrePost=true`),
       )
       if (q) cache[s] = { ...q, at: now }
     } catch {

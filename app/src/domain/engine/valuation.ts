@@ -8,6 +8,7 @@ export interface QuoteLike {
   low52?: number | null
   high52?: number | null
   spark?: number[]
+  ext?: { kind: 'pre' | 'post'; price: number; pct: number } | null
 }
 
 export interface PositionRow {
@@ -27,6 +28,8 @@ export interface PositionRow {
   low52?: number | null
   high52?: number | null
   spark?: number[]
+  /** Pre-market o after-market: prezzo fuori orario e variazione % sulla chiusura della seduta. */
+  ext?: { kind: 'pre' | 'post'; price: number; pct: number } | null
   valueEur: number | null
   /** Risultato non realizzato in EUR (al cambio di oggi), positivo = guadagno anche per gli short. */
   unrealizedEur: number | null
@@ -80,6 +83,7 @@ export function valuePositions(
       low52: q?.low52 ?? null,
       high52: q?.high52 ?? null,
       spark: q?.spark,
+      ext: q?.ext ?? null,
       valueEur,
       unrealizedEur,
       unrealizedPct: unrealizedEur !== null && pos.costEur > 0 ? (unrealizedEur / pos.costEur) * 100 : null,

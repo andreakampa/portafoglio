@@ -43,7 +43,7 @@ describe('cambi Banca d’Italia', () => {
 describe('prezzi Yahoo', () => {
   it('estrae prezzo, chiusura precedente e valuta', () => {
     const q = parseYahoo({ chart: { result: [{ meta: { symbol: 'AAPL', regularMarketPrice: 210.5, chartPreviousClose: 200, currency: 'USD', regularMarketTime: 1 } }] } })
-    expect(q).toEqual({ symbol: 'AAPL', price: 210.5, previousClose: 200, currency: 'USD', time: 1000, low52: null, high52: null, spark: [] })
+    expect(q).toEqual({ symbol: 'AAPL', price: 210.5, previousClose: 200, currency: 'USD', time: 1000, low52: null, high52: null, spark: [], ext: null })
     expect(parseYahoo({ chart: { result: [] } })).toBeNull()
   })
 })

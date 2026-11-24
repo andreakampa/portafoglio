@@ -73,6 +73,18 @@ function RowButtons({ group, r, onAction, compact }: { group: GroupId; r: Positi
   )
 }
 
+/** Pre-market (🌅) o after-market (🌙) come nel sito vecchio: nuovo prezzo e variazione % sulla chiusura. */
+function ExtPrice({ r }: { r: PositionRow }) {
+  if (!r.ext) return null
+  const label = r.ext.kind === 'pre' ? 'Pre-market' : 'After-market'
+  return (
+    <small className="cell-sub ext-price nowrap" title={`${label}: ${money(r.ext.price, r.currency)} (${pct(r.ext.pct)} sul prezzo di chiusura)`}>
+      <span aria-hidden="true">{r.ext.kind === 'pre' ? '🌅' : '🌙'}</span>
+      <span className="sr-only">{label}</span> {money(r.ext.price, r.currency)} <span className={tone(r.ext.pct)}>{pct(r.ext.pct)}</span>
+    </small>
+  )
+}
+
 const PER_ASSET_CCY: ColumnId[] = ['pmc', 'price', 'prevClose']
 const NO_UNIT: ColumnId[] = ['qty', 'weightCost', 'weightValue', 'pmcEur', 'openedOn', 'closedOn']
 const fmtDay = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
@@ -145,6 +157,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
         return (
           <>
             {money(r.price, r.currency)}
+            <ExtPrice r={r} />
             {open && !cols.includes('day') && <small className={`cell-sub ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</small>}
             {open && !cols.includes('day') && <Sparkline points={r.spark} previousClose={r.previousClose} />}
             <Range52 price={r.price} low={r.low52} high={r.high52} currency={r.currency} />
@@ -193,6 +206,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
         <DividendDotView {...dotOf(r)} onOpen={() => onAction('dividends', r.assetId)} />
         {r.isShort && <Tag tone="short">short</Tag>}
         {r.qty !== 0 && <small className="cell-sub muted">{qty(Math.abs(r.qty))} {Math.abs(r.qty) === 1 ? 'azione' : 'azioni'}</small>}
+        {!cols.includes('price') && <ExtPrice r={r} />}
       </div>
     </div>
   )
@@ -437,6 +451,7 @@ function PositionCard({ it: { r, f }, shown, weight, dot, onDot, actions }: { it
         {open && <span className={`pos-day ${tone(f.dayEur)}`}>{shown(f.dayEur, true)} · {pct(r.dayChangePct)}</span>}
         {open && <Sparkline points={r.spark} previousClose={r.previousClose} />}
       </div>
+      <ExtPrice r={r} />
       {open ? (
         <>
           <div className="pos-card-main">
