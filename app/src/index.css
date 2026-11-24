@@ -605,3 +605,8 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 @media (max-width: 520px) { .pac-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .pac-rates li { padding: 6px 0; font-size: .9rem; }
 .pac-rates .badge { margin-left: 6px; }
+
+/* Carrello del simulatore */
+.cart-row > span:first-child { min-width: 0; }
+.cart-detail { display: block; margin-top: 2px; }
+.cart-row .linklike:disabled { opacity: .35; cursor: default; }

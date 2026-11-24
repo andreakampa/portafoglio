@@ -3,8 +3,9 @@ import { Link } from 'react-router'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
+import { useSimCart } from '../data/useSimCart'
 import { symbolOf } from '../domain/engine/valuation'
-import { opsToTxs, qtyForBudget, simulate, simulateExtras, trailingDividend, type SimOp } from '../domain/simulation'
+import { opsToTxs, qtyForBudget, simulate, simulateExtras, simulateSteps, trailingDividend } from '../domain/simulation'
 import { loadDividends } from '../lib/dividends'
 import { EDITABLE_LABEL, type EditableType } from '../domain/txEdit'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
@@ -19,7 +20,7 @@ const num = (s: string) => Number(s.trim().replace(',', '.'))
  */
 export function Simulator({ presetAssetId, presetType, embedded }: { presetAssetId?: string; presetType?: EditableType; embedded?: boolean } = {}) {
   const c = useComputedPortfolio()
-  const [ops, setOps] = useState<SimOp[]>([])
+  const [ops, setOps] = useSimCart(c.status === 'ready' ? c.selectedId : null)
   const [assetId, setAssetId] = useState(presetAssetId ?? '')
   const [type, setType] = useState<EditableType>(presetType ?? 'buy')
   const [mode, setMode] = useState<'qty' | 'budget'>('qty')
@@ -37,6 +38,11 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
 
   const sim = useMemo(
     () => (c.status === 'ready' && ops.length ? simulate({ portfolio: c.portfolio, fx: c.fx, latestFx: c.latestFx, ops, today: TODAY }) : null),
+    [c, ops],
+  )
+  // Effetto di ogni riga nell'ordine del carrello (imposta, netto, nuovo PMC), come nel sito vecchio.
+  const steps = useMemo(
+    () => (c.status === 'ready' && ops.length ? simulateSteps({ portfolio: c.portfolio, fx: c.fx, latestFx: c.latestFx, ops, today: TODAY }) : null),
     [c, ops],
   )
 
@@ -130,7 +136,7 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
     <section className={embedded ? 'sim-embedded' : 'page'}>
       {!embedded && <header className="page-head">
         <h1>Simulatore</h1>
-        <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={id => { c.select(id); setOps([]); setAssetId('') }} />
+        <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={id => { c.select(id); setAssetId('') }} />
         <p className="muted small">
           Prova acquisti e vendite prima di farli: vedi il nuovo PMC, la plus o minus e le tasse stimate con le minus disponibili.
           Non salva nulla finché non tocchi "Registra come movimenti".
@@ -205,22 +211,47 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
           <div className="card">
             <div className="row-head">
               <h2>Carrello ({ops.length})</h2>
-              <button type="button" className="linklike neg" onClick={() => setOps([])}>Svuota</button>
+              <button type="button" className="linklike neg" onClick={() => { if (confirm('Svuotare il carrello?')) setOps([]) }}>Svuota</button>
             </div>
             <ul className="plain-list">
               {sim.ops.length === 0 && <li className="muted">Operazioni non valide.</li>}
-              {sim.ops.map(r => (
-                <li key={r.op.id}>
-                  <span>
-                    <b>{r.symbol}</b> · {EDITABLE_LABEL[r.op.type]} {fmtQty(r.op.qty)} × {money(r.op.price, r.currency)}
-                    <span className="muted"> = {money(r.grossNative, r.currency)}</span>
-                  </span>
-                  <span className="note-actions">
-                    {r.gainEur !== null && <b className={tone(r.gainEur)}>{eur(r.gainEur, true)}</b>}
-                    <button type="button" className="linklike neg" onClick={() => setOps(o => o.filter(x => x.id !== r.op.id))}>Togli</button>
-                  </span>
-                </li>
-              ))}
+              {sim.ops.map((r, i) => {
+                const st = steps?.get(r.op.id)
+                const closes = r.op.type === 'sell' || r.op.type === 'buy_to_cover'
+                const move = (d: -1 | 1) =>
+                  setOps(o => {
+                    const k = o.findIndex(x => x.id === r.op.id)
+                    const j = k + d
+                    if (k < 0 || j < 0 || j >= o.length) return o
+                    const n = [...o]
+                    ;[n[k], n[j]] = [n[j]!, n[k]!]
+                    return n
+                  })
+                return (
+                  <li key={r.op.id} className="cart-row">
+                    <span>
+                      <b>{r.symbol}</b> · {EDITABLE_LABEL[r.op.type]} {fmtQty(r.op.qty)} × {money(r.op.price, r.currency)}
+                      <span className="muted"> = {money(r.grossNative, r.currency)}</span>
+                      {st && (
+                        <small className="muted cart-detail">
+                          {closes
+                            ? <>{r.gainEur !== null && <span className={tone(r.gainEur)}>{eur(r.gainEur, true)}</span>} · imposta {eur(st.taxEur, true)} · netto {eur(st.netEur, true)}</>
+                            : <>{st.after.qty < 0 ? 'prezzo medio short' : 'nuovo PMC'} {money(st.after.pmcNative, r.currency)} · {st.netEur < 0 ? 'spesa' : 'incasso'} {eur(Math.abs(st.netEur))}</>}
+                        </small>
+                      )}
+                    </span>
+                    <span className="note-actions">
+                      {sim.ops.length > 1 && (
+                        <>
+                          <button type="button" className="linklike" disabled={i === 0} onClick={() => move(-1)} aria-label={`Sposta su ${r.symbol}`} title="Sposta su (conta per l'uso delle minus)">↑</button>
+                          <button type="button" className="linklike" disabled={i === sim.ops.length - 1} onClick={() => move(1)} aria-label={`Sposta giù ${r.symbol}`} title="Sposta giù">↓</button>
+                        </>
+                      )}
+                      <button type="button" className="linklike neg" onClick={() => setOps(o => o.filter(x => x.id !== r.op.id))}>Togli</button>
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           </div>
 
@@ -249,6 +280,7 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
                 </li>
               ))}
             </ul>
+            <p className="muted small">Il carrello resta salvato per questo portafoglio (anche sugli altri dispositivi) finché non lo svuoti o registri le operazioni.</p>
             <p className="muted small">Stima con le regole del portafoglio scelto, ai cambi più recenti.</p>
           </div>
 

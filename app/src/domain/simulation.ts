@@ -138,6 +138,36 @@ export function simulate(input: {
   }
 }
 
+export interface SimStep {
+  /** Imposta in più dovuta a questa operazione, nell'ordine del carrello (le minus si usano in quest'ordine). */
+  taxEur: number
+  /** Cassa di questa operazione: incasso (+) o spesa (−), al netto di commissioni e imposta. */
+  netEur: number
+  /** Posizione del titolo subito dopo questa operazione. */
+  after: PositionSnapshot
+}
+
+/** Effetto di ogni riga del carrello, come nel sito vecchio: si aggiungono le operazioni una alla volta. */
+export function simulateSteps(input: Parameters<typeof simulate>[0]): Map<string, SimStep> {
+  const out = new Map<string, SimStep>()
+  let prevTax = 0
+  for (let i = 0; i < input.ops.length; i++) {
+    const s = simulate({ ...input, ops: input.ops.slice(0, i + 1) })
+    const op = input.ops[i]!
+    const r = s.ops.find(x => x.op.id === op.id)
+    if (!r) continue
+    const taxEur = s.taxEur - prevTax
+    prevTax = s.taxEur
+    const sign = op.type === 'sell' || op.type === 'short_sell' ? 1 : -1
+    out.set(op.id, {
+      taxEur,
+      netEur: sign * r.grossEur - op.commissionEur - taxEur,
+      after: s.assets.find(a => a.assetId === op.assetId)!.after,
+    })
+  }
+  return out
+}
+
 /**
  * Operazioni del carrello da salvare come movimenti veri, con la data indicata. Il prezzo è quello simulato
  * (spesso la quotazione del momento): resta "da confermare" finché non si inserisce quello eseguito.
