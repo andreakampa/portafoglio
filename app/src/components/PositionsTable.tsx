@@ -10,7 +10,7 @@ import { useDividends } from '../data/useDividends'
 import { qtyBefore } from '../domain/engine/dividends'
 import type { PositionRow } from '../domain/engine/valuation'
 import {
-  COLUMNS, dividendDot, GROUP_LABEL, ROW_ACTION_LABEL, rowActions, GROUPS_OPEN_BY_DEFAULT, groupRows, moveColumn, rowFigures, sortRows, toggleColumn, visibleColumns,
+  COLUMNS, dividendDot, GROUP_LABEL, matchesSearch, ROW_ACTION_LABEL, rowActions, GROUPS_OPEN_BY_DEFAULT, groupRows, moveColumn, rowFigures, sortRows, toggleColumn, visibleColumns,
   type ColumnId, type DividendDot, type RowAction, type GroupId, type RowFigures, type SortKey, type SortState,
 } from '../domain/positionTable'
 import { exportPdf, exportXlsx, type ExportTable } from '../lib/exportTable'
@@ -73,6 +73,18 @@ function RowButtons({ group, r, onAction, compact }: { group: GroupId; r: Positi
   )
 }
 
+/** Pre-market (🌅) o after-market (🌙) come nel sito vecchio: nuovo prezzo e variazione % sulla chiusura. */
+function ExtPrice({ r }: { r: PositionRow }) {
+  if (!r.ext) return null
+  const label = r.ext.kind === 'pre' ? 'Pre-market' : 'After-market'
+  return (
+    <small className="cell-sub ext-price nowrap" title={`${label}: ${money(r.ext.price, r.currency)} (${pct(r.ext.pct)} sul prezzo di chiusura)`}>
+      <span aria-hidden="true">{r.ext.kind === 'pre' ? '🌅' : '🌙'}</span>
+      <span className="sr-only">{label}</span> {money(r.ext.price, r.currency)} <span className={tone(r.ext.pct)}>{pct(r.ext.pct)}</span>
+    </small>
+  )
+}
+
 const PER_ASSET_CCY: ColumnId[] = ['pmc', 'price', 'prevClose']
 const NO_UNIT: ColumnId[] = ['qty', 'weightCost', 'weightValue', 'pmcEur', 'openedOn', 'closedOn']
 const fmtDay = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
@@ -84,6 +96,8 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
   const [k, d] = sortPref.split(':') as [SortKey, 'asc' | 'desc']
   const sort: SortState = { key: k, dir: d }
   const [showCols, setShowCols] = useState(false)
+  const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
   const cols = visibleColumns(cfg)
   const colsKey = cols.join(',')
 
@@ -132,7 +146,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
     const ro = new ResizeObserver(check)
     ro.observe(wrap)
     return () => ro.disconnect()
-  }, [colsKey, c.rows])
+  }, [colsKey, c.rows, search])
 
   const cell = (id: ColumnId, { r, f }: Item): ReactNode => {
     const open = r.qty !== 0
@@ -143,6 +157,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
         return (
           <>
             {money(r.price, r.currency)}
+            <ExtPrice r={r} />
             {open && !cols.includes('day') && <small className={`cell-sub ${tone(r.dayChangePct)}`}>{pct(r.dayChangePct)}</small>}
             {open && !cols.includes('day') && <Sparkline points={r.spark} previousClose={r.previousClose} />}
             <Range52 price={r.price} low={r.low52} high={r.high52} currency={r.currency} />
@@ -191,11 +206,17 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
         <DividendDotView {...dotOf(r)} onOpen={() => onAction('dividends', r.assetId)} />
         {r.isShort && <Tag tone="short">short</Tag>}
         {r.qty !== 0 && <small className="cell-sub muted">{qty(Math.abs(r.qty))} {Math.abs(r.qty) === 1 ? 'azione' : 'azioni'}</small>}
+        {!cols.includes('price') && <ExtPrice r={r} />}
       </div>
     </div>
   )
 
-  const visibleGroups = GROUP_ORDER.filter(g => groups[g].length > 0)
+  // Ricerca per nome: mentre si digita restano solo i titoli che corrispondono (i gruppi si aprono da soli).
+  const searching = search.trim() !== ''
+  const shownGroups = Object.fromEntries(GROUP_ORDER.map(g => [g, groups[g].filter(r => matchesSearch(r, assets[r.assetId], search))])) as Record<GroupId, PositionRow[]>
+  const visibleGroups = GROUP_ORDER.filter(g => shownGroups[g].length > 0)
+  const matchCount = new Set(GROUP_ORDER.flatMap(g => shownGroups[g].map(r => r.assetId))).size
+  const totalCount = new Set(c.rows.map(r => r.assetId)).size
 
   // Esportazione: titoli attivi e short con le colonne visibili (come il sito vecchio).
   // Excel riceve numeri veri (si possono sommare), il PDF gli stessi già formattati.
@@ -272,6 +293,15 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
   return (
     <div className={`pos-view ${fits ? '' : 'too-wide'}`}>
       <div className="pos-tools">
+        <span className="pos-search" role="search">
+          <span className="pos-search-icon" aria-hidden="true">🔍</span>
+          <input
+            ref={searchRef} type="search" value={search} placeholder="Cerca titolo…" aria-label="Cerca un titolo per nome, simbolo o ISIN"
+            autoComplete="off" spellCheck={false}
+            onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') setSearch('') }}
+          />
+          {searching && <span className="muted small nowrap" role="status">{matchCount} di {totalCount}</span>}
+        </span>
         <label className="inline cards-sort">
           Ordina per
           <select value={sortPref} onChange={e => setSortPref(e.target.value)}>
@@ -314,14 +344,16 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
         </div>
       )}
 
+      {searching && matchCount === 0 && <p className="card muted">Nessun titolo corrisponde a «{search.trim()}».</p>}
+
       {!fits && <p className="muted small scroll-hint table-only">Le colonne scelte non entrano tutte: scorri la tabella verso destra →</p>}
 
       {/* Telefono: schede. */}
       <div className="pos-cards-wrap">
         {visibleGroups.map(g => (
-          <Group key={g} id={g} count={groups[g].length}>
+          <Group key={g} id={g} count={shownGroups[g].length} forceOpen={searching}>
             <ul className="pos-cards">
-              {sortRows(items(groups[g]), sort, costBase).map(it => (
+              {sortRows(items(shownGroups[g]), sort, costBase).map(it => (
                 <PositionCard key={it.r.assetId + g} it={it} shown={shown} weight={pctText(weightOf[it.r.assetId])} dot={dotOf(it.r)} onDot={() => onAction('dividends', it.r.assetId)} actions={<RowButtons group={g} r={it.r} onAction={onAction} />} />
               ))}
             </ul>
@@ -334,14 +366,16 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
         <table className="pos-table">
           <thead>
             <tr>
-              <SortTh label="Titolo" k="name" sort={sort} onSort={onSort} left />
+              <SortTh label="Titolo" k="name" sort={sort} onSort={onSort} left extra={
+                <button type="button" className="th-search" title="Cerca un titolo" aria-label="Cerca un titolo" onClick={() => searchRef.current?.focus()}>🔍</button>
+              } />
               {cols.map(id => <SortTh key={id} label={LABEL[id]} k={id} sort={sort} onSort={onSort} />)}
               <th className="num">Azioni</th>
             </tr>
           </thead>
           {visibleGroups.map(g => (
-            <GroupBody key={g} id={g} count={groups[g].length} span={cols.length + 2}>
-              {sortRows(items(groups[g]), sort, costBase).map(it => (
+            <GroupBody key={g} id={g} count={shownGroups[g].length} span={cols.length + 2} forceOpen={searching}>
+              {sortRows(items(shownGroups[g]), sort, costBase).map(it => (
                 <tr key={it.r.assetId + g}>
                   <td>{titleCell(it)}</td>
                   {cols.map(id => <td key={id} className="num">{cell(id, it)}</td>)}
@@ -356,7 +390,7 @@ export function PositionsTable({ c, shown, weightOf, convert, currency, onAction
   )
 }
 
-function SortTh({ label, k, sort, onSort, left }: { label: string; k: SortKey; sort: SortState; onSort: (k: SortKey) => void; left?: boolean }) {
+function SortTh({ label, k, sort, onSort, left, extra }: { label: string; k: SortKey; sort: SortState; onSort: (k: SortKey) => void; left?: boolean; extra?: ReactNode }) {
   const active = sort.key === k
   return (
     <th className={left ? '' : 'num'} aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
@@ -364,6 +398,7 @@ function SortTh({ label, k, sort, onSort, left }: { label: string; k: SortKey; s
         {label}
         <span className="sort-arrow" aria-hidden="true">{active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}</span>
       </button>
+      {extra}
     </th>
   )
 }
@@ -373,8 +408,9 @@ function useGroupOpen(id: GroupId): [boolean, () => void] {
   return [v === 'open', () => set(v === 'open' ? 'closed' : 'open')]
 }
 
-function GroupBody({ id, count, span, children }: { id: GroupId; count: number; span: number; children: ReactNode }) {
-  const [open, toggle] = useGroupOpen(id)
+function GroupBody({ id, count, span, forceOpen, children }: { id: GroupId; count: number; span: number; forceOpen?: boolean; children: ReactNode }) {
+  const [stored, toggle] = useGroupOpen(id)
+  const open = stored || !!forceOpen
   return (
     <tbody>
       <tr className="group-row">
@@ -389,8 +425,9 @@ function GroupBody({ id, count, span, children }: { id: GroupId; count: number; 
   )
 }
 
-function Group({ id, count, children }: { id: GroupId; count: number; children: ReactNode }) {
-  const [open, toggle] = useGroupOpen(id)
+function Group({ id, count, forceOpen, children }: { id: GroupId; count: number; forceOpen?: boolean; children: ReactNode }) {
+  const [stored, toggle] = useGroupOpen(id)
+  const open = stored || !!forceOpen
   return (
     <section className="pos-group">
       <button type="button" className="linklike group-head" aria-expanded={open} onClick={toggle}>
@@ -414,6 +451,7 @@ function PositionCard({ it: { r, f }, shown, weight, dot, onDot, actions }: { it
         {open && <span className={`pos-day ${tone(f.dayEur)}`}>{shown(f.dayEur, true)} · {pct(r.dayChangePct)}</span>}
         {open && <Sparkline points={r.spark} previousClose={r.previousClose} />}
       </div>
+      <ExtPrice r={r} />
       {open ? (
         <>
           <div className="pos-card-main">
