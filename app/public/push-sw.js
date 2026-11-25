@@ -20,10 +20,18 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const url = (event.notification.data && event.notification.data.url) || self.registration.scope
+  const scope = self.registration.scope
+  // Si aprono solo pagine dell'app: un indirizzo esterno nella notifica viene ignorato.
+  let url = scope
+  try {
+    const wanted = new URL((event.notification.data && event.notification.data.url) || scope, scope)
+    if (wanted.href.startsWith(scope)) url = wanted.href
+  } catch {
+    // indirizzo non valido: si apre l'app
+  }
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) if (c.url.startsWith(self.registration.scope) && 'focus' in c) return c.navigate(url).then(w => (w || c).focus())
+      for (const c of list) if (c.url.startsWith(scope) && 'focus' in c) return c.navigate(url).then(w => (w || c).focus())
       return self.clients.openWindow(url)
     }),
   )
