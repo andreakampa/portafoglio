@@ -58,6 +58,8 @@ export function Assistant() {
   const [question, setQuestion] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Privacy: di base a Gemini vanno solo pesi e percentuali. Gli importi solo se l'utente lo attiva (vale fino a quando lascia la pagina).
+  const [amounts, setAmounts] = useState(false)
 
   const saveKey = (k: string) => {
     try {
@@ -77,7 +79,7 @@ export function Assistant() {
     setChat(m => [...m, { role: 'user', text }])
     setQuestion('')
     try {
-      const context = buildAiContext({ portfolio: c.portfolio, result: c.result, rows: c.rows, totals: c.totals, today: TODAY })
+      const context = buildAiContext({ portfolio: c.portfolio, result: c.result, rows: c.rows, totals: c.totals, today: TODAY, amounts })
       const r = await fetch(`${PROXY}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Gemini-Key': key },
@@ -124,7 +126,7 @@ export function Assistant() {
       <header className="page-head">
         <h1>Assistente</h1>
         {c.status === 'ready' && <PortfolioPicker options={c.options} selectedId={c.selectedId} onSelect={id => { c.select(id); setChat([]) }} />}
-        <p className="muted small">Fai domande sul portafoglio scelto: l’assistente vede posizioni, risultati, situazione fiscale dell’anno e ultimi movimenti (non il nome del conto né i tuoi dati personali). Non è consulenza finanziaria.</p>
+        <p className="muted small">Fai domande sul portafoglio scelto: l’assistente vede titoli, pesi, risultati in percentuale, situazione fiscale dell’anno e ultimi movimenti (mai il nome del conto né i tuoi dati personali). Non è consulenza finanziaria.</p>
       </header>
 
       {!key ? (
@@ -140,6 +142,14 @@ export function Assistant() {
       ) : (
         <>
           <div className="card chat">
+            <label className="check small" style={{ alignItems: 'flex-start' }}>
+              <input type="checkbox" checked={amounts} onChange={e => setAmounts(e.target.checked)} />
+              <span>
+                Manda anche gli importi (euro, quantità, prezzi e PMC)
+                <br />
+                <span className="muted">{amounts ? 'Gemini riceve anche i valori: risposte più precise su tasse e cifre.' : 'Ora Gemini riceve solo titoli, pesi e percentuali, come nel sito vecchio.'}</span>
+              </span>
+            </label>
             <div className="form-actions">
               <button type="button" className="btn btn-primary" onClick={() => analyze(false)} disabled={busy || c.status !== 'ready'}>
                 Analizza portafoglio
