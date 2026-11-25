@@ -38,7 +38,12 @@ export async function enablePush(uid: string): Promise<void> {
     // "Registration failed - push service error": il browser non riesce a parlare col suo servizio di notifiche
     // (Brave con l'opzione spenta, finestra anonima, rete o antivirus che lo bloccano).
     if (e instanceof Error && /push service/i.test(e.message)) {
-      throw new Error('Il browser non riesce a raggiungere il suo servizio di notifiche. Su Brave attiva «Usa i servizi Google per la messaggistica push» (brave://settings/privacy); altrimenti prova con Chrome o Edge, fuori dalla finestra anonima.')
+      const brave = await (navigator as Navigator & { brave?: { isBrave?: () => Promise<boolean> } }).brave?.isBrave?.().catch(() => false)
+      throw new Error(
+        brave
+          ? 'Stai usando Brave, che di serie tiene spente le notifiche push. Scrivi brave://settings/privacy nella barra degli indirizzi, attiva «Usa i servizi Google per la messaggistica push», chiudi e riapri Brave e premi di nuovo «Attiva le notifiche».'
+          : 'Il browser non riesce a raggiungere il suo servizio di notifiche. Prova fuori dalla finestra anonima, controlla che antivirus o rete non lo blocchino, oppure usa Chrome o Edge.',
+      )
     }
     throw e
   }
