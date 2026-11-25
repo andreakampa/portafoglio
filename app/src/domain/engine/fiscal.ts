@@ -42,8 +42,16 @@ export interface ManualLoss {
   categoria?: Category
 }
 
+/** Quanto di una minus è andato a compensare una plus (o viceversa): `key` è la riga dall'altra parte. */
+export interface LossUse {
+  key: string
+  eur: number
+}
+
 export interface FiscalLine {
   key: string
+  /** Per le minus inserite a mano: posizione nell'elenco `fiscal.manualLosses` (serve per modificarle). */
+  manualIndex?: number
   assetId: string | null
   assetName: string
   assetType: AssetType
@@ -62,6 +70,12 @@ export interface FiscalLine {
   taxableEur: number
   taxEur: number
   excluded: 'fondo-etf' | null
+  /** Plus: da quali minus viene `compensatedEur`. */
+  usedFrom?: LossUse[]
+  /** Minus: su quali plus è stata usata (per i titoli di Stato sulla base al 48,08%). */
+  usedBy?: LossUse[]
+  /** Minus: quanto ne resta da usare (anche se scaduta: la scadenza è `year` + 4). */
+  lossLeftEur?: number
 }
 
 export interface LossBucket {
@@ -90,10 +104,10 @@ export function computeFiscal(
   manualLosses: ManualLoss[] = [],
   regime: TaxRegime = 'amministrato',
 ): FiscalResult {
-  type Item = { kind: 'event'; e: FiscalEventInput; key: string } | { kind: 'manual'; m: ManualLoss; key: string }
+  type Item = { kind: 'event'; e: FiscalEventInput; key: string } | { kind: 'manual'; m: ManualLoss; key: string; index: number }
   const items: Item[] = [
     ...events.map((e, i) => ({ kind: 'event' as const, e, key: `${e.assetId}#${e.txId ?? e.date}#${i}` })),
-    ...manualLosses.map((m, i) => ({ kind: 'manual' as const, m, key: `manual#${i}#${m.date}` })),
+    ...manualLosses.map((m, i) => ({ kind: 'manual' as const, m, key: `manual#${i}#${m.date}`, index: i })),
   ]
   const dateOf = (it: (typeof items)[number]) => (it.kind === 'event' ? it.e.date : it.m.date)
   const isLoss = (it: (typeof items)[number]) => it.kind === 'manual' || it.e.gainEur < 0
@@ -112,30 +126,43 @@ export function computeFiscal(
 
   const buckets: LossBucket[] = []
   const lines: FiscalLine[] = []
+  // Dentro ogni cassetto (anno e categoria) le singole minus, nell'ordine in cui sono nate:
+  // si usano prima le più vecchie. Serve solo a dire quale minus è finita su quale plus.
+  const sources = new Map<LossBucket, { line: FiscalLine; remaining: number }[]>()
 
-  const addLoss = (category: Category, year: number, amount: number) => {
+  const addLoss = (category: Category, year: number, amount: number, line: FiscalLine) => {
     if (amount <= 0.005) return
     let b = buckets.find(x => x.category === category && x.year === year)
     if (!b) {
       b = { category, year, expiresYear: year + YEARS_CARRY_FORWARD, originalEur: 0, remainingEur: 0 }
       buckets.push(b)
+      sources.set(b, [])
     }
     b.originalEur += amount
     b.remainingEur += amount
+    sources.get(b)!.push({ line, remaining: amount })
   }
 
-  const consumeLosses = (category: Category, year: number, wanted: number) => {
+  const consumeLosses = (category: Category, year: number, wanted: number, gainKey: string) => {
     let used = 0
+    const from: LossUse[] = []
     const usable = buckets
       .filter(b => b.category === category && b.remainingEur > 0.005 && b.year <= year && year <= b.expiresYear)
       .sort((a, b) => a.year - b.year)
     for (const b of usable) {
-      const u = Math.min(b.remainingEur, wanted - used)
-      b.remainingEur -= u
-      used += u
+      for (const src of sources.get(b)!) {
+        const u = Math.min(src.remaining, wanted - used)
+        if (u <= 0.005) continue
+        src.remaining -= u
+        b.remainingEur -= u
+        used += u
+        from.push({ key: src.line.key, eur: u })
+        ;(src.line.usedBy ??= []).push({ key: gainKey, eur: u })
+        if (wanted - used <= 0.005) break
+      }
       if (wanted - used <= 0.005) break
     }
-    return used
+    return { used, from }
   }
 
   for (const it of items) {
@@ -143,12 +170,13 @@ export function computeFiscal(
       const amount = Math.abs(parseFloat(String(it.m.amount)) || 0)
       if (amount <= 0.005 || !it.m.date) continue
       const category = it.m.categoria === 'crypto' ? 'crypto' : 'strumenti'
-      addLoss(category, yearOf(it.m.date), amount)
-      lines.push({
-        key: it.key, assetId: null, assetName: it.m.title || 'Minus inserita a mano', assetType: 'altro',
+      const line: FiscalLine = {
+        key: it.key, manualIndex: it.index, assetId: null, assetName: it.m.title || 'Minus inserita a mano', assetType: 'altro',
         date: it.m.date, year: yearOf(it.m.date), side: 'manuale', gainEur: -amount,
         compensatedEur: 0, taxableEur: 0, taxEur: 0, excluded: null,
-      })
+      }
+      lines.push(line)
+      addLoss(category, yearOf(it.m.date), amount, line)
       continue
     }
 
@@ -161,8 +189,9 @@ export function computeFiscal(
     }
 
     if (e.gainEur < -0.005) {
-      addLoss(category, year, -e.gainEur * baseWeight(e.assetType))
-      lines.push({ ...base, gainEur: e.gainEur, compensatedEur: 0, taxableEur: 0, taxEur: 0, excluded: null })
+      const line: FiscalLine = { ...base, gainEur: e.gainEur, compensatedEur: 0, taxableEur: 0, taxEur: 0, excluded: null }
+      lines.push(line)
+      addLoss(category, year, -e.gainEur * baseWeight(e.assetType), line)
       continue
     }
     if (e.gainEur <= 0.005) {
@@ -172,13 +201,16 @@ export function computeFiscal(
 
     const excluded = plusNotCompensable(e.assetType) ? ('fondo-etf' as const) : null
     const taxBase = e.gainEur * baseWeight(e.assetType)
-    const compensatedEur = excluded ? 0 : consumeLosses(category, year, taxBase)
+    const { used: compensatedEur, from } = excluded ? { used: 0, from: [] } : consumeLosses(category, year, taxBase, it.key)
     const taxableEur = taxBase - compensatedEur
     lines.push({
       ...base, gainEur: e.gainEur, compensatedEur, taxableEur,
       taxEur: taxableEur * baseRate(e.assetType), excluded,
+      ...(from.length ? { usedFrom: from } : {}),
     })
   }
+
+  for (const list of sources.values()) for (const src of list) src.line.lossLeftEur = Math.max(0, src.remaining)
 
   return { lines, buckets: buckets.sort((a, b) => a.category.localeCompare(b.category) || a.year - b.year) }
 }

@@ -22,11 +22,24 @@ const csp = (): Plugin => ({
   },
 })
 
+// In locale il Worker finance-proxy non accetta localhost: Vite inoltra /__proxy al Worker
+// presentandosi come il sito pubblicato (vale per npm run dev e npm run preview).
+const proxy = {
+  '/__proxy': {
+    target: 'https://finance-proxy.andrea-kampa.workers.dev',
+    changeOrigin: true,
+    rewrite: (p: string) => '/' + p.replace(/^\/__proxy\/?/, ''),
+    headers: { Origin: 'https://andreakampa.github.io' },
+  },
+}
+
 export default defineConfig({
   base: BASE,
   define: { __APP_VERSION__: JSON.stringify(VERSION) },
   // Firebase (auth + database) pesa da solo ~450 kB non compressi (~170 kB gzip): è atteso.
   build: { chunkSizeWarningLimit: 800 },
+  server: { proxy },
+  preview: { proxy },
   plugins: [
     react(),
     csp(),

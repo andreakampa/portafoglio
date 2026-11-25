@@ -172,6 +172,8 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Riepilogo anno con "Imponibile netto".
 - [x] Minus disponibili: barra (quanto resta) e "scadono tra N giorni".
 - [x] Inserimento ed eliminazione a mano di minus esterne (stessi campi del sito vecchio, `fiscal/manualLosses`).
+- [x] Minus a mano dentro l'elenco del loro anno (non più riquadro fisso), con **Modifica** ed Elimina; sotto ogni minus su quali plus è stata usata e quanto resta,
+      sotto ogni plus da quali minus viene la compensazione (`usedBy`/`usedFrom`/`lossLeftEur` in `engine/fiscal.ts`, minus dello stesso anno usate in ordine di data). PR `minus-a-mano`, 25/11/2026.
 - [ ] Correzione a mano del compensato (✎): nei dati non è mai stata usata; si fa solo se Andrea la chiede.
 
 ### 12. Movimenti (`storico.js`) — fatto (PR `movimenti-periodo`)
@@ -189,6 +191,7 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 ### 14. Carrello simulazioni (`cart.js`) — fatto (PR `carrello`)
 - [x] Salvato per portafoglio su Firebase (`settings/simCart`), condiviso tra pagina Simulatore e finestra "Simula" di Posizioni.
 - [x] Per riga: imposta e netto (vendite), nuovo PMC (acquisti); conferma su "Svuota"; righe spostabili ↑↓ (ordine di uso delle minus).
+- [x] (25/11/2026, richiesta di Andrea) Anteprima in tempo reale nella finestra Simula prima di aggiungere: prima/dopo di quantità, PMC, costo di carico, valore; spesa o plus, imposta (motore vero, dopo il carrello), netto. "Per budget" anche in vendita (somma da incassare). Pulsante carrello fisso in basso su tutte le pagine con il numero di operazioni, pannello con righe e totali (uscite, entrate nette, imposte, saldo) — `components/SimCart.tsx`.
 
 ### 15. Impostazioni, avvisi, assistente — fatto (PR `impostazioni-avvisi`)
 - [x] Cambio password; svuota cache prezzi/cambi/dividendi (le preferenze restano).
@@ -196,6 +199,8 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Assistente: risposte formattate (grassetto, elenchi, tabelle), "Analizza portafoglio" con l'ultima analisi salvata sul dispositivo.
 
 ### Da decidere con Andrea
-- **Assistente e privacy:** il vecchio non mandava a Gemini importi in euro, la v2 manda valori e PMC.
-- **IBKR dal browser:** impostazioni token/Query ID, "Scarica ora", revisione prima dell'import, annulla ultimo import.
-  Nella v2 la sincronizzazione è automatica (cron delle 06:00): servono ancora?
+- [x] **Assistente e privacy** (deciso da Andrea il 25/11/2026): interruttore "Manda anche gli importi" nell'Assistente, spento ogni volta che si apre la pagina.
+      Di base solo titoli, pesi %, risultati %, numero di vendite e anni delle minus (`buildAiContext`, `amounts`), come il vecchio. PR `assistente-privacy`.
+- [x] **IBKR dal browser** (deciso da Andrea il 25/11/2026): niente token, "Scarica ora" o revisione nel browser della v2, basta la sincronizzazione automatica.
+      L'inserimento a mano resta sempre. In Impostazioni → Portafogli, solo sul portafoglio aggiornato da `ibkr-sync`, l'interruttore "Scarica i movimenti da IBKR ogni mattina"
+      (`settings/ibkrAutoSync`, false = pausa; il Worker scrive `portfolioId` e `paused` in `ibkr_sync`). L'automatico per altri utenti si farà quando servirà. PR `ibkr-interruttore`.

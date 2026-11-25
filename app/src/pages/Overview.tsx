@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { IbkrSyncNotice } from '../components/IbkrSyncNotice'
 import { MarginCard } from '../components/MarginCard'
+import { RecentTradesCard } from '../components/RecentTradesCard'
 import { HistoryCard, IndicesCard } from '../components/MarketCards'
 import { WelcomeCard } from '../components/PortfolioAdmin'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
@@ -15,7 +16,7 @@ import { Tag } from '../components/Tag'
 type Ready = Extract<ReturnType<typeof useComputedPortfolio>, { status: 'ready' }>
 
 /**
- * PC: numeri chiave in alto, poi due colonne (andamento e posizioni | mercati, watchlist, margine).
+ * PC: numeri chiave in alto, poi due colonne (andamento e posizioni | operazioni recenti, mercati, watchlist, margine).
  * Telefono: una colonna, nello stesso ordine di importanza. Il CSS (.overview-*) decide.
  */
 export function Overview() {
@@ -44,6 +45,7 @@ export function Overview() {
           {c.status === 'ready' && <TopPositions c={c} />}
         </div>
         <div className="overview-side">
+          {c.status === 'ready' && <RecentTradesCard c={c} />}
           <IndicesCard />
           <WatchlistSummary />
           {c.status === 'ready' && <MarginCard c={c} />}

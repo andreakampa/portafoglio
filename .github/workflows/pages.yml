@@ -37,6 +37,9 @@ jobs:
         working-directory: app
         run: npm run check
 
+      - name: Test dei Worker Cloudflare
+        run: npm run test:workers
+
       - name: Build della nuova app
         working-directory: app
         run: npm run build

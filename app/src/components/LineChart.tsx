@@ -6,6 +6,10 @@ export interface LineSeries {
   /** Variabile CSS del colore della serie, es. 'var(--series-1)'. */
   color: string
   points: { date: string; v: number }[]
+  /** Linea tratteggiata (es. capitale investito). */
+  dashed?: boolean
+  /** Area colorata leggera sotto la linea (es. valore del portafoglio). */
+  area?: boolean
 }
 
 interface Props {
@@ -97,7 +101,7 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
       {visible.length > 1 && (
         <ul className="chart-legend" aria-label="Legenda">
           {visible.map(s => (
-            <li key={s.key}><span className="key-line" style={{ background: s.color }} />{s.name}</li>
+            <li key={s.key}><span className={`key-line${s.dashed ? ' dashed' : ''}`} style={{ color: s.color, background: s.dashed ? undefined : s.color }} />{s.name}</li>
           ))}
         </ul>
       )}
@@ -117,12 +121,21 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
           </g>
         ))}
         {zero && min < 0 && max > 0 && <line x1={left} x2={right} y1={y(0)} y2={y(0)} className="chart-axis" />}
+        {visible.filter(s => s.area).map(s => (
+          <polygon
+            key={s.key + '-area'}
+            fill={s.color}
+            fillOpacity={0.1}
+            points={s.points.map(p => `${x(idx.get(p.date)!)},${y(p.v)}`).join(' ') + ` ${x(idx.get(s.points.at(-1)!.date)!)},${bottom} ${x(idx.get(s.points[0]!.date)!)},${bottom}`}
+          />
+        ))}
         {visible.map(s => (
           <polyline
             key={s.key}
             fill="none"
             stroke={s.color}
             strokeWidth={2}
+            strokeDasharray={s.dashed ? '5 4' : undefined}
             strokeLinejoin="round"
             strokeLinecap="round"
             points={s.points.map(p => `${x(idx.get(p.date)!)},${y(p.v)}`).join(' ')}

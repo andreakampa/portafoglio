@@ -235,6 +235,9 @@ select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .fiscal-lines li { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .fiscal-line > summary, .fiscal-line-plain { display: flex; justify-content: space-between; gap: 12px; }
 .fiscal-lines li:last-child { border-bottom: none; }
+.loss-usage { list-style: none; margin: 4px 0 0; padding: 0 0 0 12px; border-left: 2px solid var(--border); }
+.loss-usage li { padding: 1px 0; border: none; }
+.fiscal-line-actions { margin-top: 6px; }
 .fiscal-line > summary > .num, .fiscal-line-plain > .num { display: grid; justify-items: end; align-content: start; gap: 2px; }
 
 /* ── Movimenti ───────────────────────────────────── */
@@ -323,6 +326,18 @@ textarea {
 .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 0 0 6px; padding: 0; font-size: .85rem; color: var(--muted); }
 .chart-legend li { display: flex; align-items: center; gap: 6px; }
 .key-line { display: inline-block; width: 14px; height: 2px; border-radius: 1px; }
+.key-line.dashed { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px); }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-2); }
+.seg button { min-height: 36px; padding: 0 16px; border: none; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.chart-toggles { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 4px; }
+.chart-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); color: var(--muted); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.chart-toggle[aria-pressed="true"] { background: var(--surface); color: var(--text); border-color: var(--toggle-color); }
+.toggle-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--toggle-color); box-sizing: border-box; }
+.chart-toggle[aria-pressed="true"] .toggle-dot { background: var(--toggle-color); }
+.chart-headline { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 12px 0 0; }
+.chart-headline b { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
 .chart-tip { position: absolute; top: 28px; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; box-shadow: var(--shadow); pointer-events: none; font-size: .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .chart-tip-row { display: flex; align-items: center; gap: 6px; }
 .chart-table { margin-top: 6px; }
@@ -699,3 +714,76 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .fiscal-lots-wrap { overflow-x: auto; }
 @media (max-width: 599px) { .fiscal-lots .col-native { display: none; } }
 @media (max-width: 599px) { .fiscal-lots { font-size: .8rem; } .fiscal-lots th { white-space: normal; } }
+
+/* Anteprima in tempo reale della finestra Simula (prima / dopo), come nel sito vecchio. */
+.sim-preview { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.sim-preview-title { display: flex; justify-content: space-between; gap: 8px; padding: 6px 12px; background: var(--sim-bg); color: var(--sim); font-size: .75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.sim-preview-empty { margin: 0; padding: 10px 12px; }
+.sim-preview table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.sim-preview th, .sim-preview td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+.sim-preview th { color: var(--muted); font-size: .75rem; font-weight: 500; }
+.sim-preview th:first-child, .sim-preview td:first-child { text-align: left; }
+.sim-preview .after { color: var(--sim); font-weight: 600; border-left: 2px solid var(--sim-bg); }
+.sim-preview td.after small { display: block; color: var(--muted); font-size: .75rem; font-weight: 500; }
+.sim-preview-op, .cart-totals { display: grid; gap: 4px; margin: 0; padding: 10px 12px; font-variant-numeric: tabular-nums; }
+.sim-preview-op > div, .cart-totals > div { display: flex; justify-content: space-between; gap: 12px; }
+.sim-preview-op dd, .cart-totals dd { margin: 0; }
+.sim-preview-op .big, .cart-grand { font-weight: 700; font-size: 1.02rem; }
+.cart-totals { padding: 10px 0 0; border-top: 1px solid var(--border); margin-top: 8px; }
+
+/* Pulsante carrello fisso in basso (sopra la barra del telefono) e pannello che si apre. */
+.cart-fab { position: fixed; right: 16px; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); z-index: 900; display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border: 0; border-radius: 999px; background: var(--primary); color: var(--primary-text); font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 6px 18px rgb(0 0 0 / 25%); }
+.cart-fab:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.cart-badge { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--danger); color: #fff; font-size: .78rem; }
+.cart-badge.bump { animation: cart-bump .5s ease-out; }
+@keyframes cart-bump { 40% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .cart-badge.bump { animation: none; } }
+.cart-scrim { position: fixed; inset: 0; z-index: 950; background: rgb(0 0 0 / 40%); }
+.cart-drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 960; display: grid; gap: 10px; align-content: start; max-height: 85dvh; overflow: auto;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--surface); color: var(--text); border-top: 1px solid var(--border); border-radius: 14px 14px 0 0; box-shadow: 0 -10px 40px rgb(0 0 0 / 25%); }
+.cart-drawer h2 { margin: 0; }
+@media (min-width: 900px) and (pointer: fine), (min-width: 1200px) {
+  .cart-fab { right: 24px; bottom: 24px; }
+  .cart-drawer { left: auto; right: 24px; bottom: 84px; width: min(460px, calc(100vw - 48px)); border: 1px solid var(--border); border-radius: 14px; }
+}
+@media print { .cart-fab, .cart-drawer, .cart-scrim { display: none !important; } }
+
+/* ── Operazioni recenti (Panoramica) ─────────────── */
+.recent-card { display: grid; gap: 8px; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.recent-card:hover { border-color: var(--primary); }
+.recent-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.recent-title { font-family: var(--font-head); font-size: 1.15rem; font-weight: 650; line-height: 1.2; }
+.recent-open { color: var(--primary); font-weight: 650; font-size: .9rem; }
+.recent-total { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.recent-total > span { font-size: 1rem; font-weight: 600; }
+.recent-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.recent-head .seg button { min-width: 52px; }
+.recent-head-total { display: grid; justify-items: end; gap: 2px; }
+.recent-card .top-list small.num { white-space: nowrap; }
+
+/* ── Stress test del margine (riquadro Margine) ─────────────── */
+.stress { display: grid; gap: 12px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.stress h3 { margin: 0; font-size: 1rem; }
+.stress-ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.stress-ctrl input[type=range] { flex: 1 1 240px; accent-color: var(--primary); min-height: 32px; }
+.stress-num { display: flex; align-items: center; gap: 4px; font-weight: 600; }
+.stress-num input { width: 5.5em; text-align: right; font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.stress-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.stress-presets .pill { min-height: 32px; font-size: .85rem; }
+.stress-verdict { display: grid; gap: 2px; padding: 12px 14px; border-radius: 10px; border: 1px solid transparent; }
+.stress-verdict.ok { background: color-mix(in srgb, var(--pos) 10%, transparent); }
+.stress-verdict.near { background: var(--warn-bg); border-color: var(--warn-border); }
+.stress-verdict.call { background: color-mix(in srgb, var(--neg) 12%, transparent); border-color: var(--neg); }
+.stress-chart { display: grid; gap: 6px; min-width: 0; }
+.stress-chart svg { display: block; max-width: 100%; }
+.stress-chart text { fill: var(--muted); font-size: 11px; }
+.stress-chart text.stress-call-label { fill: var(--neg); font-weight: 600; }
+.stress-legend { display: flex; flex-wrap: wrap; gap: 14px; }
+.stress-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.stress-legend i.zone { height: 10px; background: var(--neg); opacity: .3; }
+.stress form.inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Impostazioni → Portafogli: interruttore della sincronizzazione IBKR sotto il nome del portafoglio. */
+.plain-list li:has(.ibkr-auto) { flex-wrap: wrap; }
+.ibkr-auto { flex-basis: 100%; align-items: flex-start; margin-top: 6px; }

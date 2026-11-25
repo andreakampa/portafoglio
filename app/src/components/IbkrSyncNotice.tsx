@@ -16,7 +16,12 @@ export function IbkrSyncNotice() {
           <b>Sincronizzazione IBKR non riuscita</b> ({when(s.lastError.at)}): {s.lastError.message}
         </div>
       )}
-      {s.lastRun && (
+      {s.lastRun && s.paused && (
+        <div className="card">
+          <b>Sincronizzazione IBKR in pausa</b> (ultimo controllo {when(s.lastRun)}): si riattiva da Impostazioni → Portafogli.
+        </div>
+      )}
+      {s.lastRun && !s.paused && (
         <details className={`card${s.review.length ? ' warn' : ''}`}>
           <summary>
             IBKR, {when(s.lastRun)}: {syncHeadline(s)}

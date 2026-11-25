@@ -50,3 +50,20 @@ export function daysToExpiry(expiresYear: number, today: string): number {
   const now = Date.parse(today + 'T00:00:00Z')
   return Math.max(0, Math.round((end - now) / 86400000))
 }
+
+/** Valori del modulo per modificare una minus già salvata. */
+export function formOf(m: StoredManualLoss): ManualLossForm {
+  return {
+    date: m.date,
+    amount: String(Math.abs(Number(m.amount))).replace('.', ','),
+    title: m.title ?? '',
+    categoria: m.categoria === 'crypto' ? 'crypto' : 'strumenti',
+  }
+}
+
+/** Sostituisce la voce `index` solo se è ancora quella vista (stessa data e importo); altrimenti `undefined`. */
+export function replaceManualLoss(list: StoredManualLoss[], index: number, seen: StoredManualLoss, next: StoredManualLoss): StoredManualLoss[] | undefined {
+  const cur = list[index]
+  if (!cur || cur.date !== seen.date || Number(cur.amount) !== Number(seen.amount)) return undefined
+  return list.map((m, i) => (i === index ? { ...m, ...next } : m))
+}

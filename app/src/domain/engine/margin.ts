@@ -33,6 +33,8 @@ export interface MarginSummary {
   /** Esposizione lorda (long + short in valore assoluto) e patrimonio netto (titoli + cassa), in EUR. */
   grossEur: number
   equityEur: number
+  /** Valore netto delle posizioni (long − |short|), in EUR. */
+  positionsEur: number
   /** Esposizione lorda / patrimonio netto (1,00x = nessuna leva). null se non calcolabile. */
   leverage: number | null
   /** Titoli senza prezzo: esclusi da esposizione e patrimonio, la leva è approssimata. */
@@ -116,6 +118,7 @@ export function summarizeMargin(
     usedEur: round(usedEur),
     grossEur: round(grossEur),
     equityEur: round(equityEur),
+    positionsEur: round(valueEur),
     leverage: leverage === null ? null : round(leverage, 3),
     missingPrices,
     dailyCostEur: round(dailyCostEur),

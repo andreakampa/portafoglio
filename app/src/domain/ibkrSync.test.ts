@@ -26,4 +26,9 @@ describe('stato sincronizzazione IBKR', () => {
     expect(syncHeadline(syncStatusFromDb({ added: ['a', 'b', 'c'], review: ['x'] })!)).toBe('3 operazioni importate, 1 da controllare')
     expect(syncHeadline(syncStatusFromDb({ added: ['a'] })!)).toBe('1 operazione importata, 0 da controllare')
   })
+
+  it('portafoglio sincronizzato e pausa', () => {
+    expect(syncStatusFromDb({ portfolioId: 'P1', paused: true })).toMatchObject({ portfolioId: 'P1', paused: true })
+    expect(syncStatusFromDb({ portfolioId: 3, paused: 'sì' })).toMatchObject({ portfolioId: undefined, paused: undefined })
+  })
 })

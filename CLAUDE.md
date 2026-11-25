@@ -17,7 +17,7 @@ Regole fiscali applicate dal motore: [docs/regole-fiscali.md](docs/regole-fiscal
 |---|---|
 | `index.html`, `js/`, `css/` | sito attuale (JS vanilla), ancora usato per inserire movimenti |
 | `app/` | v2: Vite + React + TypeScript + PWA. `src/domain/` motore puro con test, `src/pages/` schermate |
-| `workers/finance-proxy` | proxy Yahoo/cambi + `/chat` Gemini (chiave dell'utente) |
+| `workers/finance-proxy` | proxy Yahoo/cambi + `/chat` Gemini (chiave dell'utente). Solo il sito pubblicato (in locale la v2 passa da `/__proxy` di Vite), limite al minuto per IP |
 | `workers/ibkr-relay` | relay Flex IBKR per il browser |
 | `workers/ibkr-sync` | cron giornaliero 06:00 UTC: report Flex → portafoglio IBKR su Firebase; cron ogni 15 min: soglie delle watchlist → notifiche push (secret su Cloudflare) |
 | `database.rules.json`, `tests/rules.test.mjs` | regole Firebase (inviti monouso, membri, admin) e loro test |
@@ -28,6 +28,7 @@ Regole fiscali applicate dal motore: [docs/regole-fiscali.md](docs/regole-fiscal
 ```
 cd app && npm run check          # tipi + linter + test unitari (obbligatorio prima di ogni commit)
 npm run test:rules               # dalla radice: test regole Firebase sugli emulatori (serve Java)
+npm run test:workers             # dalla radice: test dei Worker (origini e limite di richieste)
 npx wrangler@4 deploy -c workers/<nome>/wrangler.jsonc
 firebase deploy --only database  # pubblica le regole
 ```

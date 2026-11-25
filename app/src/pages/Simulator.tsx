@@ -5,7 +5,8 @@ import { useComputedPortfolio } from '../data/useComputedPortfolio'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { useSimCart } from '../data/useSimCart'
 import { symbolOf } from '../domain/engine/valuation'
-import { opsToTxs, qtyForBudget, simulate, simulateExtras, simulateSteps, trailingDividend } from '../domain/simulation'
+import { opsToTxs, previewOp, qtyForBudget, qtyForProceeds, simulate, simulateExtras, simulateSteps, spends, trailingDividend, type OpPreview } from '../domain/simulation'
+import { CartList, CartTotalsBox } from '../components/SimCart'
 import { loadDividends } from '../lib/dividends'
 import { EDITABLE_LABEL, type EditableType } from '../domain/txEdit'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
@@ -75,14 +76,23 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
   const rate = current ? (current.currency === 'EUR' ? 1 : c.latestFx[current.currency] ?? NaN) : NaN
   const priceNow = price.trim() ? num(price) : quote ?? NaN
   const commNow = commission.trim() ? num(commission) : 0
-  const budgetQty = mode === 'budget' ? qtyForBudget(num(budget), priceNow, rate, commNow) : 0
+  const budgetQty = mode !== 'budget' ? 0 : spends(type) ? qtyForBudget(num(budget), priceNow, rate, commNow) : qtyForProceeds(num(budget), priceNow, rate, commNow)
+  const qtyNow = mode === 'budget' ? budgetQty : num(qty)
+  // Anteprima in tempo reale (come nel sito vecchio): cosa succede aggiungendo questa operazione al carrello.
+  const preview =
+    current && qtyNow > 0 && Number.isFinite(priceNow) && priceNow > 0 && Number.isFinite(commNow) && commNow >= 0
+      ? previewOp({ portfolio: c.portfolio, fx: c.fx, latestFx: c.latestFx, today: TODAY, cart: ops, op: { id: 'anteprima', assetId: current.id, type, qty: qtyNow, price: priceNow, commissionEur: commNow } })
+      : null
+  /** Valore in euro al prezzo di oggi (o a quello scritto, se non c'è quotazione). */
+  const valueEur = (q: number) => (Number.isFinite(rate) && rate > 0 ? (q * (quote ?? priceNow)) / rate : null)
 
   function add() {
     if (!current) return
-    const q = mode === 'budget' ? budgetQty : num(qty)
+    const q = qtyNow
     const p = priceNow
     const comm = commNow
-    if (mode === 'budget' && !(num(budget) > 0)) return setError('Scrivi il budget in euro.')
+    if (mode === 'budget' && !(num(budget) > 0)) return setError(spends(type) ? 'Scrivi il budget in euro.' : 'Scrivi quanto vuoi incassare, in euro.')
+    if (preview?.issue) return setError(preview.issue)
     if (!(q > 0)) return setError('La quantità deve essere maggiore di zero.')
     if (!Number.isFinite(p) || p < 0) return setError('Scrivi il prezzo: non c’è una quotazione da usare.')
     if (!Number.isFinite(comm) || comm < 0) return setError('Le commissioni non sono valide.')
@@ -165,18 +175,16 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
             {quote !== null && <> · prezzo attuale {money(quote, current.currency)}</>}
           </p>
         )}
-        {type === 'buy' && (
-          <div className="pills" role="radiogroup" aria-label="Come scegliere la quantità">
-            <button type="button" role="radio" aria-checked={mode === 'qty'} className={`pill small-pill ${mode === 'qty' ? 'active' : ''}`} onClick={() => setMode('qty')}>Per quantità</button>
-            <button type="button" role="radio" aria-checked={mode === 'budget'} className={`pill small-pill ${mode === 'budget' ? 'active' : ''}`} onClick={() => setMode('budget')}>Per budget</button>
-          </div>
-        )}
+        <div className="pills" role="radiogroup" aria-label="Come scegliere la quantità">
+          <button type="button" role="radio" aria-checked={mode === 'qty'} className={`pill small-pill ${mode === 'qty' ? 'active' : ''}`} onClick={() => setMode('qty')}>Per quantità</button>
+          <button type="button" role="radio" aria-checked={mode === 'budget'} className={`pill small-pill ${mode === 'budget' ? 'active' : ''}`} onClick={() => setMode('budget')}>Per budget</button>
+        </div>
         <div className="form-row">
-          {type === 'buy' && mode === 'budget' ? (
+          {mode === 'budget' ? (
             <label>
-              Budget (€)
+              {spends(type) ? 'Budget da spendere (€)' : 'Somma da incassare (€)'}
               <input inputMode="decimal" value={budget} onChange={e => setBudget(e.target.value)} />
-              <small className="muted">{budgetQty > 0 ? `= ${fmtQty(budgetQty)} azioni` : 'quante azioni intere compri'}</small>
+              <small className="muted">{budgetQty > 0 ? `= ${fmtQty(budgetQty)} azioni` : spends(type) ? 'quante azioni intere compri' : 'quante azioni intere vendi'}</small>
             </label>
           ) : (
             <label>
@@ -193,9 +201,10 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
           </label>
         </div>
         <label>Commissioni (€)<input inputMode="decimal" value={commission} onChange={e => setCommission(e.target.value)} placeholder="0" /></label>
+        {current && <SimPreview p={preview} currency={current.currency} type={type} budgetLeft={mode === 'budget' && spends(type) && preview ? num(budget) + preview.netEur : null} valueEur={valueEur} />}
         <p className="auth-error" role="alert">{error}</p>
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary">Aggiungi al carrello</button>
+          <button type="submit" className="btn btn-primary" disabled={!preview || !!preview.issue}>Aggiungi al carrello</button>
         </div>
       </form>
 
@@ -213,46 +222,8 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
               <h2>Carrello ({ops.length})</h2>
               <button type="button" className="linklike neg" onClick={() => { if (confirm('Svuotare il carrello?')) setOps([]) }}>Svuota</button>
             </div>
-            <ul className="plain-list">
-              {sim.ops.length === 0 && <li className="muted">Operazioni non valide.</li>}
-              {sim.ops.map((r, i) => {
-                const st = steps?.get(r.op.id)
-                const closes = r.op.type === 'sell' || r.op.type === 'buy_to_cover'
-                const move = (d: -1 | 1) =>
-                  setOps(o => {
-                    const k = o.findIndex(x => x.id === r.op.id)
-                    const j = k + d
-                    if (k < 0 || j < 0 || j >= o.length) return o
-                    const n = [...o]
-                    ;[n[k], n[j]] = [n[j]!, n[k]!]
-                    return n
-                  })
-                return (
-                  <li key={r.op.id} className="cart-row">
-                    <span>
-                      <b>{r.symbol}</b> · {EDITABLE_LABEL[r.op.type]} {fmtQty(r.op.qty)} × {money(r.op.price, r.currency)}
-                      <span className="muted"> = {money(r.grossNative, r.currency)}</span>
-                      {st && (
-                        <small className="muted cart-detail">
-                          {closes
-                            ? <>{r.gainEur !== null && <span className={tone(r.gainEur)}>{eur(r.gainEur, true)}</span>} · imposta {eur(st.taxEur, true)} · netto {eur(st.netEur, true)}</>
-                            : <>{st.after.qty < 0 ? 'prezzo medio short' : 'nuovo PMC'} {money(st.after.pmcNative, r.currency)} · {st.netEur < 0 ? 'spesa' : 'incasso'} {eur(Math.abs(st.netEur))}</>}
-                        </small>
-                      )}
-                    </span>
-                    <span className="note-actions">
-                      {sim.ops.length > 1 && (
-                        <>
-                          <button type="button" className="linklike" disabled={i === 0} onClick={() => move(-1)} aria-label={`Sposta su ${r.symbol}`} title="Sposta su (conta per l'uso delle minus)">↑</button>
-                          <button type="button" className="linklike" disabled={i === sim.ops.length - 1} onClick={() => move(1)} aria-label={`Sposta giù ${r.symbol}`} title="Sposta giù">↓</button>
-                        </>
-                      )}
-                      <button type="button" className="linklike neg" onClick={() => setOps(o => o.filter(x => x.id !== r.op.id))}>Togli</button>
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
+            <CartList sim={sim} steps={steps} setOps={setOps} />
+            {steps && <CartTotalsBox ops={ops} steps={steps} />}
           </div>
 
           {sim.issues.length > 0 && (
@@ -319,5 +290,37 @@ export function Simulator({ presetAssetId, presetType, embedded }: { presetAsset
         </>
       )}
     </section>
+  )
+}
+
+/** Riquadro "Anteprima": prima e dopo (quantità, PMC, costo di carico, valore) ed effetto dell'operazione. */
+function SimPreview({ p, currency, type, budgetLeft, valueEur }: { p: OpPreview | null; currency: string; type: EditableType; budgetLeft: number | null; valueEur: (q: number) => number | null }) {
+  if (!p) return <div className="sim-preview"><div className="sim-preview-title">Anteprima</div><p className="muted small sim-preview-empty">Scrivi quantità (o somma) e prezzo: qui vedi subito come cambia la posizione.</p></div>
+  if (p.issue) return <div className="sim-preview"><div className="sim-preview-title">Anteprima</div><p className="neg small sim-preview-empty">{p.issue}</p></div>
+  const delta = (a: number, b: number, f: (n: number) => string) => (Math.abs(b - a) > 1e-9 ? <small>{b > a ? '+' : '−'}{f(Math.abs(b - a))}</small> : null)
+  const pmc = (n: number) => money(n, currency)
+  const vb = valueEur(p.before.qty)
+  const va = valueEur(p.after.qty)
+  const sells = !spends(type)
+  return (
+    <div className="sim-preview" aria-live="polite">
+      <div className="sim-preview-title"><span>Anteprima</span><span>si aggiorna mentre scrivi</span></div>
+      <table>
+        <thead><tr><th>Posizione</th><th>Prima</th><th className="after">Dopo</th></tr></thead>
+        <tbody>
+          <tr><td>Quantità</td><td>{fmtQty(p.before.qty)}</td><td className="after">{fmtQty(p.after.qty)}{delta(p.before.qty, p.after.qty, fmtQty)}</td></tr>
+          <tr><td>{p.after.qty < 0 ? 'Prezzo medio short' : 'PMC'}</td><td>{pmc(p.before.pmcNative)}</td><td className="after">{pmc(p.after.pmcNative)}{delta(p.before.pmcNative, p.after.pmcNative, pmc)}</td></tr>
+          <tr><td>Costo di carico</td><td>{eur(p.before.costEur)}</td><td className="after">{eur(p.after.costEur)}{delta(p.before.costEur, p.after.costEur, eur)}</td></tr>
+          {vb !== null && va !== null && <tr><td>Valore (prezzo attuale)</td><td>{eur(vb)}</td><td className="after">{eur(va)}{delta(vb, va, eur)}</td></tr>}
+        </tbody>
+      </table>
+      <dl className="sim-preview-op">
+        {sells && p.gainEur !== null && <div><dt>Plus/minus lorda</dt><dd className={tone(p.gainEur)}>{eur(p.gainEur, true)}</dd></div>}
+        {(sells || Math.abs(p.taxEur) >= 0.005) && <div><dt>Imposta stimata{p.taxEur < 0 ? ' (risparmio)' : ''}</dt><dd>{eur(p.taxEur, true)}</dd></div>}
+        {sells && p.gainEur !== null && <div><dt>Guadagno netto</dt><dd className={tone(p.gainEur - p.taxEur)}>{eur(p.gainEur - p.taxEur, true)}</dd></div>}
+        <div className="big"><dt>{p.netEur < 0 ? 'Spendi' : 'Incassi netti'}</dt><dd>{eur(Math.abs(p.netEur))}</dd></div>
+        {budgetLeft !== null && <div className="muted"><dt>Avanzano dal budget</dt><dd>{eur(budgetLeft)}</dd></div>}
+      </dl>
+    </div>
   )
 }
