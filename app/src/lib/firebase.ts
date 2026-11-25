@@ -26,6 +26,8 @@ export const usingEmulator = readEmulatorFlag()
 
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
+// Email di Firebase (es. reimpostazione della password) in italiano.
+auth.languageCode = 'it'
 export const db = getDatabase(app)
 
 if (usingEmulator) {
