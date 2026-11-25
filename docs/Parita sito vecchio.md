@@ -172,6 +172,8 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Riepilogo anno con "Imponibile netto".
 - [x] Minus disponibili: barra (quanto resta) e "scadono tra N giorni".
 - [x] Inserimento ed eliminazione a mano di minus esterne (stessi campi del sito vecchio, `fiscal/manualLosses`).
+- [x] Minus a mano dentro l'elenco del loro anno (non più riquadro fisso), con **Modifica** ed Elimina; sotto ogni minus su quali plus è stata usata e quanto resta,
+      sotto ogni plus da quali minus viene la compensazione (`usedBy`/`usedFrom`/`lossLeftEur` in `engine/fiscal.ts`, minus dello stesso anno usate in ordine di data). PR `minus-a-mano`, 25/11/2026.
 - [ ] Correzione a mano del compensato (✎): nei dati non è mai stata usata; si fa solo se Andrea la chiede.
 
 ### 12. Movimenti (`storico.js`) — fatto (PR `movimenti-periodo`)

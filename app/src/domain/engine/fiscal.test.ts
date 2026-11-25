@@ -98,4 +98,32 @@ describe('cassetto fiscale', () => {
     const r = computeFiscal([ev('2026-05-10', 100)], [{ amount: 50, date: '2026-05-10' }])
     expect(r.lines.find(l => l.gainEur > 0)!.compensatedEur).toBeCloseTo(50, 8)
   })
+
+  it('dice quale minus è stata usata su quale plus, prima le più vecchie', () => {
+    // Come Mediolanum 2026: Porsche in perdita, minus a mano del fondo, poi due plus.
+    const r = computeFiscal(
+      [ev('2026-03-04', -207.12, 'stock', 'P911'), ev('2026-04-17', 399.73, 'stock', 'INFQ'), ev('2026-06-26', 642.27, 'stock', 'META')],
+      [{ amount: 204.81, date: '2026-04-15', title: 'Fondo MBB' }],
+    )
+    const by = (id: string) => r.lines.find(l => l.assetId === id)!
+    const manual = r.lines.find(l => l.side === 'manuale')!
+    expect(manual.manualIndex).toBe(0)
+    expect(by('INFQ').usedFrom!.map(u => [u.key, Math.round(u.eur * 100) / 100])).toEqual([
+      [by('P911').key, 207.12],
+      [manual.key, 192.61],
+    ])
+    expect(by('META').usedFrom!.map(u => [u.key, Math.round(u.eur * 100) / 100])).toEqual([[manual.key, 12.2]])
+    expect(manual.usedBy!.map(u => [u.key, Math.round(u.eur * 100) / 100])).toEqual([
+      [by('INFQ').key, 192.61],
+      [by('META').key, 12.2],
+    ])
+    expect(by('P911').usedBy!.map(u => u.key)).toEqual([by('INFQ').key])
+    expect(by('META').taxEur).toBeCloseTo((642.27 - 12.2) * 0.26, 6)
+  })
+
+  it('una minus non usata non ha usedBy, una plus non compensata non ha usedFrom', () => {
+    const r = computeFiscal([ev('2026-01-10', 100, 'stock', 'a'), ev('2026-03-10', -50, 'stock', 'b')])
+    expect(r.lines[0]!.usedFrom).toBeUndefined()
+    expect(r.lines[1]!.usedBy).toBeUndefined()
+  })
 })

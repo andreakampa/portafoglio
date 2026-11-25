@@ -2,21 +2,26 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { DividendsCard } from '../components/DividendsCard'
 import { Issues } from '../components/Issues'
-import { ManualLossesCard } from '../components/ManualLossesCard'
+import { ManualLossEditor, removeManualLossAsk } from '../components/ManualLossEditor'
 import { Kpi, PortfolioPicker } from '../components/PortfolioPicker'
 import { useComputedPortfolio } from '../data/useComputedPortfolio'
-import { availableLosses } from '../domain/engine/fiscal'
+import { availableLosses, YEARS_CARRY_FORWARD, type FiscalLine } from '../domain/engine/fiscal'
+import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { daysToExpiry, type StoredManualLoss } from '../domain/manualLosses'
 import { localToday } from '../lib/today'
 import { wealthTax, wealthTaxKindFor } from '../domain/engine/wealthTax'
 import { eur, money, qty, THIS_YEAR, tone } from '../lib/format'
 import { FiscalLineDetail } from '../components/FiscalLineDetail'
-import { Tag } from '../components/Tag'
+import { Tag, TagButton } from '../components/Tag'
 
 export function Fiscal() {
   const c = useComputedPortfolio()
   const currentYear = THIS_YEAR
   const [pickedYear, setYear] = useState<number | null>(null)
+  // Minus a mano: null = nessun modulo aperto, 'new' = nuova, numero = posizione di quella da modificare.
+  const [lossForm, setLossForm] = useState<'new' | number | null>(null)
+  const [lossError, setLossError] = useState('')
+  const edit = usePortfolioEdit()
 
   if (c.status === 'loading') return <section className="page"><h1>Fiscale</h1><div className="card skeleton" style={{ height: 240 }} /></section>
   if (c.status === 'error') return <section className="page"><h1>Fiscale</h1><div className="card error">{c.message}</div></section>
@@ -32,6 +37,7 @@ export function Fiscal() {
   const tax = lines.reduce((s, l) => s + l.taxEur, 0)
   const taxable = lines.reduce((s, l) => s + l.taxableEur, 0)
   const manual = ((c.portfolio as { fiscal?: { manualLosses?: StoredManualLoss[] } }).fiscal?.manualLosses ?? []).filter(Boolean)
+  const byKey = new Map(fiscal.lines.map(l => [l.key, l]))
   const today = localToday()
   const open = fiscal.buckets.filter(b => b.remainingEur > 0.005 && b.expiresYear >= currentYear)
   const kind = wealthTaxKindFor(c.result.regime)
@@ -103,13 +109,11 @@ export function Fiscal() {
         )}
       </div>
 
-      <ManualLossesCard pid={c.selectedId} list={manual} />
-
       <div className="card">
         <h2>Movimenti {year}</h2>
         {lines.some(l => l.detail) && <p className="muted small">Tocca una riga per vedere come si arriva alla plus o alla minus: vendita, acquisti chiusi, cambio, commissioni e tasse.</p>}
         {lines.length === 0 ? (
-          <p className="muted">Nessuna vendita nel {year}.</p>
+          <p className="muted">Nessuna vendita né minus a mano nel {year}.</p>
         ) : (
           <ul className="fiscal-lines">
             {lines.map(l => {
@@ -118,7 +122,7 @@ export function Fiscal() {
                   <div>
                     <b>{l.assetName}</b>
                     {l.side === 'short' && <Tag tone="short">short</Tag>}
-                    {l.side === 'manuale' && <span className="badge">a mano</span>}
+                    {l.side === 'manuale' && <span className="badge">minus a mano</span>}
                     {l.excluded && <span className="badge">ETF/fondo: non compensabile</span>}
                     <br />
                     <small className="muted">
@@ -133,6 +137,14 @@ export function Fiscal() {
                   </div>
                 </>
               )
+              const stored = l.manualIndex != null ? manual[l.manualIndex] : undefined
+              if (stored && lossForm === l.manualIndex) {
+                return (
+                  <li key={l.key}>
+                    <ManualLossEditor pid={c.selectedId} editing={{ index: l.manualIndex!, loss: stored }} onDone={() => setLossForm(null)} />
+                  </li>
+                )
+              }
               // Con il dettaglio: si apre con un clic e mostra come si arriva alla plus o minus.
               return (
                 <li key={l.key}>
@@ -144,10 +156,34 @@ export function Fiscal() {
                   ) : (
                     <div className="fiscal-line-plain">{row}</div>
                   )}
+                  <LossUsage l={l} byKey={byKey} currentYear={currentYear} />
+                  {stored && (
+                    <div className="note-actions fiscal-line-actions">
+                      <TagButton tone="edit" title={`Modifica la minus ${l.assetName}`} onClick={() => { setLossError(''); setLossForm(l.manualIndex!) }}>
+                        Modifica
+                      </TagButton>
+                      <TagButton
+                        tone="delete"
+                        title={`Elimina la minus ${l.assetName}`}
+                        onClick={() => {
+                          setLossError('')
+                          removeManualLossAsk(edit, c.selectedId, l.manualIndex!, stored).catch(err => setLossError(err instanceof Error ? err.message : 'Eliminazione non riuscita.'))
+                        }}
+                      >
+                        Elimina
+                      </TagButton>
+                    </div>
+                  )}
                 </li>
               )
             })}
           </ul>
+        )}
+        {lossError && <p className="auth-error" role="alert">{lossError}</p>}
+        {lossForm === 'new' ? (
+          <ManualLossEditor pid={c.selectedId} onDone={() => setLossForm(null)} />
+        ) : (
+          <button type="button" className="btn btn-ghost" onClick={() => { setLossError(''); setLossForm('new') }}>+ Minus a mano</button>
         )}
       </div>
 
@@ -177,5 +213,45 @@ export function Fiscal() {
       <Issues result={c.result} portfolio={c.portfolio} />
       <p className="muted small">Calcoli indicativi secondo le regole in docs/regole-fiscali.md: non sostituiscono il commercialista.</p>
     </section>
+  )
+}
+
+const shortDate = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT')
+
+/** Sotto una minus: su quali plus è stata usata e quanto resta. Sotto una plus: da quali minus viene la compensazione. */
+function LossUsage({ l, byKey, currentYear }: { l: FiscalLine; byKey: Map<string, FiscalLine>; currentYear: number }) {
+  const name = (key: string) => byKey.get(key)?.assetName ?? '?'
+  const date = (key: string) => {
+    const d = byKey.get(key)?.date
+    return d ? shortDate(d) : ''
+  }
+  if (l.usedFrom?.length) {
+    return (
+      <ul className="loss-usage muted small">
+        {l.usedFrom.map(u => (
+          <li key={u.key}>
+            minus usata {eur(u.eur)} da {name(u.key)} ({date(u.key)})
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  if (l.lossLeftEur == null) return null
+  const expired = l.year + YEARS_CARRY_FORWARD < currentYear
+  return (
+    <ul className="loss-usage muted small">
+      {(l.usedBy ?? []).map(u => (
+        <li key={u.key}>
+          usata {eur(u.eur)} su {name(u.key)} il {date(u.key)}
+        </li>
+      ))}
+      <li>
+        {l.lossLeftEur <= 0.005
+          ? <b>usata tutta</b>
+          : expired
+            ? <>{eur(l.lossLeftEur)} non usati: scaduta il 31/12/{l.year + YEARS_CARRY_FORWARD}</>
+            : <>da usare ancora: <b>{eur(l.lossLeftEur)}</b> (entro il 31/12/{l.year + YEARS_CARRY_FORWARD})</>}
+      </li>
+    </ul>
   )
 }
