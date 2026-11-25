@@ -3,6 +3,7 @@ import { parseLeverage, useMaxLeverage } from '../data/maxLeverage'
 import type { Computed } from '../data/useComputedPortfolio'
 import { leverageAlert, summarizeMargin, type MarginPortfolio } from '../domain/engine/margin'
 import { eur, money, THIS_YEAR } from '../lib/format'
+import { MarginStress } from './MarginStress'
 import { Kpi } from './PortfolioPicker'
 
 type Ready = Extract<Computed, { status: 'ready' }>
@@ -37,6 +38,7 @@ export function MarginCard({ c }: { c: Ready }) {
         {m.incomplete.length > 0 && ` Costo stimato senza ${m.incomplete.join(', ')} (tasso o cambio non disponibile).`}
         {max === null && ' Imposta una leva massima per ricevere l’avviso (vale su tutti i dispositivi).'}
       </p>
+      <MarginStress m={m} />
     </div>
   )
 }
