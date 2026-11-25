@@ -699,3 +699,37 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .fiscal-lots-wrap { overflow-x: auto; }
 @media (max-width: 599px) { .fiscal-lots .col-native { display: none; } }
 @media (max-width: 599px) { .fiscal-lots { font-size: .8rem; } .fiscal-lots th { white-space: normal; } }
+
+/* Anteprima in tempo reale della finestra Simula (prima / dopo), come nel sito vecchio. */
+.sim-preview { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.sim-preview-title { display: flex; justify-content: space-between; gap: 8px; padding: 6px 12px; background: var(--sim-bg); color: var(--sim); font-size: .75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.sim-preview-empty { margin: 0; padding: 10px 12px; }
+.sim-preview table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.sim-preview th, .sim-preview td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--border); }
+.sim-preview th { color: var(--muted); font-size: .75rem; font-weight: 500; }
+.sim-preview th:first-child, .sim-preview td:first-child { text-align: left; }
+.sim-preview .after { color: var(--sim); font-weight: 600; border-left: 2px solid var(--sim-bg); }
+.sim-preview td.after small { display: block; color: var(--muted); font-size: .75rem; font-weight: 500; }
+.sim-preview-op, .cart-totals { display: grid; gap: 4px; margin: 0; padding: 10px 12px; font-variant-numeric: tabular-nums; }
+.sim-preview-op > div, .cart-totals > div { display: flex; justify-content: space-between; gap: 12px; }
+.sim-preview-op dd, .cart-totals dd { margin: 0; }
+.sim-preview-op .big, .cart-grand { font-weight: 700; font-size: 1.02rem; }
+.cart-totals { padding: 10px 0 0; border-top: 1px solid var(--border); margin-top: 8px; }
+
+/* Pulsante carrello fisso in basso (sopra la barra del telefono) e pannello che si apre. */
+.cart-fab { position: fixed; right: 16px; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); z-index: 900; display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border: 0; border-radius: 999px; background: var(--primary); color: var(--primary-text); font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 6px 18px rgb(0 0 0 / 25%); }
+.cart-fab:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.cart-badge { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--danger); color: #fff; font-size: .78rem; }
+.cart-badge.bump { animation: cart-bump .5s ease-out; }
+@keyframes cart-bump { 40% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .cart-badge.bump { animation: none; } }
+.cart-scrim { position: fixed; inset: 0; z-index: 950; background: rgb(0 0 0 / 40%); }
+.cart-drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 960; display: grid; gap: 10px; align-content: start; max-height: 85dvh; overflow: auto;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--surface); color: var(--text); border-top: 1px solid var(--border); border-radius: 14px 14px 0 0; box-shadow: 0 -10px 40px rgb(0 0 0 / 25%); }
+.cart-drawer h2 { margin: 0; }
+@media (min-width: 900px) and (pointer: fine), (min-width: 1200px) {
+  .cart-fab { right: 24px; bottom: 24px; }
+  .cart-drawer { left: auto; right: 24px; bottom: 84px; width: min(460px, calc(100vw - 48px)); border: 1px solid var(--border); border-radius: 14px; }
+}
+@media print { .cart-fab, .cart-drawer, .cart-scrim { display: none !important; } }

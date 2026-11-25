@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RawPortfolio } from './engine/portfolio'
-import { opsToTxs, qtyForBudget, simulate, simulateExtras, simulateSteps, trailingDividend, type SimOp } from './simulation'
+import { cartTotals, opsToTxs, previewOp, qtyForBudget, qtyForProceeds, simulate, simulateExtras, simulateSteps, trailingDividend, type SimOp } from './simulation'
 
 const TODAY = '2026-11-21'
 const noFx = () => undefined
@@ -167,5 +167,53 @@ describe('righe del carrello', () => {
     const rev = simulateSteps({ portfolio: p, fx: noFx, latestFx: {}, ops: [ops[1]!, ops[0]!], today: TODAY })
     expect(rev.get('2')!.taxEur).toBeCloseTo(198 * 0.26, 8)
     expect(rev.get('1')!.taxEur).toBe(0)
+  })
+})
+
+describe('anteprima della finestra Simula', () => {
+  const base = { fx: noFx, latestFx: {}, today: TODAY }
+
+  it('acquisto: prima e dopo, spesa con commissioni', () => {
+    const p = previewOp({ ...base, portfolio: eurPortfolio('amministrato'), cart: [], op: op({ id: 'n', type: 'buy', qty: 10, price: 120, commissionEur: 10 }) })!
+    expect(p.before).toMatchObject({ qty: 10, pmcNative: 100, costEur: 1000 })
+    expect(p.after.qty).toBe(20)
+    expect(p.after.pmcNative).toBeCloseTo(2210 / 20, 8)
+    expect(p.netEur).toBeCloseTo(-1210, 8)
+    expect(p.taxEur).toBe(0)
+    expect(p.issue).toBeNull()
+  })
+
+  it('vendita dopo il carrello: parte dalla posizione già simulata e conta solo la sua imposta', () => {
+    const cart = [op({ id: 'c1', type: 'sell', qty: 4, price: 150 })]
+    const p = previewOp({ ...base, portfolio: eurPortfolio('amministrato'), cart, op: op({ id: 'n', type: 'sell', qty: 2, price: 150, commissionEur: 2 }) })!
+    expect(p.before.qty).toBe(6)
+    expect(p.after.qty).toBe(4)
+    expect(p.gainEur).toBeCloseTo(98, 8)
+    expect(p.taxEur).toBeCloseTo(98 * 0.26, 8)
+    expect(p.netEur).toBeCloseTo(300 - 2 - 98 * 0.26, 8)
+  })
+
+  it('vendita oltre la quantità: lo dice', () => {
+    const p = previewOp({ ...base, portfolio: eurPortfolio('amministrato'), cart: [], op: op({ id: 'n', type: 'sell', qty: 50, price: 150 }) })
+    expect(p?.issue).toBeTruthy()
+  })
+
+  it('totali del carrello: uscite, entrate nette, imposte e saldo', () => {
+    const ops = [op({ id: 'v', type: 'sell', qty: 4, price: 150 }), op({ id: 'a', assetId: 'y', type: 'buy', qty: 1, price: 100, commissionEur: 1 })]
+    const steps = simulateSteps({ ...base, portfolio: eurPortfolio('amministrato'), ops })
+    const t = cartTotals(ops, steps)
+    expect(t.spentEur).toBeCloseTo(101, 8)
+    expect(t.taxEur).toBeCloseTo(52, 8)
+    expect(t.receivedEur).toBeCloseTo(600 - 52, 8)
+    expect(t.balanceEur).toBeCloseTo(600 - 52 - 101, 8)
+  })
+})
+
+describe('qtyForProceeds', () => {
+  it('azioni intere da vendere per incassare almeno la somma, commissioni comprese', () => {
+    expect(qtyForProceeds(1000, 7.1, 1, 2)).toBe(142) // 141 × 7,10 = 1.001,10 non basta per 1.002
+    expect(qtyForProceeds(1000, 100, 1, 0)).toBe(10)
+    expect(qtyForProceeds(1000, 200, 1.1, 0)).toBe(6) // in dollari
+    expect(qtyForProceeds(0, 100, 1, 0)).toBe(0)
   })
 })

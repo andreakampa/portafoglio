@@ -275,3 +275,74 @@ export function qtyForBudget(budgetEur: number, priceNative: number, rate: numbe
   if (!(budgetEur > 0) || !(unitEur > 0)) return 0
   return Math.max(0, Math.floor((budgetEur - commissionEur) / unitEur))
 }
+
+/**
+ * Azioni intere da vendere per incassare almeno `amountEur` (lordo delle tasse, commissioni comprese).
+ * È il "per budget" della vendita: "voglio incassare 1.000 €".
+ */
+export function qtyForProceeds(amountEur: number, priceNative: number, rate: number, commissionEur: number): number {
+  const unitEur = priceNative / rate
+  if (!(amountEur > 0) || !(unitEur > 0)) return 0
+  return Math.max(0, Math.ceil((amountEur + commissionEur) / unitEur - 1e-9))
+}
+
+/** Operazioni che fanno uscire cassa (acquisto, chiusura short): per queste il "budget" è quanto spendere. */
+export const spends = (t: EditableType) => t === 'buy' || t === 'buy_to_cover'
+
+export interface OpPreview {
+  /** Posizione del titolo prima dell'operazione (dopo quelle già nel carrello). */
+  before: PositionSnapshot
+  after: PositionSnapshot
+  grossEur: number
+  /** Plus/minus (vendite e chiusure short), prima delle tasse. */
+  gainEur: number | null
+  /** Imposta in più dovuta a questa operazione, dopo quelle già nel carrello (minus del cassetto comprese). */
+  taxEur: number
+  /** Incasso (+) o spesa (−) dell'operazione, al netto di commissioni e imposta. */
+  netEur: number
+  /** Problema del motore su questa operazione (es. vendita oltre la quantità posseduta). */
+  issue: string | null
+}
+
+/**
+ * Anteprima in tempo reale della finestra Simula, come nel sito vecchio: cosa succede se aggiungo `op` al carrello.
+ * Usa il motore vero (regime, LIFO, minus del cassetto) e tiene conto delle operazioni già nel carrello.
+ */
+export function previewOp(input: Omit<Parameters<typeof simulate>[0], 'ops'> & { cart: SimOp[]; op: SimOp }): OpPreview | null {
+  const { cart, op, ...rest } = input
+  const withOp = simulate({ ...rest, ops: [...cart, op] })
+  const r = withOp.ops.find(x => x.op.id === op.id)
+  const asset = withOp.assets.find(a => a.assetId === op.assetId)
+  if (!r || !asset) return null
+  const cartSim = cart.length ? simulate({ ...rest, ops: cart }) : null
+  const before = cartSim?.assets.find(a => a.assetId === op.assetId)?.after ?? asset.before
+  const taxEur = withOp.taxEur - (cartSim?.taxEur ?? 0)
+  const sign = spends(op.type) ? -1 : 1
+  const issue = withOp.issues.find(i => i.txId === SIM + op.id)?.message ?? null
+  return { before, after: asset.after, grossEur: r.grossEur, gainEur: r.gainEur, taxEur, netEur: sign * r.grossEur - op.commissionEur - taxEur, issue }
+}
+
+export interface CartTotals {
+  /** Spese per acquisti e chiusure short, commissioni comprese (positivo). */
+  spentEur: number
+  /** Incassi netti di vendite e aperture short, al netto di commissioni e imposta. */
+  receivedEur: number
+  taxEur: number
+  /** Saldo: incassi − spese. */
+  balanceEur: number
+}
+
+/** Totali del carrello, come in fondo alla "lista della spesa" del sito vecchio. */
+export function cartTotals(ops: SimOp[], steps: Map<string, SimStep>): CartTotals {
+  let spentEur = 0
+  let receivedEur = 0
+  let taxEur = 0
+  for (const o of ops) {
+    const s = steps.get(o.id)
+    if (!s) continue
+    taxEur += s.taxEur
+    if (spends(o.type)) spentEur -= s.netEur
+    else receivedEur += s.netEur
+  }
+  return { spentEur, receivedEur, taxEur, balanceEur: receivedEur - spentEur }
+}

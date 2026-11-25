@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { BonusRunner } from '../components/BonusRunner'
 import { PacRunner } from '../components/PacRunner'
+import { CartFab } from '../components/SimCart'
 import { Toaster } from '../components/Toaster'
 import { usingEmulator } from '../lib/firebase'
 import { IconChat, IconHome, IconMore, IconMovements, IconNotes, IconPositions, IconSettings, IconSimulator, IconTax, IconWatch } from './icons'
@@ -57,6 +58,7 @@ export function AppShell() {
         <Toaster />
         <BonusRunner />
         <Outlet />
+        <CartFab />
       </main>
 
       <nav className="tabbar" aria-label="Sezioni">
