@@ -24,6 +24,8 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     Chiusura del sito: `/notice` con `closesAt` a 60 giorni, avviso in app a tutti ed email in copia nascosta. Per tutti: "Scarica i miei dati" (JSON completo di `users/{uid}`)
     ed "Elimina il mio account" (non per l'admin). Motore `app/src/domain/accountLifecycle.ts`, schermate `components/AccountLifecycle.tsx`, 27 nuovi test delle regole.
     Dopo l'unione serve `firebase deploy --only database`. L'account di accesso di chi viene cancellato dall'admin resta in Firebase → Authentication (solo email): si toglie da lì.
+    **Password dimenticata (25/11/2026):** link nella schermata di accesso, email di Firebase in italiano (`sendPasswordResetEmail`); stesso messaggio se l'email non esiste.
+    Con la cifratura dei dati degli amici il reset dovrà passare dalla chiave di recupero.
     **Avvisi di prezzo per più utenti:** `runAlerts` (ibkr-sync) scarica un prezzo per titolo per tutti e resta sotto le 50 richieste per giro del piano gratuito Cloudflare;
     se i titoli sono troppi li controlla a turno (`planQuotes`, cursore in `alerts_state/cursor`). Va ripubblicato il Worker.
     **In sospeso:** cifratura dei dati degli amici (decisa: tutto cifrato tranne watchlist e soglie) (Andrea non vuole poterli leggere), nuovo nome Gruzzolo su indirizzo gratuito.

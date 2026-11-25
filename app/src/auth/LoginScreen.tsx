@@ -1,8 +1,10 @@
+import { sendPasswordResetEmail } from 'firebase/auth'
 import { useState, type FormEvent } from 'react'
+import { auth } from '../lib/firebase'
 import { inviteFromUrl } from '../lib/invites'
 import { AuthError, useAuth } from './context'
 
-type Mode = 'login' | 'register' | 'claim'
+type Mode = 'login' | 'register' | 'claim' | 'reset'
 
 const message = (e: unknown) => (e instanceof AuthError ? e.message : 'Qualcosa è andato storto. Riprova.')
 
@@ -17,10 +19,12 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
   const [invite, setInvite] = useState(linked ?? '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [info, setInfo] = useState('')
 
   const switchTo = (m: Mode) => {
     setMode(m)
     setError('')
+    setInfo('')
   }
 
   async function onSubmit(e: FormEvent) {
@@ -29,6 +33,21 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
     if (mode === 'register') {
       if (password !== password2) return setError('Le password non coincidono.')
       if (password.length < 6) return setError('Password troppo corta (almeno 6 caratteri).')
+    }
+    if (mode === 'reset') {
+      if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Scrivi l\'email con cui ti sei registrato.')
+      setBusy(true)
+      try {
+        await sendPasswordResetEmail(auth, email.trim())
+      } catch (err) {
+        // Stesso messaggio se l'email non esiste: non si rivela chi è iscritto.
+        if ((err as { code?: string }).code === 'auth/too-many-requests') {
+          setBusy(false)
+          return setError('Troppi tentativi: riprova tra qualche minuto.')
+        }
+      }
+      setBusy(false)
+      return setInfo('Se l\'email è registrata, ti abbiamo mandato un link per scegliere una nuova password. Controlla anche lo spam.')
     }
     setBusy(true)
     try {
@@ -44,8 +63,8 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
     }
   }
 
-  const title = { login: 'Accedi', register: 'Registrati', claim: 'Serve un invito' }[mode]
-  const submit = { login: 'Accedi', register: 'Crea account', claim: 'Attiva account' }[mode]
+  const title = { login: 'Accedi', register: 'Registrati', claim: 'Serve un invito', reset: 'Password dimenticata' }[mode]
+  const submit = { login: 'Accedi', register: 'Crea account', claim: 'Attiva account', reset: 'Mandami il link' }[mode]
 
   return (
     <main className="auth">
@@ -59,12 +78,17 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
           <p className="muted">Il tuo account non è ancora abilitato. Inserisci il codice invito che hai ricevuto.</p>
         )}
 
+        {mode === 'reset' && <p className="muted">Ti mandiamo un'email con il link per scegliere una nuova password.</p>}
         {mode !== 'claim' && (
           <>
             <label>
               Email
               <input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} />
             </label>
+          </>
+        )}
+        {(mode === 'login' || mode === 'register') && (
+          <>
             <label>
               Password
               <input
@@ -83,7 +107,7 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
             <input type="password" autoComplete="new-password" required value={password2} onChange={e => setPassword2(e.target.value)} />
           </label>
         )}
-        {mode !== 'login' && (
+        {(mode === 'register' || mode === 'claim') && (
           <label>
             Codice invito
             <input
@@ -99,14 +123,25 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
         )}
 
         <p className="auth-error" role="alert">{error}</p>
+        {info && <p className="small" role="status">{info}</p>}
 
         <button className="btn btn-primary" type="submit" disabled={busy}>
           {busy ? 'Attendi…' : submit}
         </button>
 
         {mode === 'login' && (
-          <button className="btn btn-ghost" type="button" onClick={() => switchTo('register')}>
-            Ho un codice invito: registrati
+          <>
+            <button className="btn btn-ghost" type="button" onClick={() => switchTo('register')}>
+              Ho un codice invito: registrati
+            </button>
+            <button className="linklike" type="button" onClick={() => switchTo('reset')}>
+              Password dimenticata?
+            </button>
+          </>
+        )}
+        {mode === 'reset' && (
+          <button className="btn btn-ghost" type="button" onClick={() => switchTo('login')}>
+            Torna all'accesso
           </button>
         )}
         {mode === 'register' && (
