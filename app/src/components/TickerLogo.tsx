@@ -4,7 +4,8 @@ import { useState } from 'react'
 
 const COLORS = ['#2a7f5e', '#1a6fa0', '#7b4fa0', '#a05c1a', '#1a8a6a', '#6a3fa0', '#a03a3a', '#2a5fa0']
 const baseOf = (symbol: string) => symbol.split('.')[0]!.split('-')[0]!.toUpperCase()
-const sources = (b: string) => [
+// Il simbolo finisce in un indirizzo: si codifica, così caratteri come / ? # non cambiano la richiesta.
+const sources = (symbol: string, b = encodeURIComponent(symbol)) => [
   `https://financialmodelingprep.com/image-stock/${b}.png`,
   `https://assets.parqet.com/logos/symbol/${b}?format=jpg`,
   `https://eodhd.com/img/logos/US/${b}.png`,

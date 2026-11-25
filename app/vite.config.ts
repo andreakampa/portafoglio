@@ -1,13 +1,26 @@
 /// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { buildCsp } from './src/security/csp.ts'
 
 // La nuova versione viene pubblicata accanto al sito attuale, in /portafoglio/v2/.
 const BASE = '/portafoglio/v2/'
 
 // Versione mostrata nelle Impostazioni: commit in CI, "locale" sul PC.
 const VERSION = process.env.GITHUB_SHA?.slice(0, 7) ?? 'locale'
+
+// Content Security Policy (src/security/csp.ts) subito dopo <meta charset>, prima di ogni script,
+// solo nella versione pubblicata: in sviluppo Vite usa script in linea per il ricaricamento a caldo.
+const CHARSET = '<meta charset="UTF-8" />'
+const csp = (): Plugin => ({
+  name: 'ptpro-csp',
+  apply: 'build',
+  transformIndexHtml: html => {
+    if (!html.includes(CHARSET)) throw new Error('index.html: manca <meta charset>, non so dove mettere la CSP')
+    return html.replace(CHARSET, `${CHARSET}\n    <meta http-equiv="Content-Security-Policy" content="${buildCsp()}" />`)
+  },
+})
 
 // In locale il Worker finance-proxy non accetta localhost: Vite inoltra /__proxy al Worker
 // presentandosi come il sito pubblicato (vale per npm run dev e npm run preview).
@@ -29,6 +42,7 @@ export default defineConfig({
   preview: { proxy },
   plugins: [
     react(),
+    csp(),
     VitePWA({
       // Aggiornamento automatico: niente più "premi Ctrl+F5" dopo una pubblicazione.
       registerType: 'autoUpdate',

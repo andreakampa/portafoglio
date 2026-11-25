@@ -14,6 +14,11 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     Il sito vecchio aperto su localhost non riceve più i prezzi (si usa quello pubblicato).
   - Regole Firebase con inviti monouso, membri e admin (38 test).
   - Codice dei Worker nel repository.
+  - **Content Security Policy nella v2** (`app/src/security/csp.ts`, messa nella pagina solo alla build): ammessi solo il sito, Firebase,
+    il proxy Cloudflare e i 3 siti dei loghi. Una nuova API o fonte di immagini va aggiunta lì, altrimenti il browser la blocca.
+  - **Sito vecchio:** le 3 librerie da CDN (jsPDF, autotable, xlsx) hanno l'impronta `integrity`; cambiando versione va ricalcolata.
+    Restano senza impronta i moduli Firebase da gstatic (import ES).
+  - Clic sulle notifiche: si aprono solo pagine dell'app.
 - **v2 online** su `/portafoglio/v2/`
   - Login, registrazione con invito, PWA che si aggiorna da sola.
   - **Posizioni:** valore, PMC e risultato, con schede su telefono e tabella su PC.
