@@ -766,3 +766,16 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .recent-head .seg button { min-width: 52px; }
 .recent-head-total { display: grid; justify-items: end; gap: 2px; }
 .recent-card .top-list small.num { white-space: nowrap; }
+
+/* Import da Trade Republic */
+.card-head-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.card-head-row h2 { margin: 0; }
+.tr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.tr-chips .badge { margin-left: 0; }
+.tr-list { max-height: 55vh; overflow-y: auto; }
+.tr-list .cell-sub { color: var(--muted); }
+.tr-what { font-weight: 600; text-align: right; }
+.tr-replace { color: var(--primary); }
+.tr-new { color: var(--buy); }
+.tr-fix { color: var(--warn); }
+.tr-same, .tr-unknown { color: var(--muted); }

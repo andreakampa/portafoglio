@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { Computed } from '../data/useComputedPortfolio'
 import { isEditableMovement, isTransferMovement, useMovementRemove } from '../data/useMovementRemove'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
+import { TrImport } from './TrImport'
 import { toast } from '../lib/toast'
 import { assetHistory, type HistoryRow } from '../domain/assetHistory'
 import { KIND_LABEL, type Movement } from '../domain/engine/movements'
@@ -28,6 +29,7 @@ export function AssetHistory({ c, assetId }: { c: Ready; assetId: string }) {
   const edit = usePortfolioEdit()
   const [confirming, setConfirming] = useState<Set<string> | null>(null)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
   const estimated = rows.filter(r => r.m.estimated).map(r => r.m)
   const refOf = (m: Movement) => {
     const t = c.portfolio.assets?.[m.assetId]?.transactions?.[m.index]
@@ -53,6 +55,8 @@ export function AssetHistory({ c, assetId }: { c: Ready; assetId: string }) {
       ? <TransferEditCard c={c} movement={editing} onClose={() => setEditing(null)} />
       : <MovementForm c={c} editing={editing} onClose={() => setEditing(null)} bare />
   }
+
+  if (importing) return <TrImport c={c} onClose={() => setImporting(false)} />
 
   if (confirming) {
     const chosen = estimated.filter(m => confirming.has(m.key))
@@ -149,8 +153,9 @@ export function AssetHistory({ c, assetId }: { c: Ready; assetId: string }) {
         <div className="confirm-banner">
           <div>
             <b>{estimated.length} {estimated.length === 1 ? 'movimento' : 'movimenti'} da confermare</b>
-            <span className="small">Prezzo stimato dalla chiusura di borsa. Confermali se coincidono con le conferme d'ordine, altrimenti correggili con la matita.</span>
+            <span className="small">Prezzo stimato dalla chiusura di borsa. Confermali se coincidono con le conferme d'ordine, correggili con la matita, oppure importa l'estratto di Trade Republic.</span>
           </div>
+          <button type="button" className="btn btn-ghost" onClick={() => setImporting(true)}>Importa da Trade Republic</button>
           <button type="button" className="btn btn-primary" disabled={busy} onClick={() => setConfirming(new Set(estimated.map(m => m.key)))}>Conferma tutte</button>
         </div>
       )}
