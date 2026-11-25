@@ -1,10 +1,12 @@
 // finance-proxy — Cloudflare Worker del sito Portafoglio Tracker Pro.
 //   GET  /?url=<indirizzo>  proxy CORS, SOLO verso i domini in ALLOWED_HOSTS
 //   POST /chat              assistente AI (Gemini) con la chiave dell'utente (BYOK, mai salvata)
-// Entrambi rispondono solo alle pagine servite dai domini in ALLOWED_ORIGINS.
+// Entrambi rispondono solo alle pagine servite dai domini in ALLOWED_ORIGINS (niente localhost:
+// in locale la v2 passa dall'inoltro di Vite, vedi app/vite.config.ts) e hanno un limite di
+// richieste al minuto per indirizzo IP (binding PROXY_LIMIT e CHAT_LIMIT in wrangler.jsonc).
+// Nota: l'origine la può falsificare chiunque fuori dal browser; il limite è la difesa vera.
 
 const ALLOWED_ORIGINS = ['https://andreakampa.github.io'];
-const ALLOW_LOCALHOST = true; // per provare il sito in locale
 
 // Unici domini che il proxy può contattare (quelli usati dal sito)
 const ALLOWED_HOSTS = new Set([
@@ -14,9 +16,7 @@ const ALLOWED_HOSTS = new Set([
   'tassidicambio.bancaditalia.it',
 ]);
 
-const isAllowedOrigin = (origin) =>
-  ALLOWED_ORIGINS.includes(origin) ||
-  (ALLOW_LOCALHOST && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
+const isAllowedOrigin = (origin) => ALLOWED_ORIGINS.includes(origin);
 
 const cors = (origin, methods, extra = {}) => ({
   'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0],
@@ -33,11 +33,32 @@ const json = (origin, methods, obj, status = 200) =>
     headers: cors(origin, methods, { 'Content-Type': 'application/json' }),
   });
 
+// ---- LIMITE DI RICHIESTE ----
+
+// true se la richiesta supera il limite. Chiave = indirizzo IP del client.
+// Senza binding (configurazione sbagliata) il limite non si applica ma lo si segnala nei log.
+async function overLimit(limiter, request, name) {
+  if (!limiter) {
+    console.warn(`limite ${name} non configurato`);
+    return false;
+  }
+  const ip = request.headers.get('CF-Connecting-IP') || 'sconosciuto';
+  const { success } = await limiter.limit({ key: ip });
+  return !success;
+}
+
+const tooMany = (origin, methods) =>
+  new Response(JSON.stringify({ error: 'troppe_richieste' }), {
+    status: 429,
+    headers: cors(origin, methods, { 'Content-Type': 'application/json', 'Retry-After': '60' }),
+  });
+
 // ---- PROXY ----
 
-async function handleProxy(request, origin) {
+async function handleProxy(request, env, origin) {
   const M = 'GET, OPTIONS';
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin, M) });
+  if (await overLimit(env.PROXY_LIMIT, request, 'PROXY_LIMIT')) return tooMany(origin, M);
   if (!isAllowedOrigin(origin)) return json(origin, M, { error: 'origine non consentita' }, 403);
   if (request.method !== 'GET') return json(origin, M, { error: 'metodo non consentito' }, 405);
 
@@ -90,6 +111,7 @@ function callGemini(model, body, key) {
 async function handleChat(request, env, origin) {
   const M = 'POST, OPTIONS';
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin, M) });
+  if (await overLimit(env.CHAT_LIMIT, request, 'CHAT_LIMIT')) return tooMany(origin, M);
   if (request.method !== 'POST') return json(origin, M, { error: 'metodo non consentito' }, 405);
   if (!isAllowedOrigin(origin)) return json(origin, M, { error: 'origine non consentita' }, 403);
 
@@ -147,6 +169,6 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const { pathname } = new URL(request.url);
     if (pathname === '/chat') return handleChat(request, env, origin);
-    return handleProxy(request, origin);
+    return handleProxy(request, env, origin);
   },
 };

@@ -5,5 +5,9 @@
   "compatibility_date": "2026-11-18",
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Limite di richieste per indirizzo IP (finestra di 60 secondi). namespace_id: numero libero, unico nell'account.
+  "ratelimits": [
+    { "name": "RELAY_LIMIT", "namespace_id": "1003", "simple": { "limit": 20, "period": 60 } }
+  ]
 }

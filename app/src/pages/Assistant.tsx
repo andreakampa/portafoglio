@@ -20,6 +20,7 @@ const readKey = () => {
 const ERRORS: Record<string, string> = {
   chiave_mancante: 'Serve la tua chiave Gemini (vedi sotto).',
   chiave_non_valida: 'La chiave Gemini non è valida: controllala o creane una nuova.',
+  troppe_richieste: 'Troppe domande in poco tempo: aspetta un minuto e riprova.',
   quota_esaurita: 'Hai finito le richieste gratuite di Gemini per ora: riprova più tardi.',
   gemini_non_disponibile: 'Gemini non risponde in questo momento: riprova tra poco.',
 }

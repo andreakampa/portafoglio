@@ -5,5 +5,11 @@
   "compatibility_date": "2026-03-14",
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Limite di richieste per indirizzo IP (finestra di 60 secondi). namespace_id: numero libero, unico nell'account.
+  // Largo per il proxy: al primo avvio la v2 scarica prezzi, storici, dividendi e cambi di tutti i titoli.
+  "ratelimits": [
+    { "name": "PROXY_LIMIT", "namespace_id": "1001", "simple": { "limit": 600, "period": 60 } },
+    { "name": "CHAT_LIMIT", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }
+  ]
 }

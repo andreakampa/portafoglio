@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:workers": "node --test workers/test/workers.test.mjs",
     "test:rules": "firebase emulators:exec --only auth,database --project calcolo-pmc \"node tests/rules.test.mjs\""
   }
 }
