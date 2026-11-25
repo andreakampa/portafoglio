@@ -30,7 +30,7 @@ const SUFFIXES = ['.MI', '.DE', '.AS', '.PA', '.SW', '.L', '.MC', '.TO']
 async function quote(symbol) {
   const url = `${PROXY}?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`)}`
   try {
-    const j = await (await fetch(url, { headers: { Origin: 'http://localhost:5173' } })).json()
+    const j = await (await fetch(url, { headers: { Origin: 'https://andreakampa.github.io' } })).json()
     const m = j.chart?.result?.[0]?.meta
     return m?.regularMarketPrice ? { name: m.longName || m.shortName || '' } : null
   } catch {

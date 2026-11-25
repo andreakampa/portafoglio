@@ -4,17 +4,16 @@
 //   POST /send  { token, queryId }        -> { ok, referenceCode } oppure { ok:false, errorCode, errorMessage }
 //   POST /get   { token, referenceCode }  -> { ok, xml } | { ok:false, pending:true } | { ok:false, errorCode, ... }
 // Il token viaggia nel corpo della POST (non nell'URL) e non viene mai scritto nei log.
+// Limite di richieste al minuto per indirizzo IP: binding RELAY_LIMIT in wrangler.jsonc.
 
-// Domini del sito autorizzati a usare il relay (aggiungi qui eventuali altri domini)
+// Domini del sito autorizzati a usare il relay (aggiungi qui eventuali altri domini; niente localhost)
 const ALLOWED_ORIGINS = ['https://andreakampa.github.io'];
-const ALLOW_LOCALHOST = true; // comodo per provare in locale; mettilo a false quando non ti serve
 
 const IBKR_BASE = 'https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService';
 // Errori IBKR che significano "riprova tra poco" (non sono veri errori)
 const RETRIABLE = new Set(['1001', '1004', '1005', '1019', '1021']);
 
-const isAllowed = (origin) => ALLOWED_ORIGINS.includes(origin)
-    || (ALLOW_LOCALHOST && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
+const isAllowed = (origin) => ALLOWED_ORIGINS.includes(origin);
 
 const corsFor = (origin) => ({
     'Access-Control-Allow-Origin': origin,
@@ -45,12 +44,19 @@ async function callIbkr(path, params) {
 }
 
 export default {
-    async fetch(request) {
+    async fetch(request, env = {}) {
         const origin = request.headers.get('Origin') || '';
         if (!isAllowed(origin)) return reply({ ok: false, error: 'origin-non-consentito' }, 403, {});
         const cors = corsFor(origin);
 
         if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+        if (env.RELAY_LIMIT) {
+            const ip = request.headers.get('CF-Connecting-IP') || 'sconosciuto';
+            const { success } = await env.RELAY_LIMIT.limit({ key: ip });
+            if (!success) return reply({ ok: false, error: 'troppe-richieste' }, 429, { ...cors, 'Retry-After': '60' });
+        } else {
+            console.warn('limite RELAY_LIMIT non configurato');
+        }
         if (request.method !== 'POST') return reply({ ok: false, error: 'usa-POST' }, 405, cors);
 
         let body;

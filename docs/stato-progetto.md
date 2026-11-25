@@ -8,6 +8,10 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
 ## Fatto
 - **Sicurezza**
   - Proxy Cloudflare limitato a Yahoo, cambi e Banca d'Italia e alle sole richieste dal sito.
+  - **Worker più severi (25/11/2026):** `finance-proxy` e `ibkr-relay` non accettano più localhost; limite al minuto per IP
+    (proxy 600, `/chat` 10, relay 20; binding `ratelimits` in `wrangler.jsonc`), oltre il limite rispondono 429. In locale la v2
+    passa da `/__proxy` di Vite, che si presenta come il sito pubblicato. Test: `npm run test:workers` (anche in CI).
+    Il sito vecchio aperto su localhost non riceve più i prezzi (si usa quello pubblicato).
   - Regole Firebase con inviti monouso, membri e admin (38 test).
   - Codice dei Worker nel repository.
 - **v2 online** su `/portafoglio/v2/`

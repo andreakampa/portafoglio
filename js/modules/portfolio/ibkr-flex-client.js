@@ -45,6 +45,7 @@ export async function downloadFlexReport({
             throw new FlexDownloadError('rete', 'Relay non raggiungibile: controlla la connessione');
         }
         if (res.status === 403) throw new FlexDownloadError('origin', 'Il relay non autorizza questo sito');
+        if (res.status === 429) throw new FlexDownloadError('limite', 'Troppe richieste al relay: riprova tra un minuto');
         if (res.status >= 500) throw new FlexDownloadError('relay', 'IBKR non raggiungibile in questo momento');
         return res.json();
     };
