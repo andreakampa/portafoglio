@@ -26,6 +26,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     (costo medio o LIFO secondo il regime, minus del cassetto usate, in dichiarativo anche il risparmio sulle plus già
     realizzate nell'anno), cassa netta, tasto MAX. Rifà il calcolo col motore vero su una copia del portafoglio: non salva nulla.
   - **Movimenti:** prezzo di negoziazione, filtri per periodo e tipo, short, margine e interessi.
+  - **Grafico Andamento (Panoramica):** viste Valore e Performance come su IBKR, S&P 500 e Nasdaq 100 accendibili; scelta salvata in `settings/historyChart`.
   - **Note:** idee, prossime mosse, titoli da monitorare ed eventi con data, sincronizzate tra dispositivi.
 - **Nuovo motore** (`app/src/domain/engine/`; 123 test in tutto il progetto). Applica le regole di [regole-fiscali.md](regole-fiscali.md):
   - costo medio in amministrato, LIFO in dichiarativo;

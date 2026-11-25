@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { BENCHMARKS, useHistory } from '../data/useHistory'
 import { indexReturn, rebase } from '../domain/engine/history'
 import { VIX_ALERT, vixStatus } from '../domain/market'
 import type { RawPortfolio } from '../domain/engine/portfolio'
 import { loadQuotes, type Quote } from '../lib/prices'
 import { eur, pct } from '../lib/format'
-import { LineChart } from './LineChart'
+import { LineChart, type LineSeries } from './LineChart'
+import { useHistoryChartPrefs } from '../data/useHistoryChartPrefs'
+import { TOGGLES, setView, toggleLine, type ToggleKey } from '../domain/historyChart'
 import { localToday } from '../lib/today'
 
 const INDICES = [
@@ -117,37 +119,61 @@ function rangeStart(r: Range, today: string, first: string): string {
   return s < first ? first : s
 }
 
-/** Valore del portafoglio nel tempo e rendimento confrontato con S&P 500 e Nasdaq 100 (in euro). */
+/**
+ * Andamento del portafoglio con due viste, come su Interactive Brokers:
+ * Valore (euro, con capitale investito) e Performance (% time-weighted, con S&P 500 e Nasdaq 100 a scelta).
+ * Vista e linee accese restano salvate su Firebase (`settings/historyChart`).
+ */
 export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
   const h = useHistory(portfolio)
+  const [prefs, savePrefs] = useHistoryChartPrefs()
   const [range, setRange] = useState<Range>('ytd')
   const today = TODAY
   const points = useMemo(() => h.history?.points ?? [], [h.history])
   const from = points.length ? rangeStart(range, today, points[0]!.date) : today
+  const view = prefs.view
 
   const data = useMemo(() => {
     const inRange = points.filter(p => p.date >= from)
     const ret = rebase(points, from)
+    const bench = Object.fromEntries(
+      BENCHMARKS.map(b => [b.symbol, indexReturn(h.benchmarks[b.symbol] ?? {}, from, today, h.eurUsd).map(p => ({ date: p.date, v: p.pct }))]),
+    )
     return {
-      value: [
-        { key: 'v', name: 'Valore', color: 'var(--series-1)', points: inRange.map(p => ({ date: p.date, v: p.valueEur })) },
-        { key: 'i', name: 'Capitale investito', color: 'var(--series-2)', points: inRange.map(p => ({ date: p.date, v: p.investedEur })) },
-      ],
-      ret: [
-        { key: 'p', name: 'Portafoglio', color: 'var(--series-1)', points: ret.map(p => ({ date: p.date, v: p.pct })) },
-        ...BENCHMARKS.map((b, i) => ({
-          key: b.symbol, name: `${b.name} (in €)`, color: `var(--series-${i + 2})`,
-          points: indexReturn(h.benchmarks[b.symbol] ?? {}, from, today, h.eurUsd).map(p => ({ date: p.date, v: p.pct })),
-        })),
-      ],
+      value: { key: 'v', name: 'Valore', color: 'var(--series-1)', area: true, points: inRange.map(p => ({ date: p.date, v: p.valueEur })) },
+      invested: { key: 'i', name: 'Capitale investito', color: 'var(--muted)', dashed: true, points: inRange.map(p => ({ date: p.date, v: p.investedEur })) },
+      perf: { key: 'p', name: 'Portafoglio', color: 'var(--series-1)', points: ret.map(p => ({ date: p.date, v: p.pct })) },
+      bench,
     }
   }, [points, from, today, h.benchmarks, h.eurUsd])
 
-  const last = data.ret.map(s => ({ name: s.name, v: s.points.at(-1)?.v }))
+  const toggles = TOGGLES.filter(t => t.view === view)
+  const colorOf = (key: ToggleKey) => (key === 'gspc' ? 'var(--series-2)' : key === 'ndx' ? 'var(--series-3)' : 'var(--muted)')
+  const series: LineSeries[] =
+    view === 'value'
+      ? [data.value, ...(prefs.show.invested ? [data.invested] : [])]
+      : [
+          data.perf,
+          ...TOGGLES.filter(t => t.view === 'perf' && prefs.show[t.key]).map(t => ({
+            key: t.key, name: `${t.label} (in €)`, color: colorOf(t.key), points: data.bench[t.symbol!] ?? [],
+          })),
+        ]
+
+  const lastValue = data.value.points.at(-1)?.v
+  const lastInvested = data.invested.points.at(-1)?.v
+  const gain = lastValue !== undefined && lastInvested !== undefined ? lastValue - lastInvested : undefined
+  const lastPerf = data.perf.points.at(-1)?.v
+  const benchLast = TOGGLES.filter(t => t.symbol).map(t => ({ name: `${t.label} (in €)`, v: data.bench[t.symbol!]?.at(-1)?.v }))
 
   return (
     <div className="card">
-      <h2>Andamento</h2>
+      <div className="chart-head">
+        <h2>Andamento</h2>
+        <div className="seg" role="group" aria-label="Vista del grafico">
+          <button type="button" aria-pressed={view === 'value'} onClick={() => savePrefs(setView(prefs, 'value'))}>Valore</button>
+          <button type="button" aria-pressed={view === 'perf'} onClick={() => savePrefs(setView(prefs, 'perf'))}>Performance</button>
+        </div>
+      </div>
       <div className="pills" role="tablist" aria-label="Periodo">
         {RANGES.map(r => (
           <button key={r.key} type="button" role="tab" aria-selected={range === r.key} className={`pill small-pill ${range === r.key ? 'active' : ''}`} onClick={() => setRange(r.key)}>
@@ -156,24 +182,57 @@ export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
         ))}
       </div>
       {!h.history ? (
-        <div className="skeleton" style={{ height: 220 }} aria-busy="true" />
+        <div className="skeleton" style={{ height: 220, marginTop: 12 }} aria-busy="true" />
       ) : (
         <>
-          <h3>Valore e capitale investito</h3>
-          <LineChart series={data.value} format={v => eur(v)} tickFormat={eur0} label="Valore del portafoglio e capitale investito nel tempo" />
-          <h3>Rendimento a confronto</h3>
-          <LineChart series={data.ret} format={v => pct(v)} tickFormat={v => `${Math.round(v)}%`} zero label="Rendimento del portafoglio, dell'S&P 500 e del Nasdaq 100 nel periodo" />
+          <p className="chart-headline">
+            {view === 'value' ? (
+              <>
+                <b>{eur(lastValue)}</b>
+                {gain !== undefined && <span className={`small ${gain >= 0 ? 'pos' : 'neg'}`}>{gain >= 0 ? '+' : ''}{eur(gain)} rispetto al capitale investito</span>}
+              </>
+            ) : (
+              <>
+                <b className={lastPerf === undefined ? '' : lastPerf >= 0 ? 'pos' : 'neg'}>{lastPerf === undefined ? '—' : pct(lastPerf)}</b>
+                <span className="small muted">rendimento del portafoglio nel periodo</span>
+              </>
+            )}
+          </p>
+          <div className="chart-toggles" role="group" aria-label={view === 'value' ? 'Linee da mostrare' : 'Indici da confrontare'}>
+            <span className="small muted">{view === 'value' ? 'Mostra anche:' : 'Confronta con:'}</span>
+            {toggles.map(t => (
+              <button
+                key={t.key}
+                type="button"
+                className="chart-toggle"
+                aria-pressed={prefs.show[t.key]}
+                style={{ '--toggle-color': colorOf(t.key) } as CSSProperties}
+                onClick={() => savePrefs(toggleLine(prefs, t.key))}
+              >
+                <span className="toggle-dot" aria-hidden="true" />
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {view === 'value' ? (
+            <LineChart series={series} format={v => eur(v)} tickFormat={eur0} label="Valore del portafoglio nel tempo" />
+          ) : (
+            <LineChart series={series} format={v => pct(v)} tickFormat={v => `${Math.round(v)}%`} zero label="Performance percentuale del portafoglio a confronto con gli indici scelti" />
+          )}
           <p className="muted small">
-            Rendimento "time-weighted": acquisti, vendite e trasferimenti non contano come guadagni. Indici convertiti in euro.
-            Prezzi e cambi di mercato (Yahoo), non quelli fiscali. Non include dividendi e interessi.
+            {view === 'value'
+              ? 'Valore: quanto vale il portafoglio ogni giorno (sale anche quando aggiungi soldi). '
+              : 'Performance: rendimento "time-weighted", acquisti, vendite e trasferimenti non contano come guadagni. Indici convertiti in euro. '}
+            Prezzi e cambi di mercato (Yahoo), non quelli fiscali. Non include dividendi e interessi. Vista e linee scelte restano salvate.
             {h.history.missing.length > 0 && ` Senza quotazioni storiche (valutati al prezzo dei movimenti): ${h.history.missing.join(', ')}.`}
           </p>
           <details>
             <summary className="small">Tabella</summary>
             <table className="pos-table chart-table">
-              <thead><tr><th>Serie</th><th className="num">Rendimento nel periodo</th></tr></thead>
+              <thead><tr><th>Serie</th><th className="num">Nel periodo</th></tr></thead>
               <tbody>
-                {last.map(l => <tr key={l.name}><td>{l.name}</td><td className="num">{l.v === undefined ? '—' : pct(l.v)}</td></tr>)}
+                <tr><td>Portafoglio</td><td className="num">{lastPerf === undefined ? '—' : pct(lastPerf)}</td></tr>
+                {benchLast.map(l => <tr key={l.name}><td>{l.name}</td><td className="num">{l.v === undefined ? '—' : pct(l.v)}</td></tr>)}
                 <tr><td>Valore attuale</td><td className="num">{eur(points.at(-1)?.valueEur)}</td></tr>
                 <tr><td>Capitale investito</td><td className="num">{eur(points.at(-1)?.investedEur)}</td></tr>
               </tbody>
