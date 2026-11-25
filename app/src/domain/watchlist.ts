@@ -203,6 +203,24 @@ export function listCounts(items: WatchItem[]): { name: string; count: number }[
   return [...m].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))
 }
 
+// ── Avvisi nel Worker: limite di richieste ────────────────────────────────────
+
+/** Piano gratuito di Cloudflare: al massimo 50 richieste verso l'esterno per ogni esecuzione del Worker. */
+export const WORKER_SUBREQUESTS = 50
+
+/**
+ * Quali titoli controllare in questo giro: un prezzo per titolo per tutti gli utenti, al massimo `budget`;
+ * se sono di più si riparte la volta dopo da `next`, così a turno vengono controllati tutti.
+ */
+export function planQuotes(symbols: string[], cursor: number, budget: number): { batch: string[]; next: number } {
+  const all = [...new Set(symbols)].sort()
+  const n = Math.max(0, Math.floor(budget))
+  if (all.length <= n) return { batch: all, next: 0 }
+  const start = cursor >= 0 && cursor < all.length ? cursor : 0
+  const batch = Array.from({ length: n }, (_, i) => all[(start + i) % all.length]!)
+  return { batch, next: (start + n) % all.length }
+}
+
 /**
  * Mette i filtri nell'ordine scelto dall'utente. Quelli che non sono nell'ordine salvato (es. una lista IBKR nuova)
  * restano in fondo, nell'ordine di partenza; le chiavi salvate che non esistono più si ignorano.

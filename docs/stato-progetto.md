@@ -19,6 +19,14 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   - **Sito vecchio:** le 3 librerie da CDN (jsPDF, autotable, xlsx) hanno l'impronta `integrity`; cambiando versione va ricalcolata.
     Restano senza impronta i moduli Firebase da gstatic (import ES).
   - Clic sulle notifiche: si aprono solo pagine dell'app.
+- **Account degli amici (25/11/2026, PR account-amici):** decisioni di Andrea: sospensione → 30 giorni di sola lettura con avviso a ogni accesso
+    e email già scritta → poi "Cancella i dati" (le regole lo permettono all'admin solo dopo `members/{uid}/deleteAfter`, e solo come cancellazione: l'admin non legge né scrive i dati degli altri).
+    Chiusura del sito: `/notice` con `closesAt` a 60 giorni, avviso in app a tutti ed email in copia nascosta. Per tutti: "Scarica i miei dati" (JSON completo di `users/{uid}`)
+    ed "Elimina il mio account" (non per l'admin). Motore `app/src/domain/accountLifecycle.ts`, schermate `components/AccountLifecycle.tsx`, 27 nuovi test delle regole.
+    Dopo l'unione serve `firebase deploy --only database`. L'account di accesso di chi viene cancellato dall'admin resta in Firebase → Authentication (solo email): si toglie da lì.
+    **Avvisi di prezzo per più utenti:** `runAlerts` (ibkr-sync) scarica un prezzo per titolo per tutti e resta sotto le 50 richieste per giro del piano gratuito Cloudflare;
+    se i titoli sono troppi li controlla a turno (`planQuotes`, cursore in `alerts_state/cursor`). Va ripubblicato il Worker.
+    **In sospeso:** cifratura dei dati degli amici (decisa: tutto cifrato tranne watchlist e soglie) (Andrea non vuole poterli leggere), nuovo nome Gruzzolo su indirizzo gratuito.
 - **v2 online** su `/portafoglio/v2/`
   - Login, registrazione con invito, PWA che si aggiorna da sola.
   - **Posizioni:** valore, PMC e risultato, con schede su telefono e tabella su PC.

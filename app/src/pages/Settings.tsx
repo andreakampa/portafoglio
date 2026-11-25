@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { readTheme, saveTheme, type ThemePref } from '../lib/theme'
 import { CacheCard, PasswordCard } from '../components/AccountCards'
 import { InvitesCard, PortfoliosCard } from '../components/PortfolioAdmin'
+import { MembersCard, MyDataCard } from '../components/AccountLifecycle'
 
 export function Settings() {
   const { signOut } = useAuth()
@@ -36,6 +37,8 @@ export function Settings() {
       </div>
       <PortfoliosCard />
       {isAdmin && <InvitesCard />}
+      {isAdmin && <MembersCard />}
+      <MyDataCard />
       <CacheCard />
       <div className="card">
         <h2>Versione</h2>

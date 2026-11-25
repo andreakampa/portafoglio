@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alertText, applyOrder, moveKey, removeText, checkAlerts, listCounts, mergeIbkrWatchlists, parseWatchlistCsv, watchId, yahooSymbol, type WatchItem } from './watchlist.ts'
+import { alertText, applyOrder, moveKey, removeText, checkAlerts, planQuotes, listCounts, mergeIbkrWatchlists, parseWatchlistCsv, watchId, yahooSymbol, type WatchItem } from './watchlist.ts'
 
 describe('avvisi di prezzo', () => {
   const item: WatchItem = { id: 'nvda', symbol: 'NVDA', above: 200, below: 150 }
@@ -84,6 +84,26 @@ describe('allineamento con IBKR', () => {
 
   it('conteggio per lista', () => {
     expect(listCounts(existing)).toEqual([{ name: 'Semiconductor', count: 1 }, { name: 'Spazio', count: 1 }, { name: 'X', count: 1 }])
+  })
+})
+
+describe('planQuotes: avvisi entro il limite di Cloudflare', () => {
+  it('tutti i titoli se ci stanno, una volta sola anche se in più watchlist', () => {
+    expect(planQuotes(['MSFT', 'AAPL', 'MSFT'], 0, 10)).toEqual({ batch: ['AAPL', 'MSFT'], next: 0 })
+  })
+  it('a turno quando sono troppi, senza saltarne nessuno', () => {
+    const s = ['A', 'B', 'C', 'D', 'E']
+    const r1 = planQuotes(s, 0, 2)
+    const r2 = planQuotes(s, r1.next, 2)
+    const r3 = planQuotes(s, r2.next, 2)
+    expect([r1.batch, r2.batch, r3.batch]).toEqual([['A', 'B'], ['C', 'D'], ['E', 'A']])
+    expect(r3.next).toBe(1)
+  })
+  it('cursore fuori misura (titoli tolti) riparte da capo', () => {
+    expect(planQuotes(['A', 'B', 'C'], 7, 2).batch).toEqual(['A', 'B'])
+  })
+  it('budget esaurito: niente', () => {
+    expect(planQuotes(['A'], 0, -3)).toEqual({ batch: [], next: 0 })
   })
 })
 

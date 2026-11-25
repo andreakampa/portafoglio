@@ -13,7 +13,7 @@
 
 import { parseFlex } from '../../../app/src/domain/ibkr/flex.ts'
 import { applyFlexOrders } from '../../../app/src/domain/ibkr/sync.ts'
-import { alertText, checkAlerts } from '../../../app/src/domain/watchlist.ts'
+import { alertText, checkAlerts, planQuotes, WORKER_SUBREQUESTS } from '../../../app/src/domain/watchlist.ts'
 import { parseYahoo } from '../../../app/src/lib/prices.ts'
 import { sendPush } from '../../../app/src/lib/webpush.ts'
 
@@ -169,37 +169,76 @@ async function quote(symbol) {
   return parseYahoo(await r.json())?.price
 }
 
-/** Controlla le soglie di tutte le watchlist e manda una notifica per ogni soglia raggiunta. */
+/**
+ * Controlla le soglie di tutte le watchlist e manda una notifica per ogni soglia raggiunta.
+ * Piano gratuito di Cloudflare: max 50 richieste per giro. Quindi un solo prezzo per titolo per tutti gli utenti
+ * e, se i titoli sono troppi, a turno (il segno di dove ripartire sta in alerts_state/cursor, non leggibile dall'app).
+ */
 export async function runAlerts(env) {
+  let used = 0
   const sa = env.EMULATOR === '1' ? null : JSON.parse(env.FIREBASE_SA)
-  const db = database(env, sa ? await accessToken(sa) : null)
+  const token = sa ? await accessToken(sa) : null
+  if (sa) used++
+  const db = database(env, token)
   const vapid = { publicKey: env.VAPID_PUBLIC, privateKey: env.VAPID_PRIVATE, subject: 'https://andreakampa.github.io/portafoglio/' }
+  const report = { users: 0, checked: 0, symbols: 0, hits: [], sent: 0, removed: 0, skipped: 0 }
+
   const users = Object.keys((await db.get('users', 'shallow=true')) ?? {})
-  const report = { users: 0, checked: 0, hits: [], sent: 0, removed: 0 }
+  const cursor = Number(await db.get('alerts_state/cursor')) || 0
+  used += 2
+  const watch = {}
   for (const uid of users) {
+    if (used >= WORKER_SUBREQUESTS - 2) { report.skipped++; continue }
     const raw = (await db.get(`users/${uid}/settings/watchlist`)) ?? {}
+    used++
     const items = Object.entries(raw).map(([id, it]) => ({ ...it, id })).filter(it => it.symbol && (it.above != null || it.below != null))
-    if (!items.length) continue
-    report.users++
-    const prices = {}
-    for (const sym of new Set(items.map(i => i.symbol))) prices[sym] = await quote(sym).catch(() => undefined)
-    report.checked += Object.keys(prices).length
+    if (items.length) watch[uid] = items
+  }
+  report.users = Object.keys(watch).length
+
+  // Restano: 1 per salvare il cursore e qualche richiesta per notifiche e segni "già avvisato".
+  const RESERVE = 10
+  const symbols = Object.values(watch).flat().map(i => i.symbol)
+  const { batch, next } = planQuotes(symbols, cursor, WORKER_SUBREQUESTS - used - 1 - RESERVE)
+  report.symbols = new Set(symbols).size
+  const prices = {}
+  for (const sym of batch) {
+    prices[sym] = await quote(sym).catch(() => undefined)
+    used++
+  }
+  report.checked = batch.length
+  if (next !== cursor) {
+    await db.put('alerts_state/cursor', next)
+    used++
+  }
+
+  const budget = () => used < WORKER_SUBREQUESTS
+  for (const [uid, items] of Object.entries(watch)) {
     const { hits, fired } = checkAlerts(items, prices)
-    if (Object.keys(fired).length) await db.patch(`users/${uid}/settings/watchlist`, Object.fromEntries(Object.entries(fired).map(([id, f]) => [`${id}/fired`, f])))
-    if (!hits.length) continue
-    report.hits.push(...hits.map(h => `${h.symbol} ${h.kind}`))
-    const subs = Object.entries((await db.get(`users/${uid}/settings/push`)) ?? {})
+    if (!hits.length && !Object.keys(fired).length) continue
+    // Senza richieste rimaste non si segna nulla: la soglia verrà notificata al giro dopo.
+    if (!budget()) break
+    const subs = hits.length ? Object.entries((await db.get(`users/${uid}/settings/push`)) ?? {}) : []
+    if (hits.length) used++
     for (const h of hits) {
+      report.hits.push(`${h.symbol} ${h.kind}`)
       for (const [sid, sub] of subs) {
-        if (!sub?.endpoint || !vapid.privateKey) continue
+        if (!sub?.endpoint || !vapid.privateKey || !budget()) continue
         const status = await sendPush(sub, { title: 'Avviso di prezzo', body: alertText(h), tag: `alert-${h.id}-${h.kind}`, url: `${APP_URL}#/watchlist` }, vapid).catch(() => 0)
-        if (status === 404 || status === 410) {
+        used++
+        if ((status === 404 || status === 410) && budget()) {
           await db.del(`users/${uid}/settings/push/${sid}`)
+          used++
           report.removed++
         } else if (status >= 200 && status < 300) report.sent++
       }
     }
+    if (Object.keys(fired).length && budget()) {
+      await db.patch(`users/${uid}/settings/watchlist`, Object.fromEntries(Object.entries(fired).map(([id, f]) => [`${id}/fired`, f])))
+      used++
+    }
   }
+  report.used = used
   return report
 }
 
