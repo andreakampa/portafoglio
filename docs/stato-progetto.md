@@ -36,6 +36,11 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     realizzate nell'anno), cassa netta, tasto MAX. Rifà il calcolo col motore vero su una copia del portafoglio: non salva nulla.
   - **Movimenti:** prezzo di negoziazione, filtri per periodo e tipo, short, margine e interessi.
   - **Grafico Andamento (Panoramica):** viste Valore e Performance come su IBKR, S&P 500 e Nasdaq 100 accendibili; scelta salvata in `settings/historyChart`.
+  - **Pannello Mercati (Panoramica, 25/11/2026):** due pagine da sfogliare. Indici: lancetta del VIX a fasce (calmo <20, nervoso 20–25,
+    paura 25–30 giallo, paura estrema da 30 rosso), Nasdaq 100, S&P 500, VIX, VXN, EUR/USD, BTC ed ETH in dollari; variazione del giorno
+    verde/rossa, prezzo che lampeggia quando cambia, aggiornamento ogni minuto con l'app in primo piano. Fuori orario sugli indici ☀️ (pre)
+    o 🌇 (sera) con la variazione del future (Yahoo non dà il pre-mercato degli indici); festività USA non considerate.
+    Futures: ES, NQ, YM, RTY con sentiment di apertura (media oltre ±0,30%). Tutto da Yahoo via proxy, logica in `domain/market.ts`.
   - **Note:** idee, prossime mosse, titoli da monitorare ed eventi con data, sincronizzate tra dispositivi.
 - **Nuovo motore** (`app/src/domain/engine/`; 123 test in tutto il progetto). Applica le regole di [regole-fiscali.md](regole-fiscali.md):
   - costo medio in amministrato, LIFO in dichiarativo;
