@@ -24,4 +24,20 @@ describe('riquadro del pannello Mercati', () => {
     expect(value.className).toContain('flash-down')
     expect(value.className).not.toContain('flash-up')
   })
+
+  it('fuori orario mostra sole (pre) o tramonto (dopo la chiusura) con la variazione del future', () => {
+    const ndx = { symbol: '^NDX', name: 'Nasdaq 100', decimals: 2, future: 'NQ=F' }
+    const { rerender, container } = render(<MarketKpi tile={ndx} quote={q(100)} phase="pre" futureQuote={q(100.5)} />)
+    expect(container.textContent).toContain('☀️')
+    expect(container.textContent).toContain('+0,50%')
+    rerender(<MarketKpi tile={ndx} quote={q(100)} phase="post" futureQuote={q(99)} />)
+    expect(container.textContent).toContain('🌇')
+    rerender(<MarketKpi tile={ndx} quote={q(100)} phase="regular" futureQuote={q(99)} />)
+    expect(container.textContent).not.toMatch(/☀️|🌇/)
+  })
+
+  it('crypto e cambio non hanno pre e post mercato', () => {
+    const { container } = render(<MarketKpi tile={tile} quote={q(100)} phase="pre" />)
+    expect(container.textContent).not.toMatch(/☀️|🌇/)
+  })
 })
