@@ -199,6 +199,7 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 - [x] Assistente: risposte formattate (grassetto, elenchi, tabelle), "Analizza portafoglio" con l'ultima analisi salvata sul dispositivo.
 
 ### Da decidere con Andrea
-- **Assistente e privacy:** il vecchio non mandava a Gemini importi in euro, la v2 manda valori e PMC.
+- [x] **Assistente e privacy** (deciso da Andrea il 25/11/2026): interruttore "Manda anche gli importi" nell'Assistente, spento ogni volta che si apre la pagina.
+      Di base solo titoli, pesi %, risultati %, numero di vendite e anni delle minus (`buildAiContext`, `amounts`), come il vecchio. PR `assistente-privacy`.
 - **IBKR dal browser:** impostazioni token/Query ID, "Scarica ora", revisione prima dell'import, annulla ultimo import.
   Nella v2 la sincronizzazione è automatica (cron delle 06:00): servono ancora?
