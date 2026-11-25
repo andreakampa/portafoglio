@@ -423,6 +423,14 @@ textarea {
 .market-extra { margin-top: 0; }
 .kpis.kpis-3, .overview-side .kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .kpis-3 .kpi { padding: 12px 10px; }
+/* Variazione del giorno colorata e lampeggio del prezzo quando cambia (come TradingView). */
+.kpi-hint.pos { color: var(--pos); }
+.kpi-hint.neg { color: var(--neg); }
+@keyframes flash-up { from { color: var(--pos); } to { color: var(--text); } }
+@keyframes flash-down { from { color: var(--neg); } to { color: var(--text); } }
+.kpi-value.flash-up { animation: flash-up 1.2s ease-out; }
+.kpi-value.flash-down { animation: flash-down 1.2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .kpi-value.flash-up, .kpi-value.flash-down { animation-timing-function: steps(1, end); } }
 
 /* ── Etichette con icona (components/Tag.tsx) ───── */
 .tag {

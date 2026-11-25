@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BENCHMARKS, useHistory } from '../data/useHistory'
 import { indexReturn, rebase } from '../domain/engine/history'
 import { FX_CRYPTO_TILES, INDEX_TILES, VIX_ALERT, dayChange, formatTilePrice, vixStatus, type MarketTile } from '../domain/market'
@@ -16,21 +16,27 @@ const eur0 = (v: number) => `${Math.round(v).toLocaleString('it-IT')} €`
 
 const n2 = (v: number) => v.toLocaleString('it-IT', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
 
-/** Indici principali, lancetta del VIX, cambio euro/dollaro e crypto (quotazioni Yahoo, aggiornate ogni 5 minuti). */
+/** Ogni quanto si aggiornano i prezzi del pannello Mercati (solo con la pagina in primo piano). */
+const MARKET_REFRESH_MS = 60 * 1000
+
+/** Indici principali, lancetta del VIX, cambio euro/dollaro e crypto (quotazioni Yahoo, aggiornate ogni minuto). */
 export function IndicesCard() {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({})
   useEffect(() => {
     let alive = true
     let retry: ReturnType<typeof setTimeout> | undefined
     // All'apertura partono molte richieste (storico dei titoli): se un indice non risponde si riprova dopo 15 secondi.
-    const load = () =>
-      loadQuotes(ALL_TILES.map(i => i.symbol)).then(q => {
+    const load = (force = false) =>
+      loadQuotes(ALL_TILES.map(i => i.symbol), force).then(q => {
         if (!alive) return
         setQuotes(prev => ({ ...prev, ...q }))
-        if (Object.keys(q).length < ALL_TILES.length) retry = setTimeout(load, 15000)
+        if (Object.keys(q).length < ALL_TILES.length) retry = setTimeout(() => void load(true), 15000)
       })
     void load()
-    const t = setInterval(load, 5 * 60 * 1000)
+    // Ogni minuto prezzi freschi (ignorando la cache di 5 minuti), ma non con l'app in secondo piano.
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') void load(true)
+    }, MARKET_REFRESH_MS)
     return () => {
       alive = false
       clearInterval(t)
@@ -55,15 +61,35 @@ export function IndicesCard() {
   )
 }
 
-function MarketKpi({ tile, quote }: { tile: MarketTile; quote: Quote | undefined }) {
+export function MarketKpi({ tile, quote }: { tile: MarketTile; quote: Quote | undefined }) {
   const ch = quote ? dayChange(quote.price, quote.previousClose) : null
+  const valueRef = usePriceFlash(quote?.price)
   return (
     <div className="kpi">
       <span className="kpi-label">{tile.name}</span>
-      <span className="kpi-value">{quote ? formatTilePrice(quote.price, tile.decimals) : '—'}</span>
+      <span className="kpi-value" ref={valueRef}>{quote ? formatTilePrice(quote.price, tile.decimals) : '—'}</span>
       <span className={`kpi-hint ${ch === null ? '' : ch >= 0 ? 'pos' : 'neg'}`}>{ch === null ? 'in caricamento' : `${pct(ch)} oggi`}</span>
     </div>
   )
+}
+
+/**
+ * Come su TradingView: quando il prezzo cambia, il numero diventa verde (sale) o rosso (scende)
+ * per un istante e poi torna al colore normale con una breve transizione.
+ */
+function usePriceFlash(price: number | undefined) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const prev = useRef(price)
+  useEffect(() => {
+    const before = prev.current
+    prev.current = price
+    const el = ref.current
+    if (!el || before === undefined || price === undefined || price === before) return
+    el.classList.remove('flash-up', 'flash-down')
+    void el.offsetWidth // fa ripartire l'animazione anche se la direzione è la stessa di prima
+    el.classList.add(price > before ? 'flash-up' : 'flash-down')
+  }, [price])
+  return ref
 }
 
 /** Semicerchio da 0 a 50 con tacca sulla soglia (25) e lancetta sul valore attuale. */
