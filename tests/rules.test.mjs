@@ -102,5 +102,43 @@ await expect('anna non legge la radice', req(anna, 'GET', ''), false);
 await expect('anna non è admin', req(anna, 'PUT', 'invites/AAAA-BBBB-CCCC', { createdBy: anna.uid }), false);
 await expect('carlo (senza invito) resta fuori', req(carlo, 'GET', `users/${carlo.uid}`), false);
 
+console.log('\nAvviso di chiusura del sito');
+await expect('non autenticati non lo leggono', req(null, 'GET', 'notice'), false);
+await expect('chi non è membro non lo legge', req(carlo, 'GET', 'notice'), false);
+await expect('un membro non lo scrive', req(anna, 'PUT', 'notice', { closesAt: 1 }), false);
+await expect('admin lo scrive', req(admin, 'PUT', 'notice', { closesAt: Date.now() + 60 * 86400000, message: 'Grazie' }), true);
+await expect('admin non scrive un avviso senza data', req(admin, 'PUT', 'notice', { message: 'x' }), false);
+await expect('un membro lo legge', req(anna, 'GET', 'notice'), true);
+await expect('admin lo toglie', req(admin, 'DELETE', 'notice'), true);
+
+console.log('\nSospensione e cancellazione');
+await req('owner', 'PUT', `users/${bruno.uid}/settings/x`, 1);
+await expect('un membro non si toglie la sospensione da solo', req(bruno, 'PUT', `members/${bruno.uid}/suspendedAt`, null), false);
+await expect('admin sospende bruno', req(admin, 'PATCH', `members/${bruno.uid}`, { suspendedAt: Date.now(), deleteAfter: Date.now() + 30 * 86400000 }), true);
+await expect('sospeso: legge ancora i suoi dati (per scaricarli)', req(bruno, 'GET', `users/${bruno.uid}`), true);
+await expect('sospeso: legge la propria sospensione', req(bruno, 'GET', `members/${bruno.uid}`), true);
+await expect('sospeso: non modifica i dati', req(bruno, 'PUT', `users/${bruno.uid}/settings/x`, 2), false);
+await expect('sospeso: non toglie la sospensione', req(bruno, 'DELETE', `members/${bruno.uid}/suspendedAt`), false);
+await expect('admin non legge i dati di bruno', req(admin, 'GET', `users/${bruno.uid}`), false);
+await expect('admin non cancella prima dei 30 giorni', req(admin, 'DELETE', `users/${bruno.uid}`), false);
+await req('owner', 'PUT', `members/${bruno.uid}/deleteAfter`, Date.now() - 1000);
+await expect('admin non scrive i dati di bruno nemmeno dopo', req(admin, 'PUT', `users/${bruno.uid}/settings/x`, 3), false);
+await expect('admin cancella dati e membro a periodo finito', req(admin, 'PATCH', '', { [`users/${bruno.uid}`]: null, [`members/${bruno.uid}`]: null }), true);
+await expect('bruno resta fuori', req(bruno, 'GET', `users/${bruno.uid}`), false);
+await expect('admin sospende anna', req(admin, 'PATCH', `members/${anna.uid}`, { suspendedAt: Date.now(), deleteAfter: Date.now() - 1000 }), true);
+await expect('admin riattiva anna', req(admin, 'PATCH', `members/${anna.uid}`, { suspendedAt: null, deleteAfter: null }), true);
+await expect('admin non cancella i dati di un membro non sospeso', req(admin, 'DELETE', `users/${anna.uid}`), false);
+await expect('anna riattivata riscrive', req(anna, 'PUT', `users/${anna.uid}/settings/x`, 1), true);
+
+console.log('\nElimina il mio account');
+const dario = await signUp('dario@test.it');
+await req('owner', 'PUT', `members/${dario.uid}`, { invite: 'DARI-OOOO-CODE', email: dario.email, suspendedAt: 1, deleteAfter: Date.now() + 86400000 });
+await req('owner', 'PUT', `users/${dario.uid}/settings/x`, 1);
+await expect('anna non cancella i dati di dario', req(anna, 'PATCH', '', { [`users/${dario.uid}`]: null, [`members/${dario.uid}`]: null }), false);
+await expect('anna non cancella il members di dario', req(anna, 'DELETE', `members/${dario.uid}`), false);
+await expect('anna cancella i propri dati e il proprio members', req(anna, 'PATCH', '', { [`users/${anna.uid}`]: null, [`members/${anna.uid}`]: null }), true);
+await expect('anna poi non legge più nulla', req(anna, 'GET', `users/${anna.uid}`), false);
+await expect('anche sospeso si può cancellare da solo', req(dario, 'PATCH', '', { [`users/${dario.uid}`]: null, [`members/${dario.uid}`]: null }), true);
+
 console.log(`\n${passed} superati, ${failed} falliti`);
 process.exit(failed ? 1 : 0);

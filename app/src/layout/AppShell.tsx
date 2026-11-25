@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
+import { AccountNotices } from '../components/AccountLifecycle'
 import { BonusRunner } from '../components/BonusRunner'
 import { PacRunner } from '../components/PacRunner'
 import { CartFab } from '../components/SimCart'
@@ -54,6 +55,7 @@ export function AppShell() {
 
       <main className="content">
         {usingEmulator && <div className="banner">Emulatore attivo: dati di prova</div>}
+        <AccountNotices />
         <PacRunner />
         <Toaster />
         <BonusRunner />
