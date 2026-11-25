@@ -31,7 +31,17 @@ export async function enablePush(uid: string): Promise<void> {
   const perm = await Notification.requestPermission()
   if (perm !== 'granted') throw new Error('Permesso per le notifiche non concesso.')
   const reg = await navigator.serviceWorker.ready
-  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: unb64u(VAPID_PUBLIC) as BufferSource }))
+  let sub: PushSubscription
+  try {
+    sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: unb64u(VAPID_PUBLIC) as BufferSource }))
+  } catch (e) {
+    // "Registration failed - push service error": il browser non riesce a parlare col suo servizio di notifiche
+    // (Brave con l'opzione spenta, finestra anonima, rete o antivirus che lo bloccano).
+    if (e instanceof Error && /push service/i.test(e.message)) {
+      throw new Error('Il browser non riesce a raggiungere il suo servizio di notifiche. Su Brave attiva «Usa i servizi Google per la messaggistica push» (brave://settings/privacy); altrimenti prova con Chrome o Edge, fuori dalla finestra anonima.')
+    }
+    throw e
+  }
   const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }
   await set(ref(db, `users/${uid}/settings/push/${await subId(json.endpoint)}`), {
     endpoint: json.endpoint, keys: json.keys, device: navigator.userAgent.slice(0, 120), createdAt: new Date().toISOString(),
