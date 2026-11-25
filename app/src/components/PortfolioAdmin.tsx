@@ -1,6 +1,7 @@
 import { onValue, ref, remove, serverTimestamp, set, update } from 'firebase/database'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useUser } from '../auth/context'
+import { useIbkrSync } from '../data/useIbkrSync'
 import { usePortfolioState } from '../data/usePortfolioState'
 import { newPortfolio, newPortfolioId, summarizePortfolios, type TaxRegime } from '../domain/portfolioState'
 import { db } from '../lib/firebase'
@@ -75,6 +76,9 @@ export function PortfoliosCard() {
   const state = usePortfolioState()
   const [adding, setAdding] = useState(false)
   const list = state.status === 'ready' ? summarizePortfolios(state.data) : []
+  const sync = useIbkrSync()
+  const [autoSync, setAutoSync] = useState<boolean | null>(null)
+  useEffect(() => onValue(ref(db, `users/${user.uid}/settings/ibkrAutoSync`), s => setAutoSync(s.val() !== false), () => setAutoSync(true)), [user.uid])
   const rename = async (id: string, current: string) => {
     const name = prompt('Nuovo nome del portafoglio', current)?.trim()
     if (name) await set(ref(db, `users/${user.uid}/portfolio_state/portfolios/${id}/name`), name.slice(0, 40))
@@ -87,6 +91,21 @@ export function PortfoliosCard() {
           <li key={p.id}>
             <span>{p.name}<br /><small className="muted">regime {p.taxRegime} · {p.assets} titoli</small></span>
             <button type="button" className="linklike" onClick={() => void rename(p.id, p.name)}>Rinomina</button>
+            {/* Solo sul portafoglio che la sincronizzazione IBKR aggiorna: sugli altri broker non ha senso. */}
+            {sync?.portfolioId === p.id && autoSync != null && (
+              <label className="check small ibkr-auto">
+                <input
+                  type="checkbox"
+                  checked={autoSync}
+                  onChange={e => void set(ref(db, `users/${user.uid}/settings/ibkrAutoSync`), e.target.checked)}
+                />
+                <span>
+                  Scarica i movimenti da IBKR ogni mattina
+                  <br />
+                  <span className="muted">{autoSync ? 'Attivo: ogni mattina presto arrivano operazioni, dividendi e interessi. Puoi sempre inserire anche a mano.' : 'In pausa: i movimenti si inseriscono solo a mano.'}</span>
+                </span>
+              </label>
+            )}
           </li>
         ))}
       </ul>

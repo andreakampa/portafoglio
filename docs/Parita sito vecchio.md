@@ -201,5 +201,6 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 ### Da decidere con Andrea
 - [x] **Assistente e privacy** (deciso da Andrea il 25/11/2026): interruttore "Manda anche gli importi" nell'Assistente, spento ogni volta che si apre la pagina.
       Di base solo titoli, pesi %, risultati %, numero di vendite e anni delle minus (`buildAiContext`, `amounts`), come il vecchio. PR `assistente-privacy`.
-- **IBKR dal browser:** impostazioni token/Query ID, "Scarica ora", revisione prima dell'import, annulla ultimo import.
-  Nella v2 la sincronizzazione è automatica (cron delle 06:00): servono ancora?
+- [x] **IBKR dal browser** (deciso da Andrea il 25/11/2026): niente token, "Scarica ora" o revisione nel browser della v2, basta la sincronizzazione automatica.
+      L'inserimento a mano resta sempre. In Impostazioni → Portafogli, solo sul portafoglio aggiornato da `ibkr-sync`, l'interruttore "Scarica i movimenti da IBKR ogni mattina"
+      (`settings/ibkrAutoSync`, false = pausa; il Worker scrive `portfolioId` e `paused` in `ibkr_sync`). L'automatico per altri utenti si farà quando servirà. PR `ibkr-interruttore`.
