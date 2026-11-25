@@ -13,10 +13,10 @@ describe('riassunto per l’assistente AI', () => {
     },
   }
 
-  it('posizioni aperte, fiscale dell’anno, movimenti recenti; niente nome del conto', () => {
+  it('con gli importi attivati: posizioni aperte, fiscale dell’anno, movimenti recenti; niente nome del conto', () => {
     const result = computePortfolio(portfolio, () => 1)
     const rows = valuePositions(portfolio.assets, result.positions, { NVDA: { price: 120, previousClose: 118, currency: 'EUR' } }, {})
-    const ctx = buildAiContext({ portfolio, result, rows, totals: totals(rows), today: '2026-11-22' })
+    const ctx = buildAiContext({ portfolio, result, rows, totals: totals(rows), today: '2026-11-22', amounts: true })
     expect(ctx.regimeFiscale).toBe('dichiarativo')
     expect(ctx.posizioni).toEqual([expect.objectContaining({ titolo: 'NVDA', quantita: 6, prezzo: 120, valoreEur: 720 })])
     expect(ctx.fiscaleAnno).toMatchObject({ anno: 2026, plusEur: 200 })
@@ -24,5 +24,16 @@ describe('riassunto per l’assistente AI', () => {
     const text = JSON.stringify(ctx)
     expect(text).not.toContain('Mario')
     expect(text.length).toBeLessThan(30000)
+  })
+
+  it('di base niente importi, quantità o prezzi: solo pesi e percentuali', () => {
+    const result = computePortfolio(portfolio, () => 1)
+    const rows = valuePositions(portfolio.assets, result.positions, { NVDA: { price: 120, previousClose: 118, currency: 'EUR' } }, {})
+    const ctx = buildAiContext({ portfolio, result, rows, totals: totals(rows), today: '2026-11-22' })
+    expect(ctx.posizioni).toEqual([{ titolo: 'NVDA', valuta: 'EUR', short: undefined, pesoPct: 100, risultatoPct: 20 }])
+    expect(ctx.ultimiMovimenti[0]).toEqual({ s: 'NVDA', d: '2026-03-02', t: 'sell' })
+    expect(ctx.fiscaleAnno).toEqual({ anno: 2026, venditeInGuadagno: 1, venditeInPerdita: 0, minusDaUsare: [] })
+    const text = JSON.stringify(ctx)
+    for (const n of ['720', '600', '200', '150', 'Eur"']) expect(text).not.toContain(n)
   })
 })

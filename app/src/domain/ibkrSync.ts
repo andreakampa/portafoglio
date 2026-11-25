@@ -11,6 +11,10 @@ export interface SyncStatus {
   cashAdded: string[]
   review: string[]
   skipped: string[]
+  /** Portafoglio che la sincronizzazione aggiorna (scritto dal Worker). */
+  portfolioId?: string
+  /** true = l'ultimo giro non ha scaricato nulla perché l'utente l'ha messa in pausa. */
+  paused?: boolean
   /** Ultimo errore (resta finché una sincronizzazione non riesce di nuovo). */
   lastError?: { at: string; message: string }
 }
@@ -32,6 +36,8 @@ export function syncStatusFromDb(raw: unknown): SyncStatus | null {
     cashAdded: strings(r.cashAdded),
     review: strings(r.review),
     skipped: strings(r.skipped),
+    portfolioId: typeof r.portfolioId === 'string' ? r.portfolioId : undefined,
+    paused: r.paused === true || undefined,
     lastError: err && typeof err.message === 'string' ? { at: typeof err.at === 'string' ? err.at : '', message: err.message } : undefined,
   }
 }

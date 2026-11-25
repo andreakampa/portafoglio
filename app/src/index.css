@@ -235,6 +235,9 @@ select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .fiscal-lines li { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .fiscal-line > summary, .fiscal-line-plain { display: flex; justify-content: space-between; gap: 12px; }
 .fiscal-lines li:last-child { border-bottom: none; }
+.loss-usage { list-style: none; margin: 4px 0 0; padding: 0 0 0 12px; border-left: 2px solid var(--border); }
+.loss-usage li { padding: 1px 0; border: none; }
+.fiscal-line-actions { margin-top: 6px; }
 .fiscal-line > summary > .num, .fiscal-line-plain > .num { display: grid; justify-items: end; align-content: start; gap: 2px; }
 
 /* ── Movimenti ───────────────────────────────────── */
@@ -780,3 +783,7 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .stress-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
 .stress-legend i.zone { height: 10px; background: var(--neg); opacity: .3; }
 .stress form.inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Impostazioni → Portafogli: interruttore della sincronizzazione IBKR sotto il nome del portafoglio. */
+.plain-list li:has(.ibkr-auto) { flex-wrap: wrap; }
+.ibkr-auto { flex-basis: 100%; align-items: flex-start; margin-top: 6px; }
