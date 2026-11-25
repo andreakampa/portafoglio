@@ -64,6 +64,10 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
   (tasso attuale, 360 giorni; 365 per GBP/CAD/AUD…). Compare solo per i portafogli con `marginStatus`.
 - **Avviso leva:** campo "Leva massima" nel riquadro, **salvato su Firebase** (`users/{uid}/settings/maxLeverage`, uguale su tutti i dispositivi e in tempo reale);
   avviso giallo sopra il 90% della soglia, rosso sopra la soglia. Da fare, se serve: notifica push.
+- **Stress test della leva (25/11/2026, in PR):** nel riquadro Margine, cursore e campo % "Se il portafoglio cambia di…" (da −70% a +50%, scenari 2022/Covid/2008):
+  valore delle posizioni, patrimonio netto, leva, liquidità in eccesso e a quale calo scatta la margin call (`domain/engine/marginStress.ts`).
+  Il report Flex non contiene il margine di mantenimento: si usa il 25% (standard IBKR azioni), correggibile nel campo "Mantenimento IBKR"
+  (salvato in `users/{uid}/settings/maintMarginPct`).
 - **Saldo a margine su ogni acquisto (fatto):** nei Movimenti, sotto ogni acquisto, "conto a margine: X USD" oppure "conto senza margine". Dati da `marginDaily`;
   `marginHistoryFrom` è il primo giorno coperto dai report (dove non ci sono righe di debito il conto era senza margine; prima non si mostra nulla).
 - **Storico dell'anno da IBKR:** il Flex Web Service accetta le date `fd`/`td` (max 365 giorni, l'ultimo giorno disponibile è l'ultimo lavorativo chiuso).
