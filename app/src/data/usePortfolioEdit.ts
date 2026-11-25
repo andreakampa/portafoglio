@@ -5,7 +5,7 @@ import type { RawAsset, RawTx } from '../domain/engine/types'
 import type { MarginInterestRow } from '../domain/engine/movements'
 import type { StoredManualLoss } from '../domain/manualLosses'
 import { isRecorded } from '../domain/pac'
-import { addToList, buildTransferPair, findSameAsset, findTransfer, removeFromList, replaceInList, transferWrites, type PortfolioLike, type TransferForm, type TxRef } from '../domain/txEdit'
+import { addToList, buildTransferPair, confirmInList, findSameAsset, findTransfer, removeFromList, replaceInList, transferWrites, type PortfolioLike, type TransferForm, type TxRef } from '../domain/txEdit'
 import { db } from '../lib/firebase'
 
 type Asset = RawAsset & { isin?: string; commDefault?: number }
@@ -106,6 +106,13 @@ export function usePortfolioEdit() {
       save: (pid: string, aid: string, at: TxRef, tx: RawTx) =>
         change(pid, aid, cur => {
           const list = cur ? replaceInList(cur.transactions ?? [], at, tx) : null
+          return cur && list ? clean({ ...cur, transactions: list }) : undefined
+        }),
+
+      /** Conferma i movimenti indicati così come sono (toglie "da confermare"). */
+      confirm: (pid: string, aid: string, refs: TxRef[]) =>
+        change(pid, aid, cur => {
+          const list = cur ? confirmInList(cur.transactions ?? [], refs) : null
           return cur && list ? clean({ ...cur, transactions: list }) : undefined
         }),
 

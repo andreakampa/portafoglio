@@ -22,6 +22,8 @@ export interface TxForm {
   commissionCurrency: string
   /** Rata di un piano di accumulo: è un acquisto segnato come PAC. */
   pac: boolean
+  /** Importo della rata PAC in euro (facoltativo). */
+  pacAmount?: string
 }
 
 /** Come ritrovare un movimento nell'elenco: per id, altrimenti per posizione controllando che sia lo stesso. */
@@ -61,8 +63,11 @@ export function buildTx(f: TxForm, newId: () => string, previous?: RawTx): RawTx
     commission,
     commissionCurrency: f.commissionCurrency.toUpperCase(),
   }
-  if (f.pac && f.type === 'buy') tx.source = 'pac'
-  else if (tx.source === 'pac') delete tx.source
+  if (f.pac && f.type === 'buy') {
+    tx.source = 'pac'
+    const amount = f.pacAmount?.trim() ? num(f.pacAmount) : NaN
+    if (amount > 0) tx.importoPac = amount
+  } else if (tx.source === 'pac') delete tx.source
   // Salvando la maschera l'utente conferma il prezzo: non è più una stima.
   delete tx.priceEstimated
   // I cambi storici li mette il motore: un cambio rimasto da un vecchio inserimento non deve falsare il nuovo prezzo.
@@ -80,6 +85,7 @@ export function formFromTx(t: RawTx, assetCurrency: string): TxForm {
     commission: t.commission ? String(t.commission) : '',
     commissionCurrency: (t.commissionCurrency || 'EUR').toUpperCase() || assetCurrency,
     pac: t.source === 'pac',
+    pacAmount: Number(t.importoPac) > 0 ? String(t.importoPac) : '',
   }
 }
 
@@ -102,6 +108,42 @@ export function replaceInList(list: RawTx[], ref: TxRef, tx: RawTx): RawTx[] | n
   const next = [...list]
   next[i] = tx
   return sortByDate(next)
+}
+
+/** Toglie il segno "da confermare" ai movimenti indicati: prezzo e quantità restano come sono. Null se uno non c'è più. */
+export function confirmInList(list: RawTx[], refs: TxRef[]): RawTx[] | null {
+  const next = [...list]
+  for (const r of refs) {
+    const i = locate(next, r)
+    if (i < 0) return null
+    const t = { ...next[i] } as RawTx
+    delete t.priceEstimated
+    next[i] = t
+  }
+  return next
+}
+
+// ── Rate PAC: quantità dal prezzo ─────────────────────────────────────────────
+
+const round6 = (n: number) => Math.round(n * 1e6) / 1e6
+
+/**
+ * Unità della valuta del titolo per 1 euro di rata: 1 per i titoli in euro; per gli altri si ricava dalla rata
+ * com'era (quantità × prezzo ÷ importo), così il cambio del giorno resta quello usato quando è stata creata.
+ */
+export function pacRate(currency: string, previous?: RawTx): number | null {
+  if (currency.toUpperCase() === 'EUR') return 1
+  const amount = Number(previous?.importoPac)
+  const native = Number(previous?.qty) * Number(previous?.price)
+  return amount > 0 && native > 0 ? native / amount : null
+}
+
+/** Quantità di una rata: importo in euro × cambio ÷ prezzo, a 6 decimali (come le rate create dal piano). */
+export function pacQty(amountEur: string, price: string, rate: number | null): number | null {
+  const a = num(amountEur)
+  const p = num(price)
+  if (!rate || !(a > 0) || !(p > 0)) return null
+  return round6((a * rate) / p)
 }
 
 export function removeFromList(list: RawTx[], ref: TxRef): RawTx[] | null {

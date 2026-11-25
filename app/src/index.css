@@ -434,10 +434,18 @@ b + .tag, .tag + .badge { margin-left: 8px; }
 .tag-sim { color: var(--sim); background: var(--sim-bg); }
 .tag-history, .tag-neutral { color: var(--text); background: transparent; border-color: var(--border); }
 .tag-edit { color: var(--edit); background: transparent; border-color: currentColor; }
+.tag-confirm { color: var(--pos); background: transparent; border-color: currentColor; }
 .tag-delete { color: var(--delete); background: transparent; border-color: var(--delete-line); }
 .tag-btn { min-height: 32px; padding: 0 10px; border-radius: 8px; font-size: .82rem; cursor: pointer; }
 .tag-btn:hover { background: var(--surface-2); }
 .badge-warn { background: var(--warn-tint); color: var(--warn); }
+.pac-auto { display: block; margin-top: 4px; color: var(--primary); font-weight: 600; }
+.confirm-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; margin: 12px 0; border-radius: var(--radius); background: var(--warn-bg); border: 1px solid var(--warn-border); }
+.confirm-banner > div { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
+.confirm-banner b { color: var(--warn); }
+.confirm-list { list-style: none; margin: 12px 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); }
+.confirm-list li + li { border-top: 1px solid var(--border); }
+.confirm-list label { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; font-variant-numeric: tabular-nums; }
 
 /* Righe secondarie dentro le celle (quantità, variazione, di cui cambio…). */
 .cell-sub { display: block; font-size: .8rem; }
