@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BENCHMARKS, useHistory } from '../data/useHistory'
 import { indexReturn, rebase } from '../domain/engine/history'
-import { VIX_ALERT, vixStatus } from '../domain/market'
+import { FUTURES_TILES, FX_CRYPTO_TILES, INDEX_TILES, VIX_ALERT, VIX_BANDS, VIX_EXTREME, dayChange, formatTilePrice, openingSentiment, usMarketPhase, vixStatus, type MarketTile, type UsPhase } from '../domain/market'
 import type { RawPortfolio } from '../domain/engine/portfolio'
 import { loadQuotes, type Quote } from '../lib/prices'
 import { eur, pct } from '../lib/format'
@@ -10,32 +10,36 @@ import { useHistoryChartPrefs } from '../data/useHistoryChartPrefs'
 import { TOGGLES, setView, toggleLine, type ToggleKey } from '../domain/historyChart'
 import { localToday } from '../lib/today'
 
-const INDICES = [
-  { symbol: '^NDX', name: 'Nasdaq 100' },
-  { symbol: '^GSPC', name: 'S&P 500' },
-  { symbol: '^VIX', name: 'VIX' },
-  { symbol: '^VXN', name: 'VXN' },
-]
+const ALL_TILES = [...INDEX_TILES, ...FX_CRYPTO_TILES, ...FUTURES_TILES]
 const TODAY = localToday()
 const eur0 = (v: number) => `${Math.round(v).toLocaleString('it-IT')} €`
 
 const n2 = (v: number) => v.toLocaleString('it-IT', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
 
-/** Indici principali e lancetta del VIX (quotazioni Yahoo, aggiornate ogni 5 minuti). */
+/** Ogni quanto si aggiornano i prezzi del pannello Mercati (solo con la pagina in primo piano). */
+const MARKET_REFRESH_MS = 60 * 1000
+
+/** Indici principali, lancetta del VIX, cambio euro/dollaro e crypto (quotazioni Yahoo, aggiornate ogni minuto). */
 export function IndicesCard() {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({})
+  // Fase della borsa USA (pre, seduta, dopo la chiusura): si ricalcola a ogni aggiornamento dei prezzi.
+  const [phase, setPhase] = useState<UsPhase>(() => usMarketPhase(new Date()))
   useEffect(() => {
     let alive = true
     let retry: ReturnType<typeof setTimeout> | undefined
     // All'apertura partono molte richieste (storico dei titoli): se un indice non risponde si riprova dopo 15 secondi.
-    const load = () =>
-      loadQuotes(INDICES.map(i => i.symbol)).then(q => {
+    const load = (force = false) =>
+      loadQuotes(ALL_TILES.map(i => i.symbol), force).then(q => {
         if (!alive) return
         setQuotes(prev => ({ ...prev, ...q }))
-        if (Object.keys(q).length < INDICES.length) retry = setTimeout(load, 15000)
+        setPhase(usMarketPhase(new Date()))
+        if (Object.keys(q).length < ALL_TILES.length) retry = setTimeout(() => void load(true), 15000)
       })
     void load()
-    const t = setInterval(load, 5 * 60 * 1000)
+    // Ogni minuto prezzi freschi (ignorando la cache di 5 minuti), ma non con l'app in secondo piano.
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') void load(true)
+    }, MARKET_REFRESH_MS)
     return () => {
       alive = false
       clearInterval(t)
@@ -43,31 +47,123 @@ export function IndicesCard() {
     }
   }, [])
   const vix = quotes['^VIX']?.price
+  const [page, setPage] = useState(0)
+  const pagesRef = useRef<HTMLDivElement>(null)
+  const goTo = (i: number) => {
+    const el = pagesRef.current
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' })
+    setPage(i)
+  }
+  const onScroll = () => {
+    const el = pagesRef.current
+    if (el && el.clientWidth) setPage(Math.round(el.scrollLeft / el.clientWidth))
+  }
+  const futChanges = FUTURES_TILES.map(t => {
+    const q = quotes[t.symbol]
+    return q ? dayChange(q.price, q.previousClose) : null
+  })
+  const sentiment = openingSentiment(futChanges)
 
   return (
     <div className="card">
-      <h2>Mercati</h2>
-      <div className="market-grid">
-        {vix !== undefined && <VixGauge value={vix} />}
-        <div className="kpis">
-          {INDICES.map(i => {
-            const q = quotes[i.symbol]
-            const ch = q?.previousClose ? ((q.price - q.previousClose) / q.previousClose) * 100 : null
-            return (
-              <div key={i.symbol} className="kpi">
-                <span className="kpi-label">{i.name}</span>
-                <span className="kpi-value">{q ? n2(q.price) : '—'}</span>
-                <span className={`kpi-hint ${ch === null ? '' : ch >= 0 ? 'pos' : 'neg'}`}>{ch === null ? 'in caricamento' : `${pct(ch)} oggi`}</span>
-              </div>
-            )
-          })}
+      <div className="chart-head">
+        <h2>Mercati</h2>
+        <div className="seg" role="group" aria-label="Pagina del pannello Mercati">
+          <button type="button" aria-pressed={page === 0} onClick={() => goTo(0)}>Indici</button>
+          <button type="button" aria-pressed={page === 1} onClick={() => goTo(1)}>Futures</button>
         </div>
+      </div>
+      <div className="market-pages" ref={pagesRef} onScroll={onScroll}>
+        <section className="market-page" aria-label="Indici, cambio e crypto">
+          <div className="market-grid">
+            {vix !== undefined && <VixGauge value={vix} />}
+            <div className="kpis">
+              {INDEX_TILES.map(t => (
+                <MarketKpi key={t.symbol} tile={t} quote={quotes[t.symbol]} phase={phase} futureQuote={t.future ? quotes[t.future] : undefined} />
+              ))}
+            </div>
+          </div>
+          <div className="kpis kpis-3 market-extra" role="group" aria-label="Cambio euro/dollaro e crypto">
+            {FX_CRYPTO_TILES.map(t => <MarketKpi key={t.symbol} tile={t} quote={quotes[t.symbol]} />)}
+          </div>
+        </section>
+        <section className="market-page" aria-label="Futures USA">
+          <p className={`sentiment ${sentiment ? sentiment.key : ''}`}>
+            {sentiment ? (
+              <>
+                <span aria-hidden="true">{sentiment.key === 'pos' ? '▲' : sentiment.key === 'neg' ? '▼' : '●'}</span> Sentiment di apertura: <b>{sentiment.label}</b>
+                <small> (media {pct(sentiment.avg)})</small>
+              </>
+            ) : 'Futures in caricamento'}
+          </p>
+          <div className="kpis">
+            {FUTURES_TILES.map(t => <MarketKpi key={t.symbol} tile={t} quote={quotes[t.symbol]} />)}
+          </div>
+          <p className="muted small">
+            I futures si scambiano quasi 24 ore su 24: la variazione è rispetto alla chiusura di ieri e anticipa l'apertura di Wall Street (15:30 ora italiana).
+            Positivo o negativo oltre ±0,30% di media.
+          </p>
+        </section>
+      </div>
+      <div className="market-dots" aria-hidden="true">
+        <span className={page === 0 ? 'on' : ''} />
+        <span className={page === 1 ? 'on' : ''} />
       </div>
     </div>
   )
 }
 
-/** Semicerchio da 0 a 50 con tacca sulla soglia (25) e lancetta sul valore attuale. */
+/** Variazione fuori orario: quella di Yahoo, se c'è, altrimenti quella del future dell'indice. */
+function offHours(phase: UsPhase | undefined, quote: Quote | undefined, futureQuote: Quote | undefined): { kind: 'pre' | 'post'; pct: number; fromFuture: boolean } | null {
+  if (quote?.ext) return { kind: quote.ext.kind, pct: quote.ext.pct, fromFuture: false }
+  if ((phase === 'pre' || phase === 'post') && futureQuote) {
+    const ch = dayChange(futureQuote.price, futureQuote.previousClose)
+    if (ch !== null) return { kind: phase, pct: ch, fromFuture: true }
+  }
+  return null
+}
+
+export function MarketKpi({ tile, quote, phase, futureQuote }: { tile: MarketTile; quote: Quote | undefined; phase?: UsPhase; futureQuote?: Quote }) {
+  const ch = quote ? dayChange(quote.price, quote.previousClose) : null
+  const valueRef = usePriceFlash(quote?.price)
+  const off = tile.future ? offHours(phase, quote, futureQuote) : null
+  const offLabel = off ? (off.kind === 'pre' ? 'Pre-mercato' : 'Dopo la chiusura') : ''
+  return (
+    <div className="kpi">
+      <span className="kpi-label">{tile.name}</span>
+      <span className="kpi-value" ref={valueRef}>{quote ? formatTilePrice(quote.price, tile.decimals) : '—'}</span>
+      <span className={`kpi-hint ${ch === null ? '' : ch >= 0 ? 'pos' : 'neg'}`}>{ch === null ? 'in caricamento' : `${pct(ch)} oggi`}</span>
+      {off && (
+        <span className="kpi-hint kpi-off" title={`${offLabel}${off.fromFuture ? ' (dal future)' : ''}: ${pct(off.pct)}`}>
+          <span aria-hidden="true">{off.kind === 'pre' ? '☀️' : '🌇'}</span>
+          <span className="sr-only">{offLabel}</span> <span className={off.pct >= 0 ? 'pos' : 'neg'}>{pct(off.pct)}</span>
+          {off.fromFuture && <span> fut.</span>}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Come su TradingView: quando il prezzo cambia, il numero diventa verde (sale) o rosso (scende)
+ * per un istante e poi torna al colore normale con una breve transizione.
+ */
+function usePriceFlash(price: number | undefined) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const prev = useRef(price)
+  useEffect(() => {
+    const before = prev.current
+    prev.current = price
+    const el = ref.current
+    if (!el || before === undefined || price === undefined || price === before) return
+    el.classList.remove('flash-up', 'flash-down')
+    void el.offsetWidth // fa ripartire l'animazione anche se la direzione è la stessa di prima
+    el.classList.add(price > before ? 'flash-up' : 'flash-down')
+  }, [price])
+  return ref
+}
+
+/** Semicerchio da 0 a 50 con fasce colorate (verde, giallo, rosso), tacca sulla soglia (25) e lancetta sul valore attuale. */
 function VixGauge({ value }: { value: number }) {
   const max = 50
   const st = vixStatus(value)
@@ -76,14 +172,15 @@ function VixGauge({ value }: { value: number }) {
   const [nx, ny] = pt(value, 44)
   const [t1x, t1y] = pt(VIX_ALERT, 40)
   const [t2x, t2y] = pt(VIX_ALERT, 56)
-  const arc = (from: number, to: number) => {
-    const [ax, ay] = pt(from, 50)
-    const [bx, by] = pt(to, 50)
-    return `M ${ax} ${ay} A 50 50 0 0 1 ${bx} ${by}`
+  const arc = (from: number, to: number, r = 50) => {
+    const [ax, ay] = pt(from, r)
+    const [bx, by] = pt(to, r)
+    return `M ${ax} ${ay} A ${r} ${r} 0 0 1 ${bx} ${by}`
   }
   return (
     <figure className="vix-gauge" aria-label={`VIX ${n2(value)}: ${st.label}. Soglia di attenzione ${VIX_ALERT}.`}>
-      <svg viewBox="0 0 120 72" width="160" height="96" role="img">
+      <svg viewBox="-2 -2 124 74" width="160" height="96" role="img">
+        {VIX_BANDS.map(b => <path key={b.key} d={arc(b.from, b.to, 58)} className={`gauge-band status-${b.key}`} />)}
         <path d={arc(0, max)} className="gauge-track" />
         <path d={arc(0, Math.min(value, max))} className={`gauge-fill status-${st.key}`} />
         <line x1={t1x} y1={t1y} x2={t2x} y2={t2y} className="gauge-tick" />
@@ -91,9 +188,15 @@ function VixGauge({ value }: { value: number }) {
         <circle cx={60} cy={60} r={3.5} className="gauge-hub" />
       </svg>
       <figcaption>
-        <b>VIX {n2(value)}</b> <span className={`status-pill status-${st.key}`}>{st.key === 'critical' ? '▲' : st.key === 'warning' ? '●' : '▼'} {st.label}</span>
+        <b>VIX {n2(value)}</b> <span className={`status-pill status-${st.key}`}>{st.key === 'critical' ? '▲▲' : st.key === 'warning' ? (value >= VIX_ALERT ? '▲' : '●') : '▼'} {st.label}</span>
         <br />
-        <small className="muted">soglia {VIX_ALERT}: {value >= VIX_ALERT ? 'superata' : `mancano ${n2(VIX_ALERT - value)} punti`}</small>
+        <small className="muted">
+          {value >= VIX_EXTREME
+            ? `soglie ${VIX_ALERT} e ${VIX_EXTREME} superate`
+            : value >= VIX_ALERT
+              ? `soglia ${VIX_ALERT} superata · paura estrema da ${VIX_EXTREME}`
+              : `soglia ${VIX_ALERT}: mancano ${n2(VIX_ALERT - value)} punti`}
+        </small>
       </figcaption>
     </figure>
   )

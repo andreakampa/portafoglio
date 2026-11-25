@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUser } from '../auth/context'
 import { useWatchlist } from '../data/useWatchlist'
-import { listCounts, parseWatchlistCsv, type WatchItem } from '../domain/watchlist'
+import { applyOrder, listCounts, removeText, parseWatchlistCsv, type WatchItem } from '../domain/watchlist'
+import { useWatchFilterOrder } from '../data/useWatchFilterOrder'
+import { SortablePills } from '../components/SortablePills'
 import { TickerSearch } from '../components/TickerSearch'
 import { pct } from '../lib/format'
 import { loadQuotes, type Quote } from '../lib/prices'
@@ -32,12 +34,13 @@ export function Watchlist() {
   })
   const all = w.items ?? []
   const hasThreshold = (i: WatchItem) => i.above != null || i.below != null
-  const filters = [
+  const [order, saveOrder] = useWatchFilterOrder()
+  const filters = applyOrder([
     { key: 'tutte', label: 'Tutte', count: all.length },
     { key: 'soglie', label: 'Con soglia', count: all.filter(hasThreshold).length },
     { key: 'mie', label: 'Aggiunte da me', count: all.filter(i => i.source !== 'ibkr').length },
     ...listCounts(all).map(l => ({ key: `lista:${l.name}`, label: l.name, count: l.count })),
-  ].filter(f => f.key === 'tutte' || f.count > 0)
+  ].filter(f => f.key === 'tutte' || f.count > 0), order)
   const active = filters.some(f => f.key === filter) ? filter : 'tutte'
   const shown = all.filter(i =>
     active === 'tutte' ? true
@@ -110,13 +113,10 @@ export function Watchlist() {
       </form>
 
       {w.items !== null && w.items.length > 0 && (
-        <div className="pills watch-filter" role="tablist" aria-label="Filtra la watchlist">
-          {filters.map(f => (
-            <button key={f.key} type="button" role="tab" aria-selected={filter === f.key} className={`pill small-pill ${filter === f.key ? 'active' : ''}`} onClick={() => setFilter(f.key)}>
-              {f.label} <span className="pill-sub">{f.count}</span>
-            </button>
-          ))}
-        </div>
+        <>
+          <SortablePills label="Filtra la watchlist" items={filters} active={active} onSelect={setFilter} onReorder={keys => void saveOrder(keys)} />
+          <p className="muted small watch-hint">Trascina i filtri per metterli nell’ordine che preferisci (sul telefono: tieni premuto e poi trascina).</p>
+        </>
       )}
 
       {w.items === null ? (
@@ -152,6 +152,9 @@ function WatchRow({ it, q, editing, onEdit, save, remove }: {
   return (
     <li className="card mov-item">
       <div className="mov-head">
+        {(it.above != null || it.below != null) && (
+          <span className="watch-dot" role="img" aria-label="Soglia impostata" title={[it.above != null && `sopra ${price(it.above)}`, it.below != null && `sotto ${price(it.below)}`].filter(Boolean).join(' · ')} />
+        )}
         <b>{it.symbol}</b>
         {it.name && <span className="muted small">{it.name}</span>}
         {(hitAbove || hitBelow) && <span className="badge status-pill status-critical">▲ soglia raggiunta</span>}
@@ -169,7 +172,7 @@ function WatchRow({ it, q, editing, onEdit, save, remove }: {
       </div>
       <span className="note-actions">
         <button type="button" className="linklike" onClick={onEdit}>{editing ? 'Chiudi' : 'Soglie e nota'}</button>
-        <button type="button" className="linklike neg" onClick={() => { if (confirm(`Togliere ${it.symbol} dalla watchlist?`)) void remove(it.id) }}>Togli</button>
+        <button type="button" className="linklike neg" title={it.source === 'ibkr' ? 'Lo toglie solo dall’app: su IBKR resta' : undefined} onClick={() => { if (confirm(removeText(it))) void remove(it.id) }}>Togli</button>
       </span>
       {editing && (
         <form className="note-form" onSubmit={e => { e.preventDefault(); void save(it.id, { above: num(above), below: num(below), note }).then(onEdit) }}>

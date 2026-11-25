@@ -252,7 +252,8 @@ select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .kind { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: .75rem; font-weight: 650; background: var(--surface-2); color: var(--muted); }
 /* Otto colonne stanno comode solo da 1200px: prima, schede (mai scorrimento laterale). */
 @media (min-width: 900px) and (pointer: fine), (min-width: 1200px) { .mov-table.pos-table { display: none; } }
-@media (min-width: 1200px) { .mov-list { display: none; } .mov-table.pos-table { display: table; } }
+/* Solo i Movimenti hanno la tabella al posto delle schede: la watchlist resta a schede anche su schermi larghi. */
+@media (min-width: 1200px) { .mov-list:not(.watch-list) { display: none; } .mov-table.pos-table { display: table; } }
 html, body { overflow-x: hidden; }
 .content { min-width: 0; }
 
@@ -349,12 +350,16 @@ textarea {
 .gauge-fill.status-good { stroke: var(--status-good); }
 .gauge-fill.status-warning { stroke: var(--status-warning); }
 .gauge-fill.status-critical { stroke: var(--status-critical); }
+.gauge-band { fill: none; stroke-width: 3; opacity: .85; }
+.gauge-band.status-good { stroke: var(--status-good); }
+.gauge-band.status-warning { stroke: var(--status-warning); }
+.gauge-band.status-critical { stroke: var(--status-critical); }
 .gauge-tick { stroke: var(--text); stroke-width: 2; }
 .gauge-needle { stroke: var(--text); stroke-width: 2; stroke-linecap: round; }
 .gauge-hub { fill: var(--text); }
 .status-pill { font-size: .8rem; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
 .status-pill.status-good { color: var(--pos); }
-.status-pill.status-warning { color: var(--text); border-color: var(--status-warning); }
+.status-pill.status-warning { color: var(--status-warning); }
 .status-pill.status-critical { color: var(--neg); }
 
 .regime-choice { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
@@ -419,6 +424,31 @@ textarea {
   .overview-side .market-grid { grid-template-columns: 1fr; justify-items: center; }
   .overview-side .market-grid .kpis { width: 100%; }
 }
+/* Mercati: cambio euro/dollaro e crypto, sempre tre riquadri in fila sotto gli indici. */
+.market-extra { margin-top: 0; }
+.kpis.kpis-3, .overview-side .kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kpis-3 .kpi { padding: 12px 10px; }
+/* Variazione del giorno colorata e lampeggio del prezzo quando cambia (come TradingView). */
+.kpi-hint.pos { color: var(--pos); }
+.kpi-hint.neg { color: var(--neg); }
+@keyframes flash-up { from { color: var(--pos); } to { color: var(--text); } }
+@keyframes flash-down { from { color: var(--neg); } to { color: var(--text); } }
+.kpi-value.flash-up { animation: flash-up 1.2s ease-out; }
+.kpi-value.flash-down { animation: flash-down 1.2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .kpi-value.flash-up, .kpi-value.flash-down { animation-timing-function: steps(1, end); } }
+/* Mercati su due pagine da sfogliare (Indici, Futures): scorrimento orizzontale con aggancio. */
+.market-pages { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.market-pages::-webkit-scrollbar { display: none; }
+.market-page { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; display: grid; gap: 10px; align-content: start; }
+.market-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+.market-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.market-dots span.on { background: var(--text); }
+.kpi-off { font-variant-numeric: tabular-nums; }
+.kpi-off .pos, .kpi-off .neg { font-weight: 600; }
+.sentiment { margin: 0; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--border); }
+.sentiment.pos { color: var(--pos); border-color: currentColor; }
+.sentiment.neg { color: var(--neg); border-color: currentColor; }
+.sentiment small { color: var(--muted); }
 
 /* ── Etichette con icona (components/Tag.tsx) ───── */
 .tag {
@@ -810,3 +840,12 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 /* Impostazioni → Portafogli: interruttore della sincronizzazione IBKR sotto il nome del portafoglio. */
 .plain-list li:has(.ibkr-auto) { flex-wrap: wrap; }
 .ibkr-auto { flex-basis: 100%; align-items: flex-start; margin-top: 6px; }
+
+/* ── Filtri della watchlist: vanno a capo e si riordinano trascinandoli ── */
+.pills.watch-filter { flex-wrap: wrap; overflow: visible; }
+.watch-filter .pill { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.watch-filter.dragging .pill { cursor: grabbing; }
+.watch-filter .pill.drag-ghost { opacity: .55; outline: 2px dashed var(--primary); outline-offset: 2px; }
+.watch-hint { margin: -4px 0 0; }
+/* Puntino accanto ai titoli della watchlist con una soglia di prezzo. */
+.watch-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
