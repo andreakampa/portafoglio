@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { alertText, checkAlerts, listCounts, mergeIbkrWatchlists, parseWatchlistCsv, watchId, yahooSymbol, type WatchItem } from './watchlist.ts'
+import { alertText, applyOrder, moveKey, removeText, checkAlerts, listCounts, mergeIbkrWatchlists, parseWatchlistCsv, watchId, yahooSymbol, type WatchItem } from './watchlist.ts'
 
 describe('avvisi di prezzo', () => {
   const item: WatchItem = { id: 'nvda', symbol: 'NVDA', above: 200, below: 150 }
@@ -84,5 +84,36 @@ describe('allineamento con IBKR', () => {
 
   it('conteggio per lista', () => {
     expect(listCounts(existing)).toEqual([{ name: 'Semiconductor', count: 1 }, { name: 'Spazio', count: 1 }, { name: 'X', count: 1 }])
+  })
+})
+
+describe('ordine dei filtri', () => {
+  const items = ['tutte', 'lista:A', 'lista:B', 'lista:C'].map(key => ({ key }))
+  it('senza ordine salvato lascia tutto com’è', () => {
+    expect(applyOrder(items, null).map(i => i.key)).toEqual(['tutte', 'lista:A', 'lista:B', 'lista:C'])
+  })
+  it('usa l’ordine salvato, ignora le chiavi sparite e mette in fondo le liste nuove', () => {
+    expect(applyOrder(items, ['lista:C', 'sparita', 'tutte']).map(i => i.key)).toEqual(['lista:C', 'tutte', 'lista:A', 'lista:B'])
+  })
+  it('sposta una chiave avanti e indietro', () => {
+    const k = ['a', 'b', 'c', 'd']
+    expect(moveKey(k, 'a', 2)).toEqual(['b', 'c', 'a', 'd'])
+    expect(moveKey(k, 'd', 0)).toEqual(['d', 'a', 'b', 'c'])
+    expect(moveKey(k, 'x', 0)).toEqual(k)
+  })
+})
+
+describe('conferma di «Togli»', () => {
+  it('per i titoli aggiunti a mano è una domanda semplice', () => {
+    expect(removeText({ id: 'a', symbol: 'AAPL' })).toBe('Togliere AAPL dalla watchlist?')
+  })
+  it('per i titoli IBKR spiega che IBKR non cambia e che il titolo tornerà', () => {
+    const t = removeText({ id: 'n', symbol: 'NVDA', source: 'ibkr', lists: ['Semiconductor'] })
+    expect(t).toContain('Su IBKR resta')
+    expect(t).toContain('(Semiconductor)')
+    expect(t).toContain('tornerà qui')
+  })
+  it('se su IBKR non c’è più, dice che non tornerà', () => {
+    expect(removeText({ id: 'n', symbol: 'NVDA', source: 'ibkr', goneFromIbkr: true })).toContain('non tornerà')
   })
 })

@@ -202,3 +202,32 @@ export function listCounts(items: WatchItem[]): { name: string; count: number }[
   for (const it of items) for (const l of it.lists ?? []) m.set(l, (m.get(l) ?? 0) + 1)
   return [...m].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name))
 }
+
+/**
+ * Mette i filtri nell'ordine scelto dall'utente. Quelli che non sono nell'ordine salvato (es. una lista IBKR nuova)
+ * restano in fondo, nell'ordine di partenza; le chiavi salvate che non esistono più si ignorano.
+ */
+export function applyOrder<T extends { key: string }>(items: T[], order: string[] | null | undefined): T[] {
+  if (!order?.length) return items
+  const pos = new Map(order.map((k, i) => [k, i]))
+  const known = items.filter(i => pos.has(i.key)).sort((a, b) => pos.get(a.key)! - pos.get(b.key)!)
+  return [...known, ...items.filter(i => !pos.has(i.key))]
+}
+
+/** Sposta la chiave `key` nella posizione `to` (indice nell'elenco finale). */
+export function moveKey(keys: string[], key: string, to: number): string[] {
+  const from = keys.indexOf(key)
+  if (from < 0) return keys
+  const out = keys.filter(k => k !== key)
+  out.splice(Math.max(0, Math.min(to, out.length)), 0, key)
+  return out
+}
+
+/** Testo di conferma di «Togli»: per i titoli arrivati da IBKR spiega che IBKR non viene toccato. */
+export function removeText(it: WatchItem): string {
+  if (it.source !== 'ibkr') return `Togliere ${it.symbol} dalla watchlist?`
+  if (it.goneFromIbkr) return `Togliere ${it.symbol} dalla watchlist?\n\nSu IBKR non c’è più, quindi non tornerà.`
+  return `Togliere ${it.symbol} dalla watchlist dell’app?\n\nSu IBKR resta dov’è: l’app non cambia mai le tue watchlist IBKR. ` +
+    `Visto che è ancora in una lista IBKR${it.lists?.length ? ` (${it.lists.join(', ')})` : ''}, al prossimo allineamento settimanale tornerà qui, senza soglie né nota. ` +
+    `Per toglierlo per sempre, toglilo anche dalla watchlist su IBKR.`
+}
