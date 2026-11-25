@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { BENCHMARKS, useHistory } from '../data/useHistory'
 import { indexReturn, rebase } from '../domain/engine/history'
-import { VIX_ALERT, vixStatus } from '../domain/market'
+import { FX_CRYPTO_TILES, INDEX_TILES, VIX_ALERT, dayChange, formatTilePrice, vixStatus, type MarketTile } from '../domain/market'
 import type { RawPortfolio } from '../domain/engine/portfolio'
 import { loadQuotes, type Quote } from '../lib/prices'
 import { eur, pct } from '../lib/format'
@@ -10,18 +10,13 @@ import { useHistoryChartPrefs } from '../data/useHistoryChartPrefs'
 import { TOGGLES, setView, toggleLine, type ToggleKey } from '../domain/historyChart'
 import { localToday } from '../lib/today'
 
-const INDICES = [
-  { symbol: '^NDX', name: 'Nasdaq 100' },
-  { symbol: '^GSPC', name: 'S&P 500' },
-  { symbol: '^VIX', name: 'VIX' },
-  { symbol: '^VXN', name: 'VXN' },
-]
+const ALL_TILES = [...INDEX_TILES, ...FX_CRYPTO_TILES]
 const TODAY = localToday()
 const eur0 = (v: number) => `${Math.round(v).toLocaleString('it-IT')} €`
 
 const n2 = (v: number) => v.toLocaleString('it-IT', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
 
-/** Indici principali e lancetta del VIX (quotazioni Yahoo, aggiornate ogni 5 minuti). */
+/** Indici principali, lancetta del VIX, cambio euro/dollaro e crypto (quotazioni Yahoo, aggiornate ogni 5 minuti). */
 export function IndicesCard() {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({})
   useEffect(() => {
@@ -29,10 +24,10 @@ export function IndicesCard() {
     let retry: ReturnType<typeof setTimeout> | undefined
     // All'apertura partono molte richieste (storico dei titoli): se un indice non risponde si riprova dopo 15 secondi.
     const load = () =>
-      loadQuotes(INDICES.map(i => i.symbol)).then(q => {
+      loadQuotes(ALL_TILES.map(i => i.symbol)).then(q => {
         if (!alive) return
         setQuotes(prev => ({ ...prev, ...q }))
-        if (Object.keys(q).length < INDICES.length) retry = setTimeout(load, 15000)
+        if (Object.keys(q).length < ALL_TILES.length) retry = setTimeout(load, 15000)
       })
     void load()
     const t = setInterval(load, 5 * 60 * 1000)
@@ -50,19 +45,23 @@ export function IndicesCard() {
       <div className="market-grid">
         {vix !== undefined && <VixGauge value={vix} />}
         <div className="kpis">
-          {INDICES.map(i => {
-            const q = quotes[i.symbol]
-            const ch = q?.previousClose ? ((q.price - q.previousClose) / q.previousClose) * 100 : null
-            return (
-              <div key={i.symbol} className="kpi">
-                <span className="kpi-label">{i.name}</span>
-                <span className="kpi-value">{q ? n2(q.price) : '—'}</span>
-                <span className={`kpi-hint ${ch === null ? '' : ch >= 0 ? 'pos' : 'neg'}`}>{ch === null ? 'in caricamento' : `${pct(ch)} oggi`}</span>
-              </div>
-            )
-          })}
+          {INDEX_TILES.map(t => <MarketKpi key={t.symbol} tile={t} quote={quotes[t.symbol]} />)}
         </div>
       </div>
+      <div className="kpis kpis-3 market-extra" role="group" aria-label="Cambio euro/dollaro e crypto">
+        {FX_CRYPTO_TILES.map(t => <MarketKpi key={t.symbol} tile={t} quote={quotes[t.symbol]} />)}
+      </div>
+    </div>
+  )
+}
+
+function MarketKpi({ tile, quote }: { tile: MarketTile; quote: Quote | undefined }) {
+  const ch = quote ? dayChange(quote.price, quote.previousClose) : null
+  return (
+    <div className="kpi">
+      <span className="kpi-label">{tile.name}</span>
+      <span className="kpi-value">{quote ? formatTilePrice(quote.price, tile.decimals) : '—'}</span>
+      <span className={`kpi-hint ${ch === null ? '' : ch >= 0 ? 'pos' : 'neg'}`}>{ch === null ? 'in caricamento' : `${pct(ch)} oggi`}</span>
     </div>
   )
 }

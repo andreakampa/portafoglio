@@ -419,6 +419,10 @@ textarea {
   .overview-side .market-grid { grid-template-columns: 1fr; justify-items: center; }
   .overview-side .market-grid .kpis { width: 100%; }
 }
+/* Mercati: cambio euro/dollaro e crypto, sempre tre riquadri in fila sotto gli indici. */
+.market-extra { margin-top: 0; }
+.kpis.kpis-3, .overview-side .kpis.kpis-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kpis-3 .kpi { padding: 12px 10px; }
 
 /* ── Etichette con icona (components/Tag.tsx) ───── */
 .tag {
