@@ -758,3 +758,25 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .recent-head .seg button { min-width: 52px; }
 .recent-head-total { display: grid; justify-items: end; gap: 2px; }
 .recent-card .top-list small.num { white-space: nowrap; }
+
+/* ── Stress test del margine (riquadro Margine) ─────────────── */
+.stress { display: grid; gap: 12px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.stress h3 { margin: 0; font-size: 1rem; }
+.stress-ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.stress-ctrl input[type=range] { flex: 1 1 240px; accent-color: var(--primary); min-height: 32px; }
+.stress-num { display: flex; align-items: center; gap: 4px; font-weight: 600; }
+.stress-num input { width: 5.5em; text-align: right; font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.stress-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.stress-presets .pill { min-height: 32px; font-size: .85rem; }
+.stress-verdict { display: grid; gap: 2px; padding: 12px 14px; border-radius: 10px; border: 1px solid transparent; }
+.stress-verdict.ok { background: color-mix(in srgb, var(--pos) 10%, transparent); }
+.stress-verdict.near { background: var(--warn-bg); border-color: var(--warn-border); }
+.stress-verdict.call { background: color-mix(in srgb, var(--neg) 12%, transparent); border-color: var(--neg); }
+.stress-chart { display: grid; gap: 6px; min-width: 0; }
+.stress-chart svg { display: block; max-width: 100%; }
+.stress-chart text { fill: var(--muted); font-size: 11px; }
+.stress-chart text.stress-call-label { fill: var(--neg); font-weight: 600; }
+.stress-legend { display: flex; flex-wrap: wrap; gap: 14px; }
+.stress-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.stress-legend i.zone { height: 10px; background: var(--neg); opacity: .3; }
+.stress form.inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
