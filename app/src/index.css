@@ -811,3 +811,12 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 /* Impostazioni → Portafogli: interruttore della sincronizzazione IBKR sotto il nome del portafoglio. */
 .plain-list li:has(.ibkr-auto) { flex-wrap: wrap; }
 .ibkr-auto { flex-basis: 100%; align-items: flex-start; margin-top: 6px; }
+
+/* ── Filtri della watchlist: vanno a capo e si riordinano trascinandoli ── */
+.pills.watch-filter { flex-wrap: wrap; overflow: visible; }
+.watch-filter .pill { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.watch-filter.dragging .pill { cursor: grabbing; }
+.watch-filter .pill.drag-ghost { opacity: .55; outline: 2px dashed var(--primary); outline-offset: 2px; }
+.watch-hint { margin: -4px 0 0; }
+/* Puntino accanto ai titoli della watchlist con una soglia di prezzo. */
+.watch-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
