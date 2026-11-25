@@ -252,7 +252,8 @@ select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .kind { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: .75rem; font-weight: 650; background: var(--surface-2); color: var(--muted); }
 /* Otto colonne stanno comode solo da 1200px: prima, schede (mai scorrimento laterale). */
 @media (min-width: 900px) and (pointer: fine), (min-width: 1200px) { .mov-table.pos-table { display: none; } }
-@media (min-width: 1200px) { .mov-list { display: none; } .mov-table.pos-table { display: table; } }
+/* Solo i Movimenti hanno la tabella al posto delle schede: la watchlist resta a schede anche su schermi larghi. */
+@media (min-width: 1200px) { .mov-list:not(.watch-list) { display: none; } .mov-table.pos-table { display: table; } }
 html, body { overflow-x: hidden; }
 .content { min-width: 0; }
 
