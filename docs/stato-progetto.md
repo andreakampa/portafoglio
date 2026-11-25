@@ -28,7 +28,9 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     Con la cifratura dei dati degli amici il reset dovrà passare dalla chiave di recupero.
     **Avvisi di prezzo per più utenti:** `runAlerts` (ibkr-sync) scarica un prezzo per titolo per tutti e resta sotto le 50 richieste per giro del piano gratuito Cloudflare;
     se i titoli sono troppi li controlla a turno (`planQuotes`, cursore in `alerts_state/cursor`). Va ripubblicato il Worker.
-    **In sospeso:** cifratura dei dati degli amici (decisa: tutto cifrato tranne watchlist e soglie) (Andrea non vuole poterli leggere), nuovo nome Gruzzolo su indirizzo gratuito.
+    **Cifratura dei dati degli amici** (decisa: tutto cifrato tranne watchlist, soglie e notifiche; i dati di Andrea restano in chiaro per IBKR e sito vecchio).
+    Passo 1 fatto: `app/src/lib/crypto.ts` (chiave dei dati AES-GCM, buste con password e chiave di recupero via PBKDF2 600.000 giri, AAD = percorso), 13 test.
+    Prossimi: 2 chiave alla registrazione/sblocco/recupero, 3 strato dati, 4 regole che accettano solo dati cifrati per gli invitati, 5 export decifrato, 6 informativa (Andrea non vuole poterli leggere), nuovo nome Gruzzolo su indirizzo gratuito.
 - **v2 online** su `/portafoglio/v2/`
   - Login, registrazione con invito, PWA che si aggiorna da sola.
   - **Posizioni:** valore, PMC e risultato, con schede su telefono e tabella su PC.
