@@ -189,6 +189,7 @@ campo quota a margine, cambio scritto a mano sul movimento (il motore usa i camb
 ### 14. Carrello simulazioni (`cart.js`) — fatto (PR `carrello`)
 - [x] Salvato per portafoglio su Firebase (`settings/simCart`), condiviso tra pagina Simulatore e finestra "Simula" di Posizioni.
 - [x] Per riga: imposta e netto (vendite), nuovo PMC (acquisti); conferma su "Svuota"; righe spostabili ↑↓ (ordine di uso delle minus).
+- [x] (25/11/2026, richiesta di Andrea) Anteprima in tempo reale nella finestra Simula prima di aggiungere: prima/dopo di quantità, PMC, costo di carico, valore; spesa o plus, imposta (motore vero, dopo il carrello), netto. "Per budget" anche in vendita (somma da incassare). Pulsante carrello fisso in basso su tutte le pagine con il numero di operazioni, pannello con righe e totali (uscite, entrate nette, imposte, saldo) — `components/SimCart.tsx`.
 
 ### 15. Impostazioni, avvisi, assistente — fatto (PR `impostazioni-avvisi`)
 - [x] Cambio password; svuota cache prezzi/cambi/dividendi (le preferenze restano).
