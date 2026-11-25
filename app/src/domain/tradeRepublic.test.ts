@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RawTx } from './engine/types'
-import { applyTrMatches, parseTrCsv, planTrImport } from './tradeRepublic'
+import { applyTrMatches, parseTrCsv, planTrImport, suggestIsinLinks, withIsins } from './tradeRepublic'
 
 const HEAD = '"datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"'
 const row = (o: { date: string; cat?: string; type?: string; isin?: string; shares?: string; price?: string; amount?: string; fee?: string; desc?: string; id: string }) =>
@@ -73,5 +73,54 @@ describe('collegamento ai movimenti', () => {
   })
   it('null se il movimento è cambiato nel frattempo', () => {
     expect(applyTrMatches([{ ...txs[0]!, qty: 2 }], [by('t1')], () => 'n')).toBeNull()
+  })
+})
+
+describe('ordine eseguito in più pezzi', () => {
+  const csv = [
+    HEAD,
+    row({ date: '2026-05-05', isin: 'IE00BM8QS095', shares: '32', price: '27.99', amount: '-895.68', fee: '-1.00', desc: 'Buy trade', id: 'p1' }),
+    row({ date: '2026-05-05', isin: 'IE00BM8QS095', shares: '0.15434', price: '27.99', amount: '-4.32', desc: 'Buy trade', id: 'p2' }),
+    row({ date: '2026-06-02', isin: 'IE00BM8QS095', shares: '1.022146', price: '29.35', amount: '-30.00', id: 'p3' }),
+    row({ date: '2026-06-02', isin: 'IE00BM8QS095', shares: '0.302555', price: '29.35', amount: '-8.88', id: 'p4' }),
+  ].join('\n')
+  const txs: RawTx[] = [
+    { id: 'x', date: '2026-05-05', type: 'buy', qty: 32.15434, price: 27.99, commission: 1 },
+    { id: 'y', date: '2026-06-02', type: 'buy', qty: 1.022146, price: 29.35, source: 'pac' },
+  ]
+  const assets = { MCHT: { isin: 'IE00BM8QS095', transactions: txs } }
+
+  it('due righe con la stessa somma diventano un solo movimento; il Saveback a parte resta nuovo', () => {
+    const plan = planTrImport(assets, parseTrCsv(csv))
+    expect(plan.matches.map(m => [m.trade.id, m.action, m.txId ?? null])).toEqual([
+      ['p1+p2', 'same', 'x'],
+      ['p3', 'same', 'y'],
+      ['p4', 'new', null],
+    ])
+    expect(plan.matches[0]!.trade).toMatchObject({ qty: 32.15434, amount: 900, fee: 1 })
+  })
+  it('dopo l\'import un secondo giro trova tutto uguale', () => {
+    const plan = planTrImport(assets, parseTrCsv(csv))
+    const out = applyTrMatches(txs, plan.matches.filter(m => m.action !== 'same'), () => 'n')!
+    expect(out).toHaveLength(3)
+    const again = planTrImport({ MCHT: { ...assets.MCHT, transactions: out } }, parseTrCsv(csv))
+    expect(again.matches.map(m => m.action)).toEqual(['same', 'same', 'same'])
+  })
+})
+
+describe('titolo senza ISIN', () => {
+  it('propone il titolo con i movimenti negli stessi giorni e poi lo collega', () => {
+    const trades = parseTrCsv(CSV).filter(t => t.isin === 'IE000VAHT5T0')
+    const assets = {
+      ALTRO: { transactions: [{ date: '2026-01-10', type: 'buy', qty: 1, price: 1 }] },
+      VALL: { transactions: [{ id: 'a', date: '2026-11-02', type: 'buy', qty: 11.443, price: 4.37, priceEstimated: true }, { date: '2026-11-17', type: 'buy', qty: 11, price: 4.4 }] },
+    }
+    const links = suggestIsinLinks(assets, trades)
+    expect(links).toEqual({ IE000VAHT5T0: 'VALL' })
+    const plan = planTrImport(withIsins(assets, links), trades)
+    expect(plan.matches.find(m => m.trade.id === 't1')).toMatchObject({ action: 'replace', assetId: 'VALL' })
+  })
+  it('nessuna proposta se i giorni non coincidono', () => {
+    expect(suggestIsinLinks({ X: { transactions: [{ date: '2025-01-01', type: 'buy', qty: 1, price: 1 }] } }, parseTrCsv(CSV))).toEqual({})
   })
 })

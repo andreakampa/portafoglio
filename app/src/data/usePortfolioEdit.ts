@@ -118,10 +118,10 @@ export function usePortfolioEdit() {
         }),
 
       /** Applica a un titolo le operazioni scelte dall'estratto di Trade Republic. */
-      applyTr: (pid: string, aid: string, chosen: TrMatch[], newId: () => string) =>
+      applyTr: (pid: string, aid: string, chosen: TrMatch[], newId: () => string, isin?: string) =>
         change(pid, aid, cur => {
           const list = cur ? applyTrMatches(cur.transactions ?? [], chosen, newId) : null
-          return cur && list ? clean({ ...cur, transactions: list }) : undefined
+          return cur && list ? clean({ ...cur, ...(isin ? { isin } : {}), transactions: list }) : undefined
         }),
 
       remove: (pid: string, aid: string, at: TxRef) =>

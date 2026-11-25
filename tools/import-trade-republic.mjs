@@ -5,7 +5,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { applyTrMatches, parseTrCsv, planTrImport } from '../app/src/domain/tradeRepublic.ts'
+import { applyTrMatches, parseTrCsv, planTrImport, suggestIsinLinks, withIsins } from '../app/src/domain/tradeRepublic.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const DIR = path.join(ROOT, '.backup')
@@ -28,8 +28,12 @@ if (!best) throw new Error('Nessun portafoglio contiene i titoli del file')
 const { uid, pid, p } = best
 console.log(`Backup ${path.basename(backup)} · portafoglio "${p.name ?? pid}" · ${trades.length} operazioni nel file`)
 
+// Titoli senza ISIN che corrispondono a un ISIN del file (stessa proposta del tasto nella v2).
+const links = suggestIsinLinks(p.assets, trades)
+for (const [isin, aid] of Object.entries(links)) console.log(`Collego ${isin} al titolo ${p.assets[aid]?.ticker || p.assets[aid]?.nome || aid} (${aid}), che non aveva l'ISIN`)
+p.assets = withIsins(p.assets, links)
 const plan = planTrImport(p.assets, trades)
-const sym = id => p.assets[id]?.ticker || id
+const sym = id => p.assets[id]?.ticker || p.assets[id]?.nome || id
 const fmt = (q, pr) => `${+Number(q).toFixed(6)} × ${+Number(pr).toFixed(4)}`
 for (const action of ['replace', 'fix', 'new', 'same', 'unknown']) {
   const list = plan.matches.filter(m => m.action === action)
@@ -58,5 +62,11 @@ for (const [aid, list] of todo) {
     const file = path.join(out, `${aid}.json`)
     fs.writeFileSync(file, JSON.stringify(JSON.parse(JSON.stringify(next))))
     console.log(`  firebase database:set /users/${uid}/portfolio_state/portfolios/${pid}/assets/${aid}/transactions "${file}" -f`)
+    const isin = Object.entries(links).find(([, v]) => v === aid)?.[0]
+    if (isin) {
+      const f2 = path.join(out, `${aid}-isin.json`)
+      fs.writeFileSync(f2, JSON.stringify(isin))
+      console.log(`  firebase database:set /users/${uid}/portfolio_state/portfolios/${pid}/assets/${aid}/isin "${f2}" -f`)
+    }
   }
 }

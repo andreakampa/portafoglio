@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import type { Computed } from '../data/useComputedPortfolio'
 import { usePortfolioEdit } from '../data/usePortfolioEdit'
 import { symbolOf } from '../domain/engine/valuation'
-import { parseTrCsv, planTrImport, type TrAction, type TrMatch, type TrPlan } from '../domain/tradeRepublic'
+import { parseTrCsv, planTrImport, suggestIsinLinks, withIsins, type TrAction, type TrMatch, type TrPlan, type TrTrade } from '../domain/tradeRepublic'
 import { money, qty as fmtQty } from '../lib/format'
 import { toast } from '../lib/toast'
 
@@ -26,6 +26,9 @@ export function TrImport({ c, onClose }: { c: Ready; onClose: () => void }) {
   const edit = usePortfolioEdit()
   const input = useRef<HTMLInputElement>(null)
   const [plan, setPlan] = useState<TrPlan | null>(null)
+  const [trades, setTrades] = useState<TrTrade[]>([])
+  /** ISIN del file collegati a titoli dell'app che non hanno l'ISIN (si salva sul titolo applicando). */
+  const [links, setLinks] = useState<Record<string, string>>({})
   const [chosen, setChosen] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -38,17 +41,34 @@ export function TrImport({ c, onClose }: { c: Ready; onClose: () => void }) {
     try {
       const trades = parseTrCsv(await file.text())
       if (!trades.length) throw new Error('Nel file non ci sono acquisti o vendite di titoli.')
-      const p = planTrImport(assets as Parameters<typeof planTrImport>[0], trades)
-      // Le righe uguali o di titoli assenti non si toccano: si mostrano solo le altre, dalla più recente.
-      p.matches.sort((a, b) => b.trade.date.localeCompare(a.trade.date))
-      setPlan(p)
-      setChosen(new Set(p.matches.filter(m => ACTIVE.includes(m.action)).map(keyOf)))
+      const l = suggestIsinLinks(assets as Parameters<typeof suggestIsinLinks>[0], trades)
+      setTrades(trades)
+      build(trades, l)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       if (input.current) input.current.value = ''
     }
   }
+
+  function build(list: TrTrade[], l: Record<string, string>) {
+    const p = planTrImport(withIsins(assets as Parameters<typeof planTrImport>[0], l), list)
+    p.matches.sort((a, b) => b.trade.date.localeCompare(a.trade.date))
+    setLinks(l)
+    setPlan(p)
+    setChosen(new Set(p.matches.filter(m => ACTIVE.includes(m.action)).map(keyOf)))
+  }
+  const relink = (isin: string, id: string) => {
+    const l = { ...links }
+    for (const [k, v] of Object.entries(l)) if (v === id) delete l[k]
+    if (id) l[isin] = id
+    else delete l[isin]
+    build(trades, l)
+  }
+  // ISIN del file che non sono di nessun titolo con ISIN: si possono collegare a un titolo che non ce l'ha.
+  const withIsin = new Set(Object.values(assets).map(a => (a as { isin?: string }).isin?.trim().toUpperCase()).filter(Boolean))
+  const free = Object.entries(assets).filter(([, a]) => !(a as { isin?: string }).isin)
+  const orphan = [...new Map(trades.filter(t => !withIsin.has(t.isin)).map(t => [t.isin, t.name])).entries()]
 
   const apply = async () => {
     if (!plan) return
@@ -58,7 +78,8 @@ export function TrImport({ c, onClose }: { c: Ready; onClose: () => void }) {
     setBusy(true)
     setError('')
     try {
-      for (const [aid, list] of byAsset) await edit.applyTr(c.selectedId, aid, list, newId)
+      const isinOf = (aid: string) => Object.entries(links).find(([, v]) => v === aid)?.[0]
+      for (const [aid, list] of byAsset) await edit.applyTr(c.selectedId, aid, list, newId, isinOf(aid))
       toast(`${todo.length} ${todo.length === 1 ? 'movimento aggiornato' : 'movimenti aggiornati'} da Trade Republic`)
       onClose()
     } catch (e) {
@@ -94,6 +115,20 @@ export function TrImport({ c, onClose }: { c: Ready; onClose: () => void }) {
             Le operazioni del file sono collegate ai movimenti per ISIN, giorno e importo. Il file ha l'ultima parola su quantità,
             prezzo e commissioni. Nulla viene salvato finché non premi Applica.
           </p>
+          {orphan.length > 0 && free.length > 0 && (
+            <div className="tr-links">
+              {orphan.map(([isin, name]) => (
+                <label key={isin}>
+                  <span>{name} <small className="muted">({isin})</small> corrisponde a</span>
+                  <select value={links[isin] ?? ''} onChange={e => relink(isin, e.target.value)}>
+                    <option value="">nessun titolo (ignora)</option>
+                    {free.map(([id, a]) => <option key={id} value={id}>{symbolOf(a, id)}</option>)}
+                  </select>
+                </label>
+              ))}
+              <p className="muted small">Il titolo scelto riceve l'ISIN del file, così i prossimi import lo riconoscono da soli.</p>
+            </div>
+          )}
           <div className="tr-chips">
             {(['replace', 'new', 'fix', 'same', 'unknown'] as TrAction[]).filter(count).map(a => (
               <span key={a} className={`badge tr-${a}`}>{count(a)} · {WHAT[a].toLowerCase()}</span>

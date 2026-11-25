@@ -115,14 +115,45 @@ export function planTrImport(assets: Record<string, Asset>, trades: TrTrade[]): 
   const byIsin = new Map<string, string>()
   for (const [id, a] of Object.entries(assets)) if (a?.isin) byIsin.set(a.isin.trim().toUpperCase(), id)
 
-  const matches: TrMatch[] = trades.map(trade => ({ trade, action: 'unknown' as TrAction, assetId: byIsin.get(trade.isin) }))
+  let matches: TrMatch[] = trades.map(trade => ({ trade, action: 'unknown' as TrAction, assetId: byIsin.get(trade.isin) }))
   const used = new Set<string>() // assetId#indice
+  const dropped = new Set<TrMatch>()
 
   for (const [assetId, a] of Object.entries(assets)) {
     const txs = a?.transactions ?? []
-    const mine = matches.filter(m => m.assetId === assetId)
+    let mine = matches.filter(m => m.assetId === assetId)
     if (!mine.length) continue
-    const link = (m: TrMatch, i: number) => {
+    // Un ordine eseguito in più pezzi (stesso giorno e prezzo) che nell'app è un solo movimento: si uniscono le righe.
+    const merge = (group: TrMatch[]): TrMatch => {
+      const [first, ...rest] = group
+      const sum = (k: 'qty' | 'amount' | 'fee') => Math.round(group.reduce((x, m) => x + m.trade[k], 0) * 1e6) / 1e6
+      first!.trade = { ...first!.trade, id: group.map(m => m.trade.id).join('+'), qty: sum('qty'), amount: sum('amount'), fee: sum('fee') }
+      for (const m of rest) dropped.add(m)
+      mine = mine.filter(m => !dropped.has(m))
+      return first!
+    }
+    txs.forEach(t => {
+      const ids = String((t as { trId?: string }).trId ?? '').split('+')
+      if (ids.length < 2) return
+      const group = ids.map(id => mine.find(m => m.trade.id === id)).filter((m): m is TrMatch => !!m)
+      if (group.length === ids.length) merge(group)
+    })
+    txs.forEach((t, i) => {
+      if (!t || (t as { trId?: string }).trId || used.has(`${assetId}#${i}`)) return
+      const q = Number(t.qty) || 0
+      const same = mine.filter(m => m.txIndex === undefined && m.trade.date === t.date && m.trade.side === t.type)
+      if (same.some(m => close(m.trade.qty, q, 1e-6))) return
+      for (let x = 0; x < same.length; x++) {
+        for (let y = x + 1; y < same.length; y++) {
+          const a = same[x]!, b = same[y]!
+          if (close(a.trade.price, b.trade.price, 1e-4) && close(a.trade.qty + b.trade.qty, q, 1e-6)) {
+            link(merge([a, b]), i)
+            return
+          }
+        }
+      }
+    })
+    function link(m: TrMatch, i: number) {
       used.add(`${assetId}#${i}`)
       m.txIndex = i
       const t = txs[i]!
@@ -161,6 +192,7 @@ export function planTrImport(assets: Record<string, Asset>, trades: TrTrade[]): 
     }
   }
 
+  matches = matches.filter(m => !dropped.has(m))
   const dates = trades.map(t => t.date)
   const from = dates[0]
   const to = dates[dates.length - 1]
@@ -218,4 +250,37 @@ export function applyTrMatches(list: RawTx[], chosen: TrMatch[], newId: () => st
     next[i] = trTx(m, prev, newId)
   }
   return [...next, ...added].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/**
+ * Titoli dell'app senza ISIN che corrispondono a un ISIN del file: quello con più movimenti negli stessi giorni (±3)
+ * delle operazioni del file, se almeno la metà coincide. Serve a proporre il collegamento: decide l'utente.
+ */
+export function suggestIsinLinks(assets: Record<string, Asset>, trades: TrTrade[]): Record<string, string> {
+  const known = new Set(Object.values(assets).map(a => a?.isin?.trim().toUpperCase()).filter(Boolean))
+  const free = Object.entries(assets).filter(([, a]) => a && !a.isin && (a.transactions ?? []).length)
+  const out: Record<string, string> = {}
+  const taken = new Set<string>()
+  for (const isin of [...new Set(trades.map(t => t.isin))].filter(i => !known.has(i))) {
+    const mine = trades.filter(t => t.isin === isin)
+    let best: { id: string; hits: number } | null = null
+    for (const [id, a] of free) {
+      if (taken.has(id)) continue
+      const txs = a.transactions ?? []
+      const hits = mine.filter(t => txs.some(x => x.type === t.side && days(x.date, t.date) <= 3)).length
+      if (!best || hits > best.hits) best = { id, hits }
+    }
+    if (best && best.hits * 2 >= mine.length) {
+      out[isin] = best.id
+      taken.add(best.id)
+    }
+  }
+  return out
+}
+
+/** Copia dei titoli con gli ISIN scelti dall'utente (`links`: ISIN → id del titolo). */
+export function withIsins<T extends Asset>(assets: Record<string, T>, links: Record<string, string>): Record<string, T> {
+  const out = { ...assets }
+  for (const [isin, id] of Object.entries(links)) if (out[id]) out[id] = { ...out[id], isin }
+  return out
 }
