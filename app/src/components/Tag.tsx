@@ -14,6 +14,7 @@ const PATHS: Record<Tone, ReactNode> = {
   sim: <><path d="M9 3h6" /><path d="M10 9h4" /><path d="M10 3v6l-4 11a.7 .7 0 0 0 .5 1h11a.7 .7 0 0 0 .5 -1l-4 -11v-6" /></>,
   history: <><path d="M12 8v4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></>,
   edit: <><path d="M4 20h4l10.5 -10.5a2.83 2.83 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></>,
+  confirm: <path d="M5 12l5 5l10 -10" />,
   delete: <path d="M18 6l-12 12M6 6l12 12" />,
   neutral: <path d="M13 3v7h6l-8 11v-7h-6l8 -11" />,
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computePortfolio } from './engine/portfolio'
 import type { RawTx } from './engine/types'
-import { buildExercise, optionKind, optionStrike } from './txEdit'
+import { buildExercise, confirmInList, optionKind, optionStrike, pacQty, pacRate } from './txEdit'
 import {
   addToList, assetKey, deleteAssetBlock, buildAsset, buildTransferPair, buildTx, findSameAsset, findTransfer, formFromTx, heldQty, removeFromList, replaceInList, transferWrites,
   validateNewAsset, validateTransfer, validateTx, type TxForm,
@@ -198,5 +198,46 @@ describe('deleteAssetBlock', () => {
   it('bloccato se ha un trasferimento (uscita o entrata)', () => {
     expect(deleteAssetBlock({ transactions: [{ type: 'buy' }, { type: 'transfer' }] })).toMatch(/trasferimenti/)
     expect(deleteAssetBlock({ transactions: [{ type: 'buy', transferId: 'x' }] })).toMatch(/trasferimenti/)
+  })
+})
+
+describe('conferma delle rate stimate', () => {
+  const list: RawTx[] = [
+    { id: 'a', date: '2026-11-02', type: 'buy', qty: 11.443, price: 4.37, source: 'pac', priceEstimated: true },
+    { id: 'b', date: '2026-11-16', type: 'buy', qty: 11.3955, price: 4.39, source: 'pac', priceEstimated: true },
+  ]
+  it('toglie solo il segno, lasciando quantità e prezzo', () => {
+    const out = confirmInList(list, [{ id: 'a', index: 0, date: '2026-11-02', type: 'buy' }])!
+    expect(out[0]).toEqual({ id: 'a', date: '2026-11-02', type: 'buy', qty: 11.443, price: 4.37, source: 'pac' })
+    expect(out[1]?.priceEstimated).toBe(true)
+    expect(list[0]?.priceEstimated).toBe(true)
+  })
+  it('null se un movimento non c\'è più', () => {
+    expect(confirmInList(list, [{ id: 'zz', index: 0, date: '2026-11-02', type: 'buy' }])).toBeNull()
+  })
+})
+
+describe('quantità della rata PAC dal prezzo', () => {
+  it('in euro: importo ÷ prezzo, 6 decimali', () => {
+    expect(pacQty('50', '4,3812', pacRate('EUR'))).toBe(11.412398)
+  })
+  it('non in euro: il cambio si ricava dalla rata com\'era', () => {
+    const rate = pacRate('USD', { date: '2026-11-02', type: 'buy', qty: 0.5, price: 116, importoPac: 50 })
+    expect(rate).toBeCloseTo(1.16)
+    expect(pacQty('50', '120', rate)).toBe(0.483333)
+    expect(pacRate('USD', { date: '2026-11-02', type: 'buy', qty: 1, price: 1 })).toBeNull()
+  })
+  it('niente quantità senza importo o prezzo validi', () => {
+    expect(pacQty('', '4', 1)).toBeNull()
+    expect(pacQty('50', '0', 1)).toBeNull()
+    expect(pacQty('50', '4', null)).toBeNull()
+  })
+  it('l\'importo finisce nel movimento e torna nella maschera', () => {
+    const tx = buildTx(form({ pac: true, pacAmount: '25' }), id)
+    expect(tx.importoPac).toBe(25)
+    expect(formFromTx(tx, 'EUR').pacAmount).toBe('25')
+  })
+  it('salvare la maschera toglie il segno da confermare', () => {
+    expect(buildTx(form(), id, { date: '2026-11-10', type: 'buy', qty: 1, price: 1, priceEstimated: true }).priceEstimated).toBeUndefined()
   })
 })

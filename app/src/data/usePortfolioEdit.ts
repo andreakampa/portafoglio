@@ -5,7 +5,8 @@ import type { RawAsset, RawTx } from '../domain/engine/types'
 import type { MarginInterestRow } from '../domain/engine/movements'
 import type { StoredManualLoss } from '../domain/manualLosses'
 import { isRecorded } from '../domain/pac'
-import { addToList, buildTransferPair, findSameAsset, findTransfer, removeFromList, replaceInList, transferWrites, type PortfolioLike, type TransferForm, type TxRef } from '../domain/txEdit'
+import { addToList, buildTransferPair, confirmInList, findSameAsset, findTransfer, removeFromList, replaceInList, transferWrites, type PortfolioLike, type TransferForm, type TxRef } from '../domain/txEdit'
+import { applyTrMatches, type TrMatch } from '../domain/tradeRepublic'
 import { db } from '../lib/firebase'
 
 type Asset = RawAsset & { isin?: string; commDefault?: number }
@@ -107,6 +108,20 @@ export function usePortfolioEdit() {
         change(pid, aid, cur => {
           const list = cur ? replaceInList(cur.transactions ?? [], at, tx) : null
           return cur && list ? clean({ ...cur, transactions: list }) : undefined
+        }),
+
+      /** Conferma i movimenti indicati così come sono (toglie "da confermare"). */
+      confirm: (pid: string, aid: string, refs: TxRef[]) =>
+        change(pid, aid, cur => {
+          const list = cur ? confirmInList(cur.transactions ?? [], refs) : null
+          return cur && list ? clean({ ...cur, transactions: list }) : undefined
+        }),
+
+      /** Applica a un titolo le operazioni scelte dall'estratto di Trade Republic. */
+      applyTr: (pid: string, aid: string, chosen: TrMatch[], newId: () => string, isin?: string) =>
+        change(pid, aid, cur => {
+          const list = cur ? applyTrMatches(cur.transactions ?? [], chosen, newId) : null
+          return cur && list ? clean({ ...cur, ...(isin ? { isin } : {}), transactions: list }) : undefined
         }),
 
       remove: (pid: string, aid: string, at: TxRef) =>

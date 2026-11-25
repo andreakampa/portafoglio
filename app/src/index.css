@@ -437,10 +437,18 @@ b + .tag, .tag + .badge { margin-left: 8px; }
 .tag-sim { color: var(--sim); background: var(--sim-bg); }
 .tag-history, .tag-neutral { color: var(--text); background: transparent; border-color: var(--border); }
 .tag-edit { color: var(--edit); background: transparent; border-color: currentColor; }
+.tag-confirm { color: var(--pos); background: transparent; border-color: currentColor; }
 .tag-delete { color: var(--delete); background: transparent; border-color: var(--delete-line); }
 .tag-btn { min-height: 32px; padding: 0 10px; border-radius: 8px; font-size: .82rem; cursor: pointer; }
 .tag-btn:hover { background: var(--surface-2); }
 .badge-warn { background: var(--warn-tint); color: var(--warn); }
+.pac-auto { display: block; margin-top: 4px; color: var(--primary); font-weight: 600; }
+.confirm-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; margin: 12px 0; border-radius: var(--radius); background: var(--warn-bg); border: 1px solid var(--warn-border); }
+.confirm-banner > div { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
+.confirm-banner b { color: var(--warn); }
+.confirm-list { list-style: none; margin: 12px 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); }
+.confirm-list li + li { border-top: 1px solid var(--border); }
+.confirm-list label { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; font-variant-numeric: tabular-nums; }
 
 /* Righe secondarie dentro le celle (quantità, variazione, di cui cambio…). */
 .cell-sub { display: block; font-size: .8rem; }
@@ -761,6 +769,21 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .recent-head .seg button { min-width: 52px; }
 .recent-head-total { display: grid; justify-items: end; gap: 2px; }
 .recent-card .top-list small.num { white-space: nowrap; }
+
+/* Import da Trade Republic */
+.card-head-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.card-head-row h2 { margin: 0; }
+.tr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.tr-chips .badge { margin-left: 0; }
+.tr-list { max-height: 55vh; overflow-y: auto; }
+.tr-list .cell-sub { color: var(--muted); }
+.tr-what { font-weight: 600; text-align: right; }
+.tr-replace { color: var(--primary); }
+.tr-new { color: var(--buy); }
+.tr-fix { color: var(--warn); }
+.tr-same, .tr-unknown { color: var(--muted); }
+.tr-links { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+.tr-links label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* ── Stress test del margine (riquadro Margine) ─────────────── */
 .stress { display: grid; gap: 12px; padding-top: 14px; border-top: 1px dashed var(--border); }

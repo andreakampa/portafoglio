@@ -6,6 +6,8 @@ import { describePlan, formFromPlan, parsePlan, planSummary, scheduledDates, WEE
 import { eur, money, qty as fmtQty } from '../lib/format'
 import { localToday } from '../lib/today'
 import { toast } from '../lib/toast'
+import { Modal } from './Modal'
+import { TrImport } from './TrImport'
 
 type Ready = Extract<Computed, { status: 'ready' }>
 const today = () => localToday()
@@ -18,6 +20,7 @@ export function PacPlansCard({ c }: { c: Ready }) {
   /** null = chiuso, 'new' = nuovo piano, altrimenti il piano in modifica. */
   const [editing, setEditing] = useState<'new' | PacPlan | null>(null)
   const [shown, setShown] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
   const assets = Object.entries(c.portfolio.assets ?? {}).sort(([ia, a], [ib, b]) => symbolOf(a, ia).localeCompare(symbolOf(b, ib)))
   const [f, setF] = useState<PlanForm>(blank)
@@ -56,7 +59,11 @@ export function PacPlansCard({ c }: { c: Ready }) {
 
   return (
     <div className="card">
-      <h2>Piani PAC</h2>
+      <div className="card-head-row">
+        <h2>Piani PAC</h2>
+        <button type="button" className="btn btn-ghost btn-small" onClick={() => setImporting(true)}>Importa da Trade Republic</button>
+      </div>
+      {importing && <Modal title="Importa da Trade Republic" wide onClose={() => setImporting(false)}><TrImport c={c} onClose={() => setImporting(false)} /></Modal>}
       {mine.length === 0 ? (
         <p className="muted">Nessun piano. Con un piano le rate maturate si aggiungono da sole, al prezzo di chiusura di borsa.</p>
       ) : (

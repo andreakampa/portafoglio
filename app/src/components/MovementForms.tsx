@@ -6,7 +6,7 @@ import type { RawAsset } from '../domain/engine/types'
 import type { Movement } from '../domain/engine/movements'
 import { symbolOf } from '../domain/engine/valuation'
 import {
-  ASSET_TYPES, assetKey, buildAsset, buildTx, EDITABLE_LABEL, findTransfer, formFromTx, heldQty, validateNewAsset, validateTransfer, validateTx,
+  ASSET_TYPES, assetKey, buildAsset, buildTx, pacQty, pacRate, EDITABLE_LABEL, findTransfer, formFromTx, heldQty, validateNewAsset, validateTransfer, validateTx,
   type PortfolioLike,
   type EditableType, type NewAssetForm, type TxForm,
 } from '../domain/txEdit'
@@ -61,6 +61,16 @@ export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; 
   const max = maxFor(f.type, held)
   const quote = c.rows.find(r => r.assetId === assetId)?.price ?? null
   const set = <K extends keyof TxForm>(k: K, v: TxForm[K]) => setF(x => ({ ...x, [k]: v }))
+  // Rata PAC: scrivendo prezzo o importo la quantità si ricalcola (importo × cambio ÷ prezzo), finché non la si cambia a mano.
+  const [qtyByHand, setQtyByHand] = useState(false)
+  const [autoQty, setAutoQty] = useState<number | null>(null)
+  const rate = pacRate(currency, prev)
+  const setPriced = (k: 'price' | 'pacAmount', v: string) => {
+    const next = { ...f, [k]: v }
+    const q = next.pac && next.type === 'buy' && !qtyByHand ? pacQty(next.pacAmount ?? '', next.price, rate) : null
+    setF(q === null ? next : { ...next, qty: String(q) })
+    setAutoQty(q)
+  }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -152,14 +162,20 @@ export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; 
         <label>
           Quantità
           <span className="inline-pair">
-            <input inputMode="decimal" value={f.qty} onChange={e => set('qty', e.target.value)} />
+            <input inputMode="decimal" value={f.qty} onChange={e => { set('qty', e.target.value); setQtyByHand(true); setAutoQty(null) }} />
             {max > 0 && <button type="button" className="btn btn-ghost" onClick={() => set('qty', String(max))}>MAX</button>}
           </span>
+          {autoQty !== null && (
+            <span className="small pac-auto">
+              Ricalcolata: {f.pacAmount} €{rate !== 1 && rate ? ` × ${rate.toFixed(4)}` : ''} ÷ {f.price} = {fmtQty(autoQty)}
+              {prev && Number(prev.qty) !== autoQty && <> (prima {fmtQty(Number(prev.qty))})</>}
+            </span>
+          )}
         </label>
       </div>
       {!isNew && !editing && <p className="muted small">In portafoglio: {fmtQty(held)}{quote !== null && <> · prezzo attuale {money(quote, currency)}</>}</p>}
       <div className="form-row">
-        <label>Prezzo ({currency})<input inputMode="decimal" value={f.price} onChange={e => set('price', e.target.value)} placeholder={quote !== null && !editing ? String(quote) : ''} /></label>
+        <label>Prezzo ({currency})<input inputMode="decimal" value={f.price} onChange={e => setPriced('price', e.target.value)} placeholder={quote !== null && !editing ? String(quote) : ''} /></label>
         <label>Commissioni
           <span className="inline-pair">
             <input inputMode="decimal" value={f.commission} onChange={e => set('commission', e.target.value)} placeholder="0" />
@@ -172,10 +188,20 @@ export function MovementForm({ c, editing, onClose, preset, bare }: { c: Ready; 
       {f.type === 'buy' && (
         <label className="check"><input type="checkbox" checked={f.pac} onChange={e => set('pac', e.target.checked)} /> Rata di un PAC</label>
       )}
+      {f.type === 'buy' && f.pac && (
+        <>
+          <label>Importo della rata (€)<input inputMode="decimal" value={f.pacAmount ?? ''} onChange={e => setPriced('pacAmount', e.target.value)} placeholder="es. 50" /></label>
+          <p className="muted small">
+            {rate
+              ? 'Scrivendo il prezzo eseguito, la quantità si ricalcola da sola. Se Trade Republic ne mostra una diversa, scrivila tu: il ricalcolo si ferma.'
+              : 'Per questo titolo non in euro la quantità non si ricalcola: scrivila dalla conferma d\'ordine.'}
+          </p>
+        </>
+      )}
       {preview && <PreviewBox p={preview} type={f.type} currency={currency} atQuote={priced !== f} regime={c.result.regime} />}
       <p className="auth-error" role="alert">{error}</p>
       <div className="form-actions">
-        <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Salvo…' : 'Salva'}</button>
+        <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Salvo…' : prev?.priceEstimated ? 'Salva e conferma' : 'Salva'}</button>
         <button type="button" className="btn btn-ghost" onClick={onClose}>Annulla</button>
       </div>
     </form>

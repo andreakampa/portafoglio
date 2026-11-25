@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import type { Computed } from '../data/useComputedPortfolio'
 import { isEditableMovement, isTransferMovement, useMovementRemove } from '../data/useMovementRemove'
+import { usePortfolioEdit } from '../data/usePortfolioEdit'
+import { TrImport } from './TrImport'
+import { toast } from '../lib/toast'
 import { assetHistory, type HistoryRow } from '../domain/assetHistory'
 import { KIND_LABEL, type Movement } from '../domain/engine/movements'
 import { eur, money, qty as fmtQty, tone } from '../lib/format'
@@ -23,11 +26,73 @@ export function AssetHistory({ c, assetId }: { c: Ready; assetId: string }) {
   const [editing, setEditing] = useState<Movement | null>(null)
   const [error, setError] = useState('')
   const remove = useMovementRemove(c)
+  const edit = usePortfolioEdit()
+  const [confirming, setConfirming] = useState<Set<string> | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const estimated = rows.filter(r => r.m.estimated).map(r => r.m)
+  const refOf = (m: Movement) => {
+    const t = c.portfolio.assets?.[m.assetId]?.transactions?.[m.index]
+    return { id: m.txId, index: m.index, date: t?.date ?? m.date, type: String(t?.type ?? m.kind) }
+  }
+  const confirmNow = async (ms: Movement[]) => {
+    if (!ms.length) return
+    setError('')
+    setBusy(true)
+    try {
+      await edit.confirm(c.selectedId, assetId, ms.map(refOf))
+      toast(ms.length === 1 ? 'Movimento confermato' : `${ms.length} movimenti confermati`)
+      setConfirming(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Conferma non riuscita.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   if (editing) {
     return isTransferMovement(editing)
       ? <TransferEditCard c={c} movement={editing} onClose={() => setEditing(null)} />
       : <MovementForm c={c} editing={editing} onClose={() => setEditing(null)} bare />
+  }
+
+  if (importing) return <TrImport c={c} onClose={() => setImporting(false)} />
+
+  if (confirming) {
+    const chosen = estimated.filter(m => confirming.has(m.key))
+    const toggle = (k: string) => setConfirming(prev => {
+      const n = new Set(prev)
+      if (n.has(k)) n.delete(k)
+      else n.add(k)
+      return n
+    })
+    return (
+      <div className="history">
+        <h3>Confermare {estimated.length === 1 ? 'il movimento' : `${estimated.length} movimenti`} di {rows[0]?.m.symbol}?</h3>
+        <p className="muted small">
+          Quantità e prezzo restano quelli che vedi. Togli il segno alle righe che non coincidono con le conferme d'ordine
+          e correggile con la matita.
+        </p>
+        <ul className="confirm-list">
+          {estimated.map(m => (
+            <li key={m.key}>
+              <label>
+                <input type="checkbox" checked={confirming.has(m.key)} onChange={() => toggle(m.key)} />
+                <span>{fmtDate(m.date)}{m.pac && <span className="badge">PAC</span>}</span>
+                <span>{fmtQty(m.qty)} × {money(m.price, currency)}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        {error && <p className="auth-error" role="alert">{error}</p>}
+        <div className="form-actions">
+          <button type="button" className="btn btn-primary" disabled={busy || !chosen.length} onClick={() => void confirmNow(chosen)}>
+            {busy ? 'Confermo…' : `Conferma ${chosen.length}`}
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setConfirming(null)}>Annulla</button>
+        </div>
+      </div>
+    )
   }
 
   const list = asc ? [...rows].reverse() : rows
@@ -52,6 +117,7 @@ export function AssetHistory({ c, assetId }: { c: Ready; assetId: string }) {
   const actions = (m: Movement) =>
     canEdit(m) ? (
       <span className="row-actions row-actions-compact">
+        {m.estimated && <TagButton tone="confirm" title="Conferma così com'è" onClick={() => void confirmNow([m])}><span className="sr-only">Conferma</span></TagButton>}
         <TagButton tone="edit" title="Modifica" onClick={() => setEditing(m)}><span className="sr-only">Modifica</span></TagButton>
         <TagButton tone="delete" title="Elimina" onClick={() => void onRemove(m)}><span className="sr-only">Elimina</span></TagButton>
       </span>
@@ -82,6 +148,16 @@ export function AssetHistory({ c, assetId }: { c: Ready; assetId: string }) {
           Il PMC in euro e le plus/minus usano il cambio Banca d'Italia del giorno di ogni movimento, come vuole il fisco.
           Il broker mostra il PMC in {currency}: convertito al cambio di oggi dà un risultato diverso, ed è normale.
         </p>
+      )}
+      {estimated.length > 0 && (
+        <div className="confirm-banner">
+          <div>
+            <b>{estimated.length} {estimated.length === 1 ? 'movimento' : 'movimenti'} da confermare</b>
+            <span className="small">Prezzo stimato dalla chiusura di borsa. Confermali se coincidono con le conferme d'ordine, correggili con la matita, oppure importa l'estratto di Trade Republic.</span>
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={() => setImporting(true)}>Importa da Trade Republic</button>
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => setConfirming(new Set(estimated.map(m => m.key)))}>Conferma tutte</button>
+        </div>
       )}
       {error && <p className="auth-error" role="alert">{error}</p>}
 
