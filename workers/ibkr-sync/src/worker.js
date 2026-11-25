@@ -123,6 +123,12 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 export async function sync(env, { xml } = {}) {
   const sa = env.EMULATOR === '1' ? null : JSON.parse(env.FIREBASE_SA)
   const db = database(env, sa ? await accessToken(sa) : null)
+  // Interruttore nell'app (Impostazioni → Portafogli): false = non scaricare nulla da IBKR.
+  if (!xml && (await db.get(`users/${env.UID}/settings/ibkrAutoSync`)) === false) {
+    const paused = { lastRun: new Date().toISOString(), ok: true, paused: true, portfolioId: env.PORTFOLIO_ID }
+    if (env.DRY_RUN !== '1') await db.put(`users/${env.UID}/ibkr_sync`, paused)
+    return paused
+  }
   const report = parseFlex(xml ?? (await downloadFlex(env.IBKR_TOKEN, env.IBKR_QUERY_ID)))
   const path = `users/${env.UID}/portfolio_state/portfolios/${env.PORTFOLIO_ID}`
 
@@ -140,6 +146,7 @@ export async function sync(env, { xml } = {}) {
   const summary = {
     lastRun: new Date().toISOString(),
     ok: true,
+    portfolioId: env.PORTFOLIO_ID,
     dryRun: env.DRY_RUN === '1',
     reportFrom: report.from,
     reportTo: report.to,
