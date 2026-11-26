@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { createKeyring, isRecoveryCode, normalizeRecoveryCode, rewrapPassword, unlockWithPassword, unlockWithRecovery, type KeyEnvelope } from '../lib/crypto'
 import { db } from '../lib/firebase'
 import { loadDeviceKey, storeDeviceKey, takePassword } from '../lib/keyStore'
+import { setVaultKey } from '../lib/vault'
 import { useAuth, useUser } from './context'
 import { DataKeyContext, envelopePath } from './dataKey'
 
@@ -23,7 +24,13 @@ type State =
 
 export function CryptoGate({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useUser()
-  const [state, setState] = useState<State>({ s: 'loading' })
+  const [state, setRaw] = useState<State>({ s: 'loading' })
+  // La chiave va data al livello dati PRIMA che l'app parta (i figli leggono subito).
+  const setState = useCallback((n: State) => {
+    if (n.s === 'ready') setVaultKey(user.uid, n.key)
+    else setVaultKey(user.uid, null)
+    setRaw(n)
+  }, [user.uid])
   // Una sola partenza per utente (in sviluppo React lancia gli effetti due volte, e la password si legge una volta sola).
   const startedFor = useRef<string | null>(null)
 
@@ -51,7 +58,7 @@ export function CryptoGate({ children }: { children: ReactNode }) {
     } catch {
       setState({ s: 'error' })
     }
-  }, [isAdmin, user])
+  }, [isAdmin, user, setState])
 
   useEffect(() => {
     if (startedFor.current === user.uid) return

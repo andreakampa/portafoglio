@@ -1,5 +1,5 @@
 // Lettura dei dati dell'account: proprio record in members, avviso globale, copia completa dei dati.
-import { get, onValue, ref } from 'firebase/database'
+import { get, onValue, ref } from '../lib/vault'
 import { useEffect, useState } from 'react'
 import { useUser } from '../auth/context'
 import { exportFileName, exportPayload, type MemberInfo } from '../domain/accountLifecycle'

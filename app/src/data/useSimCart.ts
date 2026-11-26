@@ -1,4 +1,4 @@
-import { onValue, ref, set } from 'firebase/database'
+import { onValue, ref, set } from '../lib/vault'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUser } from '../auth/context'
 import type { SimOp } from '../domain/simulation'

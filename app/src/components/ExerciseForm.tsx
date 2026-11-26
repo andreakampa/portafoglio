@@ -1,4 +1,4 @@
-import { ref, update } from 'firebase/database'
+import { ref, update } from '../lib/vault'
 import { useState, type FormEvent } from 'react'
 import { useUser } from '../auth/context'
 import type { Computed } from '../data/useComputedPortfolio'

@@ -33,7 +33,11 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     Passo 2 fatto: `auth/CryptoGate.tsx` prima dell'app (solo non admin): chiave creata alla registrazione con chiave di recupero da salvare, busta in `users/{uid}/crypto`,
     chiave ricordata sul dispositivo in IndexedDB (non estraibile, `lib/keyStore.ts`) fino a "Esci"; dopo un reset via email si sblocca con la chiave di recupero; il cambio password richiude la busta.
     `useDataKey()` dà la chiave (null per l'admin). Provato sugli emulatori: registrazione, ricarica, altro dispositivo, reset+recupero, cambio password.
-    Prossimi: 3 strato dati, 4 regole che accettano solo dati cifrati per gli invitati, 5 export decifrato, 6 informativa (Andrea non vuole poterli leggere), nuovo nome Gruzzolo su indirizzo gratuito.
+    Passo 3 fatto: `lib/vault.ts` sostituisce firebase/database in tutti gli hook dei dati (stessi nomi); per gli invitati cifra e decifra, per l'admin va diretto.
+    Unità cifrate (`lib/vaultTree.ts`): un portafoglio intero, ogni altra voce al 2° livello; in chiaro `crypto`, `settings/watchlist`, `settings/push`.
+    Scritture dentro un'unità = rileggi-cambia-richiudi con controllo che nessuno abbia scritto nel frattempo. L'export ("Scarica i miei dati") è già decifrato.
+    Il sito vecchio non legge i dati cifrati: il collegamento è nascosto agli invitati. Provato sugli emulatori (nessun dato in chiaro su Firebase, app e export leggono tutto).
+    Prossimi: 4 regole che accettano solo dati cifrati per gli invitati, 5 export decifrato, 6 informativa (Andrea non vuole poterli leggere), nuovo nome Gruzzolo su indirizzo gratuito.
 - **v2 online** su `/portafoglio/v2/`
   - Login, registrazione con invito, PWA che si aggiorna da sola.
   - **Posizioni:** valore, PMC e risultato, con schede su telefono e tabella su PC.

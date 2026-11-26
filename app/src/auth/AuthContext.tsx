@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { auth, db } from '../lib/firebase'
 import { isValidInvite, normalizeInvite } from '../lib/invites'
 import { forgetDeviceKeys, rememberPassword } from '../lib/keyStore'
+import { setVaultKey } from '../lib/vault'
 import { AuthContext, AuthError, type AuthState } from './context'
 
 // Il controllo vero lo fanno le regole del database: senza members/{uid} i dati
@@ -104,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await forgetDeviceKeys()
+    setVaultKey('', null)
     await fbSignOut(auth)
   }, [])
 

@@ -45,9 +45,12 @@ export function Settings() {
         <p className="muted">
           Nuova app {__APP_VERSION__}.
         </p>
-        <a className="btn btn-ghost" href="/portafoglio/#settings">
-          Impostazioni del sito attuale
-        </a>
+        {/* Il sito vecchio non sa leggere i dati cifrati degli invitati: il collegamento serve solo all'amministratore. */}
+        {isAdmin && (
+          <a className="btn btn-ghost" href="/portafoglio/#settings">
+            Impostazioni del sito attuale
+          </a>
+        )}
       </div>
     </section>
   )
