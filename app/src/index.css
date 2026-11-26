@@ -856,3 +856,10 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 @media print {
   .auth-card > :not(h1):not(.recovery-code) { display: none !important; }
 }
+
+/* Informativa privacy (registrazione e Impostazioni). */
+.privacy-box summary { cursor: pointer; }
+.privacy h3 { margin: 16px 0 6px; font-size: 1rem; }
+.privacy ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.privacy p, .privacy li { line-height: 1.45; }
+.auth-card .privacy { max-height: 50vh; overflow: auto; font-size: .9rem; }

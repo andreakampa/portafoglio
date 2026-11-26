@@ -1,6 +1,7 @@
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { useState, type FormEvent } from 'react'
 import { auth } from '../lib/firebase'
+import { PrivacyText } from '../components/PrivacyText'
 import { inviteFromUrl } from '../lib/invites'
 import { AuthError, useAuth } from './context'
 
@@ -120,6 +121,13 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
               onChange={e => setInvite(e.target.value)}
             />
           </label>
+        )}
+
+        {(mode === 'register' || mode === 'claim') && (
+          <details className="privacy-box">
+            <summary className="small">Registrandoti accetti l'<b>informativa privacy</b>: i tuoi dati sono cifrati e nessuno, nemmeno chi gestisce il sito, può leggerli. Leggila</summary>
+            <PrivacyText />
+          </details>
         )}
 
         <p className="auth-error" role="alert">{error}</p>

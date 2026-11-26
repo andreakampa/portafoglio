@@ -37,7 +37,8 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     Unità cifrate (`lib/vaultTree.ts`): un portafoglio intero, ogni altra voce al 2° livello; in chiaro `crypto`, `settings/watchlist`, `settings/push`.
     Scritture dentro un'unità = rileggi-cambia-richiudi con controllo che nessuno abbia scritto nel frattempo. L'export ("Scarica i miei dati") è già decifrato.
     Il sito vecchio non legge i dati cifrati: il collegamento è nascosto agli invitati. Provato sugli emulatori (nessun dato in chiaro su Firebase, app e export leggono tutto).
-    Prossimi: 4 regole che accettano solo dati cifrati per gli invitati, 5 export decifrato, 6 informativa (Andrea non vuole poterli leggere), nuovo nome Gruzzolo su indirizzo gratuito.
+    Passo 4 fatto: regole (`users/$uid`): per chi non è admin ogni unità deve essere `{__s:{iv,ct}}` e nient'altro; in chiaro solo `crypto`, `settings/watchlist`, `settings/push` (81 test).
+    Passo 5 (export decifrato) incluso nel 3. Passo 6 fatto: informativa `components/PrivacyText.tsx` alla registrazione e in Impostazioni → Privacy.
 - **v2 online** su `/portafoglio/v2/`
   - Login, registrazione con invito, PWA che si aggiorna da sola.
   - **Posizioni:** valore, PMC e risultato, con schede su telefono e tabella su PC.
