@@ -5,7 +5,7 @@ import { FUTURES_TILES, FX_CRYPTO_TILES, INDEX_TILES, VIX_ALERT, VIX_BANDS, VIX_
 import type { RawPortfolio } from '../domain/engine/portfolio'
 import { loadQuotes, type Quote } from '../lib/prices'
 import { eur, pct } from '../lib/format'
-import { LineChart, type LineSeries } from './LineChart'
+import { LineChart, type Band, type LineSeries } from './LineChart'
 import { useHistoryChartPrefs } from '../data/useHistoryChartPrefs'
 import { TOGGLES, setView, toggleLine, type ToggleKey } from '../domain/historyChart'
 import { localToday } from '../lib/today'
@@ -225,6 +225,7 @@ function rangeStart(r: Range, today: string, first: string): string {
 /**
  * Andamento del portafoglio con due viste, come su Interactive Brokers:
  * Valore (euro, con capitale investito) e Performance (% time-weighted, con S&P 500 e Nasdaq 100 a scelta).
+ * Nei conti con margine la vista Valore toglie il prestito: patrimonio netto e soldi tuoi; i totali col prestito sono a scelta.
  * Vista e linee accese restano salvate su Firebase (`settings/historyChart`).
  */
 export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
@@ -242,19 +243,39 @@ export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
     const bench = Object.fromEntries(
       BENCHMARKS.map(b => [b.symbol, indexReturn(h.benchmarks[b.symbol] ?? {}, from, today, h.eurUsd).map(p => ({ date: p.date, v: p.pct }))]),
     )
+    const debtOf = (d: string) => h.debt?.get(d) ?? 0
     return {
       value: { key: 'v', name: 'Valore', color: 'var(--series-1)', area: true, points: inRange.map(p => ({ date: p.date, v: p.valueEur })) },
+      net: { key: 'n', name: 'Patrimonio netto', color: 'var(--series-1)', area: true, points: inRange.map(p => ({ date: p.date, v: p.valueEur - debtOf(p.date) })) },
+      own: { key: 'o', name: 'Soldi tuoi', color: 'var(--muted)', dashed: true, points: inRange.map(p => ({ date: p.date, v: p.investedEur - debtOf(p.date) })) },
+      debt: inRange.map(p => debtOf(p.date)),
       invested: { key: 'i', name: 'Capitale investito', color: 'var(--muted)', dashed: true, points: inRange.map(p => ({ date: p.date, v: p.investedEur })) },
       perf: { key: 'p', name: 'Portafoglio', color: 'var(--series-1)', points: ret.map(p => ({ date: p.date, v: p.pct })) },
       bench,
     }
-  }, [points, from, today, h.benchmarks, h.eurUsd])
+  }, [points, from, today, h.benchmarks, h.eurUsd, h.debt])
 
-  const toggles = TOGGLES.filter(t => t.view === view)
-  const colorOf = (key: ToggleKey) => (key === 'gspc' ? 'var(--series-2)' : key === 'ndx' ? 'var(--series-3)' : 'var(--muted)')
+  // Conto con margine: c'è stato un debito in qualche giorno dello storico (non solo nel periodo scelto).
+  const hasMargin = !!h.debt && [...h.debt.values()].some(v => v > 0)
+  const toggles = TOGGLES.filter(t => t.view === view && (t.key !== 'margin' || hasMargin))
+  const labelOf = (key: ToggleKey, label: string) => (hasMargin && key === 'invested' ? 'Soldi tuoi' : label)
+  const colorOf = (key: ToggleKey) => (key === 'gspc' ? 'var(--series-2)' : key === 'ndx' ? 'var(--series-3)' : key === 'margin' ? 'var(--warn)' : 'var(--muted)')
+  const showGross = hasMargin && prefs.show.margin
+  const bands: Band[] = view === 'value' && showGross ? [{ key: 'b', name: 'Prestito IBKR', color: 'var(--neg)', upper: data.value.points, lower: data.net.points }] : []
   const series: LineSeries[] =
     view === 'value'
-      ? [data.value, ...(prefs.show.invested ? [data.invested] : [])]
+      ? hasMargin
+        ? [
+            data.net,
+            ...(prefs.show.invested ? [data.own] : []),
+            ...(showGross
+              ? [
+                  { ...data.value, key: 'vg', name: 'Valore dei titoli', color: 'var(--warn)', area: false },
+                  { ...data.invested, key: 'ig', name: 'Spesi in titoli (tutto)', color: 'var(--warn)', dashed: 'dots' as const },
+                ]
+              : []),
+          ]
+        : [data.value, ...(prefs.show.invested ? [data.invested] : [])]
       : [
           data.perf,
           ...TOGGLES.filter(t => t.view === 'perf' && prefs.show[t.key]).map(t => ({
@@ -265,6 +286,9 @@ export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
   const lastValue = data.value.points.at(-1)?.v
   const lastInvested = data.invested.points.at(-1)?.v
   const gain = lastValue !== undefined && lastInvested !== undefined ? lastValue - lastInvested : undefined
+  const lastDebt = data.debt.at(-1) ?? 0
+  const lastNet = data.net.points.at(-1)?.v
+  const lastOwn = data.own.points.at(-1)?.v
   const lastPerf = data.perf.points.at(-1)?.v
   const benchLast = TOGGLES.filter(t => t.symbol).map(t => ({ name: `${t.label} (in €)`, v: data.bench[t.symbol!]?.at(-1)?.v }))
 
@@ -291,8 +315,8 @@ export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
           <p className="chart-headline">
             {view === 'value' ? (
               <>
-                <b>{eur(lastValue)}</b>
-                {gain !== undefined && <span className={`small ${gain >= 0 ? 'pos' : 'neg'}`}>{gain >= 0 ? '+' : ''}{eur(gain)} rispetto al capitale investito</span>}
+                <b>{eur(hasMargin ? lastNet : lastValue)}</b>
+                {gain !== undefined && <span className={`small ${gain >= 0 ? 'pos' : 'neg'}`}>{gain >= 0 ? '+' : ''}{eur(gain)} rispetto {hasMargin ? 'ai soldi tuoi' : 'al capitale investito'}</span>}
               </>
             ) : (
               <>
@@ -301,6 +325,13 @@ export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
               </>
             )}
           </p>
+          {view === 'value' && hasMargin && lastValue !== undefined && lastInvested !== undefined && (
+            <p className="chart-breakdown small">
+              Titoli {eur(lastValue)} − prestito IBKR {eur(lastDebt)} = patrimonio netto <b>{eur(lastNet)}</b>
+              <br />
+              Soldi tuoi: {eur(lastInvested)} spesi in titoli − {eur(lastDebt)} pagati col prestito = <b>{eur(lastOwn)}</b>
+            </p>
+          )}
           <div className="chart-toggles" role="group" aria-label={view === 'value' ? 'Linee da mostrare' : 'Indici da confrontare'}>
             <span className="small muted">{view === 'value' ? 'Mostra anche:' : 'Confronta con:'}</span>
             {toggles.map(t => (
@@ -313,17 +344,19 @@ export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
                 onClick={() => savePrefs(toggleLine(prefs, t.key))}
               >
                 <span className="toggle-dot" aria-hidden="true" />
-                {t.label}
+                {labelOf(t.key, t.label)}
               </button>
             ))}
           </div>
           {view === 'value' ? (
-            <LineChart series={series} format={v => eur(v)} tickFormat={eur0} label="Valore del portafoglio nel tempo" />
+            <LineChart series={series} bands={bands} format={v => eur(v)} tickFormat={eur0} label={hasMargin ? 'Patrimonio netto del portafoglio nel tempo' : 'Valore del portafoglio nel tempo'} />
           ) : (
             <LineChart series={series} format={v => pct(v)} tickFormat={v => `${Math.round(v)}%`} zero label="Performance percentuale del portafoglio a confronto con gli indici scelti" />
           )}
           <p className="muted small">
-            {view === 'value'
+            {view === 'value' && hasMargin
+              ? `Patrimonio netto: quello che ti resterebbe vendendo tutto e restituendo il prestito a IBKR. Soldi tuoi: quanto hai messo tu, cioè acquisti meno vendite, tolta la parte pagata col prestito.${showGross ? ' In giallo i totali con il prestito: la fascia rossa in mezzo è il debito sul margine giorno per giorno.' : ''} Prestito dalla sincronizzazione IBKR. `
+              : view === 'value'
               ? 'Valore: quanto vale il portafoglio ogni giorno (sale anche quando aggiungi soldi). '
               : 'Performance: rendimento "time-weighted", acquisti, vendite e trasferimenti non contano come guadagni. Indici convertiti in euro. '}
             Prezzi e cambi di mercato (Yahoo), non quelli fiscali. Non include dividendi e interessi. Vista e linee scelte restano salvate.
@@ -338,6 +371,8 @@ export function HistoryCard({ portfolio }: { portfolio: RawPortfolio }) {
                 {benchLast.map(l => <tr key={l.name}><td>{l.name}</td><td className="num">{l.v === undefined ? '—' : pct(l.v)}</td></tr>)}
                 <tr><td>Valore attuale</td><td className="num">{eur(points.at(-1)?.valueEur)}</td></tr>
                 <tr><td>Capitale investito</td><td className="num">{eur(points.at(-1)?.investedEur)}</td></tr>
+                {hasMargin && <tr><td>Prestito IBKR</td><td className="num">{eur(h.debt?.get(points.at(-1)?.date ?? '') ?? 0)}</td></tr>}
+                {hasMargin && <tr><td>Patrimonio netto</td><td className="num">{eur((points.at(-1)?.valueEur ?? 0) - (h.debt?.get(points.at(-1)?.date ?? '') ?? 0))}</td></tr>}
               </tbody>
             </table>
           </details>

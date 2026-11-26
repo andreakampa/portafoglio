@@ -324,10 +324,14 @@ textarea {
 .chart-dot { stroke: var(--surface); stroke-width: 2; }
 .chart-tick { font-size: 11px; fill: var(--muted); }
 .chart-end { font-size: 12px; fill: var(--text); font-variant-numeric: tabular-nums; }
+.chart-breakdown { margin: 4px 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2, rgb(127 127 127 / 8%)); color: var(--muted); line-height: 1.6; }
+.chart-breakdown b { color: var(--text); }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 0 0 6px; padding: 0; font-size: .85rem; color: var(--muted); }
 .chart-legend li { display: flex; align-items: center; gap: 6px; }
 .key-line { display: inline-block; width: 14px; height: 2px; border-radius: 1px; }
 .key-line.dashed { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px); }
+.key-line.dotted { background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px); }
+.key-band { display: inline-block; width: 14px; height: 9px; border-radius: 2px; vertical-align: middle; background: currentColor; opacity: 0.35; }
 .seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-2); }
 .seg button { min-height: 36px; padding: 0 16px; border: none; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }

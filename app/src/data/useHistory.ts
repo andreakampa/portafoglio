@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { buildHistory, type Closes, type History } from '../domain/engine/history.ts'
+import { marginDebtByDate, type MarginPortfolio } from '../domain/engine/margin.ts'
+import type { MarginDayRow } from '../domain/ibkr/sync.ts'
 import type { RawPortfolio } from '../domain/engine/portfolio.ts'
 import { symbolOf } from '../domain/engine/valuation.ts'
 import { loadCloses } from '../lib/priceHistory.ts'
@@ -35,6 +37,8 @@ export interface HistoryState {
   /** Chiusure degli indici e cambio USD per 1 EUR (per riportarli in euro). */
   benchmarks: Record<string, Closes>
   eurUsd: Closes
+  /** Debito sul margine in euro per ogni giorno dello storico; null se il portafoglio non ha dati sul margine. */
+  debt: Map<string, number> | null
 }
 
 /** Storico del valore del portafoglio scelto e degli indici di confronto (Yahoo, via Worker). */
@@ -56,7 +60,10 @@ export function useHistory(portfolio: RawPortfolio | undefined): HistoryState {
     const first = assets.flatMap(a => (a.transactions ?? []).map(t => t.date)).filter(Boolean).sort()[0] ?? today
     const years = (Date.parse(today) - Date.parse(first)) / (365 * 86400000)
     const range = years > 4.5 ? '10y' : years > 1.8 ? '5y' : '2y'
-    const currencies = [...new Set(assets.map(a => a.currency).filter(c => c !== 'EUR').concat('USD'))]
+    const mp = portfolio as MarginPortfolio
+    const marginRows: Partial<MarginDayRow>[] = Array.isArray(mp.marginDaily) ? mp.marginDaily : Object.values((mp.marginDaily ?? {}) as Record<string, MarginDayRow>)
+    const marginCurrencies = marginRows.map(r => (r?.currency || 'EUR').toUpperCase())
+    const currencies = [...new Set(assets.map(a => a.currency).concat(marginCurrencies).filter(c => c !== 'EUR').concat('USD'))]
     ;(async () => {
       const closes: Record<string, Closes> = {}
       await mapLimit([...new Set(assets.map(a => a.symbol))], 5, async s => void (closes[s] = await closesOf(s, range)))
@@ -65,7 +72,8 @@ export function useHistory(portfolio: RawPortfolio | undefined): HistoryState {
       const benchmarks: Record<string, Closes> = {}
       await mapLimit([...BENCHMARKS], 2, async b => void (benchmarks[b.symbol] = await closesOf(b.symbol, range)))
       const history = buildHistory({ assets, closes, fx, to: today })
-      if (alive) setState({ for: portfolio, value: { status: 'ready', history, benchmarks, eurUsd: fx.USD ?? {} } })
+      const debt = marginDebtByDate(mp, history.points.map(p => p.date), fx)
+      if (alive) setState({ for: portfolio, value: { status: 'ready', history, benchmarks, eurUsd: fx.USD ?? {}, debt } })
     })()
     return () => {
       alive = false
@@ -73,5 +81,5 @@ export function useHistory(portfolio: RawPortfolio | undefined): HistoryState {
   }, [portfolio, assets, today])
 
   if (state && state.for === portfolio) return state.value
-  return { status: 'loading', history: state?.value.history ?? null, benchmarks: state?.value.benchmarks ?? {}, eurUsd: state?.value.eurUsd ?? {} }
+  return { status: 'loading', history: state?.value.history ?? null, benchmarks: state?.value.benchmarks ?? {}, eurUsd: state?.value.eurUsd ?? {}, debt: state?.value.debt ?? null }
 }

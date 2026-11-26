@@ -6,10 +6,19 @@ export interface LineSeries {
   /** Variabile CSS del colore della serie, es. 'var(--series-1)'. */
   color: string
   points: { date: string; v: number }[]
-  /** Linea tratteggiata (es. capitale investito). */
-  dashed?: boolean
+  /** Linea tratteggiata (es. capitale investito), o a puntini con 'dots'. */
+  dashed?: boolean | 'dots'
   /** Area colorata leggera sotto la linea (es. valore del portafoglio). */
   area?: boolean
+}
+
+/** Fascia colorata fra due linee (es. il prestito fra valore dei titoli e patrimonio netto): nel mirino mostra la differenza. */
+export interface Band {
+  key: string
+  name: string
+  color: string
+  upper: { date: string; v: number }[]
+  lower: { date: string; v: number }[]
 }
 
 interface Props {
@@ -21,6 +30,7 @@ interface Props {
   /** Linea dello zero (per i rendimenti in %). */
   zero?: boolean
   label: string
+  bands?: Band[]
 }
 
 const fmtDay = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: '2-digit' })
@@ -41,7 +51,7 @@ function valueAt(points: LineSeries['points'], date: string): number | undefined
 }
 
 /** Grafico a linee in SVG: griglia leggera, etichette a fine linea, legenda e lettura con il mirino al passaggio del dito/mouse. */
-export function LineChart({ series, format, tickFormat = format, height = 220, zero = false, label }: Props) {
+export function LineChart({ series, format, tickFormat = format, height = 220, zero = false, label, bands = [] }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(600)
   const [hover, setHover] = useState<number | null>(null)
@@ -101,7 +111,10 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
       {visible.length > 1 && (
         <ul className="chart-legend" aria-label="Legenda">
           {visible.map(s => (
-            <li key={s.key}><span className={`key-line${s.dashed ? ' dashed' : ''}`} style={{ color: s.color, background: s.dashed ? undefined : s.color }} />{s.name}</li>
+            <li key={s.key}><span className={`key-line${s.dashed === 'dots' ? ' dotted' : s.dashed ? ' dashed' : ''}`} style={{ color: s.color, background: s.dashed ? undefined : s.color }} />{s.name}</li>
+          ))}
+          {bands.map(b => (
+            <li key={b.key}><span className="key-band" style={{ color: b.color }} />{b.name}</li>
           ))}
         </ul>
       )}
@@ -121,6 +134,14 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
           </g>
         ))}
         {zero && min < 0 && max > 0 && <line x1={left} x2={right} y1={y(0)} y2={y(0)} className="chart-axis" />}
+        {bands.filter(b => b.upper.length && b.upper.every(p => idx.has(p.date)) && b.lower.every(p => idx.has(p.date))).map(b => (
+          <polygon
+            key={b.key}
+            fill={b.color}
+            fillOpacity={0.22}
+            points={b.upper.map(p => `${x(idx.get(p.date)!)},${y(p.v)}`).concat([...b.lower].reverse().map(p => `${x(idx.get(p.date)!)},${y(p.v)}`)).join(' ')}
+          />
+        ))}
         {visible.filter(s => s.area).map(s => (
           <polygon
             key={s.key + '-area'}
@@ -135,7 +156,7 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
             fill="none"
             stroke={s.color}
             strokeWidth={2}
-            strokeDasharray={s.dashed ? '5 4' : undefined}
+            strokeDasharray={s.dashed === 'dots' ? '1 4' : s.dashed ? '5 4' : undefined}
             strokeLinejoin="round"
             strokeLinecap="round"
             points={s.points.map(p => `${x(idx.get(p.date)!)},${y(p.v)}`).join(' ')}
@@ -164,6 +185,13 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
             const v = valueAt(s.points, hd)
             return v === undefined ? null : (
               <div key={s.key} className="chart-tip-row"><span className="key-line" style={{ background: s.color }} /><b>{format(v)}</b> <span className="muted">{s.name}</span></div>
+            )
+          })}
+          {bands.map(b => {
+            const u = valueAt(b.upper, hd)
+            const l = valueAt(b.lower, hd)
+            return u === undefined || l === undefined ? null : (
+              <div key={b.key} className="chart-tip-row"><span className="key-band" style={{ color: b.color }} /><b>{format(u - l)}</b> <span className="muted">{b.name}</span></div>
             )
           })}
         </div>
