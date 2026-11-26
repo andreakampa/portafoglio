@@ -40,8 +40,8 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     Passo 4 fatto: regole (`users/$uid`): per chi non è admin ogni unità deve essere `{__s:{iv,ct}}` e nient'altro; in chiaro solo `crypto`, `settings/watchlist`, `settings/push` (81 test).
     **Nuovo nome e logo: Gruzzolo** (26/11/2026, scelto da Andrea il logo "A · Sacchetto": sacchetto oro con linea che sale su verde `#0f6e66`).
     Nome e icone cambiati in v2 (menu, accesso, manifest PWA, notifiche, inviti, email, file esportati) e nelle icone del sito vecchio.
-    Bozze in `/mnt/project-files/gruzzolo-logo/`. **Resta:** indirizzo gratuito tutto suo (es. miogruzzolo.pages.dev) al posto di andreakampa.github.io.
-    **Indirizzo gratuito (in corso):** la v2 si compila anche alla radice (`npm run build:gruzzolo`, `APP_BASE=/`) per Cloudflare Pages collegato al repo
+    Bozze in `/mnt/project-files/gruzzolo-logo/`. Indirizzo scelto: **https://miogruzzolo.pages.dev** (gruzzolo.pages.dev era già preso).
+    **Indirizzo gratuito (26/11/2026):** progetto Cloudflare Pages `miogruzzolo` creato da Andrea (Framework None, NODE_VERSION=24, ramo main; ogni unione su main lo ripubblica). la v2 si compila anche alla radice (`npm run build:gruzzolo`, `APP_BASE=/`) per Cloudflare Pages collegato al repo
     (progetto `miogruzzolo`, comando `cd app && npm ci && npm run build:gruzzolo`, cartella `app/dist`). Inviti ed email usano l'indirizzo da cui si usa l'app (`lib/site.ts`).
     Worker: `miogruzzolo.pages.dev` tra le origini ammesse; le notifiche aprono `#/watchlist` relativo. Servono: progetto Pages, dominio autorizzato in Firebase Auth, ripubblicare i 3 Worker.
     Passo 5 (export decifrato) incluso nel 3. Passo 6 fatto: informativa `components/PrivacyText.tsx` alla registrazione e in Impostazioni → Privacy.
