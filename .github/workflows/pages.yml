@@ -2,7 +2,7 @@ name: Test e pubblicazione
 
 # Su ogni PR: controlli e test. Su main: se tutto passa, pubblica su GitHub Pages
 #   /portafoglio/      sito attuale (index.html, css, js, favicon)
-#   /portafoglio/v2/   nuova app (app/, compilata con Vite)
+#   /portafoglio/v2/   rimando a https://miogruzzolo.pages.dev (v2-trasloco/)
 on:
   push:
     branches: [main]
@@ -59,7 +59,8 @@ jobs:
         run: |
           mkdir _site
           cp -r index.html css js favicon _site/
-          cp -r app/dist _site/v2
+          # La v2 si è spostata su miogruzzolo.pages.dev (Cloudflare Pages): qui resta solo il rimando.
+          cp -r v2-trasloco _site/v2
 
       - name: Carica il sito
         if: github.event_name != 'pull_request'

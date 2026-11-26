@@ -38,7 +38,7 @@ describe('codici invito', () => {
 describe('link di invito', () => {
   it('il link apre la registrazione con il codice', () => {
     const link = inviteLink('K7PM-Q2XD-9RWA')
-    expect(link).toBe('https://andreakampa.github.io/portafoglio/v2/?invito=K7PM-Q2XD-9RWA')
+    expect(link).toBe('https://miogruzzolo.pages.dev/?invito=K7PM-Q2XD-9RWA')
     expect(inviteFromUrl(new URL(link).search)).toBe('K7PM-Q2XD-9RWA')
     expect(inviteFromUrl('?invito=k7pm-q2xd-9rwa')).toBe('K7PM-Q2XD-9RWA')
     expect(inviteFromUrl('?invito=<script>')).toBeNull()

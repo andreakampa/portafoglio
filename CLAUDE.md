@@ -7,7 +7,8 @@ Regole fiscali applicate dal motore: [docs/regole-fiscali.md](docs/regole-fiscal
 - Rispondi in **italiano**, semplice: Andrea non è uno sviluppatore e vuole che tutto sia automatico (niente passi a mano se evitabili).
 - **Mai committare senza test verdi.** Ogni modifica: branch → test → commit → PR → OK di Andrea → unione su `main`.
 - Unire su `main` = pubblicare: GitHub Actions (`.github/workflows/pages.yml`) rifà test e build e pubblica su GitHub Pages
-  il sito attuale (`/portafoglio/`) e la v2 (`/portafoglio/v2/`). Su questo repository l'auto-merge non è abilitato.
+  il sito attuale (`/portafoglio/`); `/portafoglio/v2/` è solo un rimando (`v2-trasloco/`). La v2 (Gruzzolo) è su
+  https://miogruzzolo.pages.dev: Cloudflare Pages la ricompila da solo a ogni unione su main (`npm run build:gruzzolo`). Su questo repository l'auto-merge non è abilitato.
 - **Dati veri su Firebase:** prima un backup (`firebase database:get / -o .backup/database-<data>.json`), poi modifiche
   solo con l'OK esplicito di Andrea. Mostra prima cosa cambierà.
 - Mai mostrare secret (token IBKR, chiave dell'account di servizio): leggili da file e passali via stdin.
