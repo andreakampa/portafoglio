@@ -6,6 +6,7 @@ import { CacheCard, PasswordCard } from '../components/AccountCards'
 import { InvitesCard, PortfoliosCard } from '../components/PortfolioAdmin'
 import { MembersCard, MyDataCard } from '../components/AccountLifecycle'
 import { PrivacyText } from '../components/PrivacyText'
+import { OLD_SITE_URL } from '../lib/site'
 
 export function Settings() {
   const { signOut } = useAuth()
@@ -52,7 +53,7 @@ export function Settings() {
         </p>
         {/* Il sito vecchio non sa leggere i dati cifrati degli invitati: il collegamento serve solo all'amministratore. */}
         {isAdmin && (
-          <a className="btn btn-ghost" href="/portafoglio/#settings">
+          <a className="btn btn-ghost" href={`${OLD_SITE_URL}#settings`}>
             Impostazioni del sito attuale
           </a>
         )}
