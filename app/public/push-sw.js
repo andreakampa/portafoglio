@@ -4,11 +4,11 @@ self.addEventListener('push', event => {
   try {
     data = event.data ? event.data.json() : {}
   } catch {
-    data = { title: 'Portafoglio', body: event.data ? event.data.text() : '' }
+    data = { title: 'Gruzzolo', body: event.data ? event.data.text() : '' }
   }
   const scope = self.registration.scope
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Portafoglio', {
+    self.registration.showNotification(data.title || 'Gruzzolo', {
       body: data.body || '',
       tag: data.tag,
       icon: scope + 'icon-192.png',

@@ -88,9 +88,9 @@ export function mailto({ to = [], bcc = [], subject, body }: { to?: string[]; bc
 export function suspensionMail(email: string, m: Required<Pick<MemberInfo, 'suspendedAt' | 'deleteAfter'>>, appUrl: string) {
   return mailto({
     to: [email],
-    subject: 'Portafoglio: il tuo accesso è sospeso',
+    subject: 'Gruzzolo: il tuo accesso è sospeso',
     body:
-      `Ciao,\n\nti scrivo per dirti che dal ${dateIt(m.suspendedAt)} il tuo accesso a Portafoglio è sospeso.\n\n` +
+      `Ciao,\n\nti scrivo per dirti che dal ${dateIt(m.suspendedAt)} il tuo accesso a Gruzzolo è sospeso.\n\n` +
       `Puoi ancora entrare e consultare i tuoi dati fino al ${dateIt(m.deleteAfter)}. In Impostazioni trovi "Scarica i miei dati": ` +
       `ti consiglio di farlo prima di quella data, perché dopo verrà cancellato tutto.\n\n${appUrl}\n\nUn saluto`,
   })
@@ -100,9 +100,9 @@ export function closingMail(emails: string[], n: SiteNotice, appUrl: string) {
   const when = n.closesAt != null ? dateIt(n.closesAt) : ''
   return mailto({
     bcc: emails,
-    subject: `Portafoglio chiude il ${when}`,
+    subject: `Gruzzolo chiude il ${when}`,
     body:
-      `Ciao,\n\nPortafoglio chiuderà il ${when}. Dopo quella data i dati di tutti verranno cancellati.\n\n` +
+      `Ciao,\n\nGruzzolo chiuderà il ${when}. Dopo quella data i dati di tutti verranno cancellati.\n\n` +
       `Entra e scarica i tuoi da Impostazioni → "Scarica i miei dati".` +
       (n.message ? `\n\n${n.message}` : '') +
       `\n\n${appUrl}\n\nGrazie di averlo usato!`,
@@ -110,9 +110,9 @@ export function closingMail(emails: string[], n: SiteNotice, appUrl: string) {
 }
 
 /** Nome del file con tutti i dati dell'utente. */
-export const exportFileName = (now: number) => `portafoglio-miei-dati-${new Date(now).toISOString().slice(0, 10)}.json`
+export const exportFileName = (now: number) => `gruzzolo-miei-dati-${new Date(now).toISOString().slice(0, 10)}.json`
 
 /** Contenuto del file: tutto users/{uid} più due righe per capire cos'è. */
 export function exportPayload(email: string | null, data: unknown, now: number) {
-  return { esportatoIl: new Date(now).toISOString(), account: email, formato: 'Portafoglio v2, copia completa dei dati (users/{uid})', dati: data ?? {} }
+  return { esportatoIl: new Date(now).toISOString(), account: email, formato: 'Gruzzolo, copia completa dei dati (users/{uid})', dati: data ?? {} }
 }

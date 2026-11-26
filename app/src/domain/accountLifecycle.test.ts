@@ -70,7 +70,7 @@ describe('email', () => {
 
 describe('esportazione', () => {
   it('nome del file con la data', () => {
-    expect(exportFileName(NOW)).toBe('portafoglio-miei-dati-2026-11-25.json')
+    expect(exportFileName(NOW)).toBe('gruzzolo-miei-dati-2026-11-25.json')
   })
   it('contiene tutti i dati', () => {
     const p = exportPayload('a@b.it', { settings: { x: 1 } }, NOW)

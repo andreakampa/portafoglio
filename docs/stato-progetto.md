@@ -38,6 +38,9 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     Scritture dentro un'unità = rileggi-cambia-richiudi con controllo che nessuno abbia scritto nel frattempo. L'export ("Scarica i miei dati") è già decifrato.
     Il sito vecchio non legge i dati cifrati: il collegamento è nascosto agli invitati. Provato sugli emulatori (nessun dato in chiaro su Firebase, app e export leggono tutto).
     Passo 4 fatto: regole (`users/$uid`): per chi non è admin ogni unità deve essere `{__s:{iv,ct}}` e nient'altro; in chiaro solo `crypto`, `settings/watchlist`, `settings/push` (81 test).
+    **Nuovo nome e logo: Gruzzolo** (26/11/2026, scelto da Andrea il logo "A · Sacchetto": sacchetto oro con linea che sale su verde `#0f6e66`).
+    Nome e icone cambiati in v2 (menu, accesso, manifest PWA, notifiche, inviti, email, file esportati) e nelle icone del sito vecchio.
+    Bozze in `/mnt/project-files/gruzzolo-logo/`. **Resta:** indirizzo gratuito tutto suo (es. gruzzolo.pages.dev) al posto di andreakampa.github.io.
     Passo 5 (export decifrato) incluso nel 3. Passo 6 fatto: informativa `components/PrivacyText.tsx` alla registrazione e in Impostazioni → Privacy.
 - **v2 online** su `/portafoglio/v2/`
   - Login, registrazione con invito, PWA che si aggiorna da sola.

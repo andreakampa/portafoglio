@@ -72,7 +72,7 @@ export function LoginScreen({ mode: initial = 'login' }: { mode?: Mode }) {
       <form className="auth-card" onSubmit={onSubmit} noValidate>
         <div className="auth-brand">
           <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={40} height={40} />
-          <span>Portafoglio</span>
+          <span>Gruzzolo</span>
         </div>
         <h1>{title}</h1>
         {mode === 'claim' && (
