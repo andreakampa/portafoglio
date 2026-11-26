@@ -9,6 +9,8 @@ export const TOGGLES = [
   { key: 'gspc', symbol: '^GSPC', label: 'S&P 500', view: 'perf' },
   { key: 'ndx', symbol: '^NDX', label: 'Nasdaq 100', view: 'perf' },
   { key: 'invested', symbol: null, label: 'Capitale investito', view: 'value' },
+  /** Solo per i conti con margine: valore dei titoli e spesa totale, compresa la parte pagata col prestito. */
+  { key: 'margin', symbol: null, label: 'Titoli comprati a margine', view: 'value' },
 ] as const
 
 export type ToggleKey = (typeof TOGGLES)[number]['key']
@@ -18,8 +20,8 @@ export interface HistoryChartPrefs {
   show: Record<ToggleKey, boolean>
 }
 
-/** Prima di qualsiasi scelta: vista Valore, tutte le linee accese (come il grafico di prima). */
-export const DEFAULT_PREFS: HistoryChartPrefs = { view: 'value', show: { gspc: true, ndx: true, invested: true } }
+/** Prima di qualsiasi scelta: vista Valore, indici e capitale accesi; i totali col prestito spenti. */
+export const DEFAULT_PREFS: HistoryChartPrefs = { view: 'value', show: { gspc: true, ndx: true, invested: true, margin: false } }
 
 /** Legge ciò che è salvato, ignorando valori sconosciuti o rovinati; quello che manca prende il valore di base. */
 export function reconcileChartPrefs(saved: unknown): HistoryChartPrefs {

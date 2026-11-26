@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { leverageAlert, marginOnDate, summarizeMargin, type MarginPortfolio } from './margin'
+import { leverageAlert, marginDebtByDate, marginOnDate, summarizeMargin, type MarginPortfolio } from './margin'
 import type { PositionRow } from './valuation'
 
 const row = (valueEur: number | null, qty = 1): PositionRow => ({
@@ -107,5 +107,40 @@ describe('margine nel giorno di un acquisto', () => {
     expect(marginOnDate(covered, '2026-03-10')).toEqual({ date: '2026-03-10', debts: [] })
     expect(marginOnDate(covered, '2026-12-01')!.debts).toEqual([])
     expect(marginOnDate(covered, '2025-12-31')).toBeNull()
+  })
+})
+
+describe('debito sul margine giorno per giorno', () => {
+  const daily: MarginPortfolio = {
+    marginHistoryFrom: '2026-01-01',
+    marginDaily: [
+      { date: '2026-06-02', currency: 'USD', principal: -1100, ratePct: 5, interest: 0 },
+      { date: '2026-06-02', currency: 'CAD', principal: -150, ratePct: 4, interest: 0 },
+      { date: '2026-06-03', currency: 'USD', principal: -2200, ratePct: 5, interest: 0 },
+    ],
+    marginStatus: { date: '2026-06-20', baseCurrency: 'EUR', baseCash: -5000, balances: [{ currency: 'USD', endingCash: -5600, accrued: 0, ratePct: 5 }] },
+  }
+  const fxs = { USD: { '2026-06-01': 1.1, '2026-06-03': 1.1 }, CAD: { '2026-06-02': 1.5 } }
+
+  it('somma le valute a debito in euro, tiene il giorno fino a 5 giorni, poi zero; dalla foto usa il saldo IBKR', () => {
+    const d = marginDebtByDate(daily, ['2026-05-30', '2026-06-02', '2026-06-03', '2026-06-06', '2026-06-15', '2026-06-20', '2026-06-25'], fxs)!
+    expect(d.get('2026-05-30')).toBe(0)
+    expect(d.get('2026-06-02')).toBe(1100) // 1000 (USD, cambio del giorno prima) + 100 (CAD)
+    expect(d.get('2026-06-03')).toBe(2000)
+    expect(d.get('2026-06-06')).toBe(2000)
+    expect(d.get('2026-06-15')).toBe(0)
+    expect(d.get('2026-06-20')).toBe(5000)
+    expect(d.get('2026-06-25')).toBe(5000)
+  })
+
+  it('senza dati sul margine risponde null; saldo positivo = nessun debito', () => {
+    expect(marginDebtByDate({}, ['2026-06-02'], fxs)).toBeNull()
+    const credit = marginDebtByDate({ marginStatus: { date: '2026-06-01', baseCurrency: 'EUR', baseCash: 300, balances: [{ currency: 'EUR', endingCash: 300, accrued: 0, ratePct: null }] } }, ['2026-06-02'], fxs)!
+    expect(credit.get('2026-06-02')).toBe(0)
+  })
+
+  it('accetta lo storico salvato come oggetto (Firebase)', () => {
+    const asObject = { ...daily, marginDaily: Object.fromEntries((daily.marginDaily ?? []).map((r, i) => [String(i), r])) } as unknown as MarginPortfolio
+    expect(marginDebtByDate(asObject, ['2026-06-03'], fxs)!.get('2026-06-03')).toBe(2000)
   })
 })

@@ -62,6 +62,9 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     realizzate nell'anno), cassa netta, tasto MAX. Rifà il calcolo col motore vero su una copia del portafoglio: non salva nulla.
   - **Movimenti:** prezzo di negoziazione, filtri per periodo e tipo, short, margine e interessi.
   - **Grafico Andamento (Panoramica):** viste Valore e Performance come su IBKR, S&P 500 e Nasdaq 100 accendibili; scelta salvata in `settings/historyChart`.
+    **Patrimonio netto (26/11/2026):** nei conti con margine la vista Valore mostra patrimonio netto (valore − prestito) e "Soldi tuoi" (capitale investito − prestito);
+    "Titoli comprati a margine" (spento di base) riaccende valore e spesa totali con la fascia rossa del prestito. Debito giornaliero da `marginDaily`
+    (cambi di mercato), dal giorno della foto `marginStatus` in poi il saldo IBKR in euro (`marginDebtByDate` in `engine/margin.ts`). Gli altri portafogli non cambiano.
   - **Pannello Mercati (Panoramica, 25/11/2026):** due pagine da sfogliare. Indici: lancetta del VIX a fasce (calmo <20, nervoso 20–25,
     paura 25–30 giallo, paura estrema da 30 rosso), Nasdaq 100, S&P 500, VIX, VXN, EUR/USD, BTC ed ETH in dollari; variazione del giorno
     verde/rossa, prezzo che lampeggia quando cambia, aggiornamento ogni minuto con l'app in primo piano. Fuori orario sugli indici ☀️ (pre)

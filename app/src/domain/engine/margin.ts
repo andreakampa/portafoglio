@@ -158,3 +158,81 @@ export function marginOnDate(p: MarginPortfolio, date: string): MarginOnDate | n
   const debts = rows.filter(r => r.date === day && r.principal < 0).map(r => ({ currency: r.currency, principal: r.principal, ratePct: r.ratePct }))
   return { date: day, debts }
 }
+
+/**
+ * Debito sul margine giorno per giorno, in euro, per i giorni chiesti (di solito quelli del grafico Andamento).
+ * - Righe giornaliere della sincronizzazione IBKR: si usa l'ultimo giorno registrato entro 5 giorni,
+ *   altrimenti (nel periodo coperto dallo storico) il conto non aveva debito. Valute convertite col cambio di mercato del giorno.
+ * - Dal giorno della foto del margine in poi vale la foto (saldo netto in euro di IBKR): è la più recente.
+ * - Prima dello storico si considera 0: non si inventa un debito.
+ * null se il portafoglio non ha dati sul margine (non è un conto IBKR sincronizzato).
+ * `fx`: unità di valuta per 1 EUR, per data (come in buildHistory).
+ */
+export function marginDebtByDate(p: MarginPortfolio, dates: string[], fx: Record<string, Record<string, number>>): Map<string, number> | null {
+  const raw = p.marginDaily as MarginDayRow[] | Record<string, MarginDayRow> | undefined
+  const rows = (Array.isArray(raw) ? raw : Object.values(raw ?? {})).filter(r => r?.date && Number.isFinite(Number(r.principal)))
+  const st = p.marginStatus
+  const statusDebt = st && st.balances?.length ? statusDebtEur(st) : null
+  if (!rows.length && statusDebt === null) return null
+
+  const byDay = new Map<string, MarginDayRow[]>()
+  for (const r of rows) byDay.set(r.date, [...(byDay.get(r.date) ?? []), r])
+  const days = [...byDay.keys()].sort()
+  const lastFx = new Map<string, number>()
+  const fxDays = new Map(Object.entries(fx).map(([c, s]) => [c, Object.keys(s).sort()]))
+  const rateOn = (cur: string, d: string): number | null => {
+    if (cur === 'EUR') return 1
+    const s = fx[cur]
+    const ds = fxDays.get(cur)
+    if (s && ds) {
+      // Ultimo cambio noto entro quel giorno (anche nei weekend).
+      let lo = 0
+      let hi = ds.length - 1
+      let found: string | undefined
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1
+        if (ds[mid]! <= d) {
+          found = ds[mid]
+          lo = mid + 1
+        } else hi = mid - 1
+      }
+      const r = found ? s[found] : undefined
+      if (r && r > 0) {
+        lastFx.set(cur, r)
+        return r
+      }
+    }
+    return lastFx.get(cur) ?? null
+  }
+
+  const out = new Map<string, number>()
+  let di = -1
+  for (const d of [...dates].sort()) {
+    if (statusDebt !== null && st && d >= st.date) {
+      out.set(d, statusDebt)
+      continue
+    }
+    while (di + 1 < days.length && days[di + 1]! <= d) di++
+    const day = di >= 0 ? days[di]! : null
+    if (day === null || Date.parse(d) - Date.parse(day) > 5 * 86400000) {
+      out.set(d, 0)
+      continue
+    }
+    let debt = 0
+    for (const r of byDay.get(day)!) {
+      const principal = Number(r.principal)
+      if (principal >= 0) continue
+      const rate = rateOn((r.currency || 'EUR').toUpperCase(), day)
+      if (rate) debt += -principal / rate
+    }
+    out.set(d, round(debt))
+  }
+  return out
+}
+
+/** Debito netto in euro dalla foto del margine (riga in euro di IBKR, o somma delle valute in EUR se manca). */
+function statusDebtEur(st: MarginStatus): number | null {
+  if (st.baseCash != null && Number.isFinite(st.baseCash)) return round(Math.max(0, -st.baseCash))
+  if (st.balances.every(b => b.currency === 'EUR')) return round(Math.max(0, -st.balances.reduce((s, b) => s + b.endingCash, 0)))
+  return null
+}
