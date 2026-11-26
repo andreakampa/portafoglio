@@ -55,6 +55,16 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(600)
   const [hover, setHover] = useState<number | null>(null)
+  // Altezza massima vista della legenda: mentre si leggono i valori va a capo, e il grafico non deve saltare a ogni passaggio.
+  const legend = useRef<HTMLUListElement>(null)
+  const [legendH, setLegendH] = useState(0)
+  const legendKey = series.map(s => s.key).concat(bands.map(b => b.key)).join('|')
+
+  useEffect(() => setLegendH(0), [legendKey, width])
+  useEffect(() => {
+    const h = legend.current?.offsetHeight ?? 0
+    if (h > legendH) setLegendH(h)
+  })
 
   useEffect(() => {
     const el = box.current
@@ -108,16 +118,23 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
 
   return (
     <div className="chart" ref={box}>
-      {visible.length > 1 && (
-        <ul className="chart-legend" aria-label="Legenda">
-          {visible.map(s => (
-            <li key={s.key}><span className={`key-line${s.dashed === 'dots' ? ' dotted' : s.dashed ? ' dashed' : ''}`} style={{ color: s.color, background: s.dashed ? undefined : s.color }} />{s.name}</li>
-          ))}
-          {bands.map(b => (
-            <li key={b.key}><span className="key-band" style={{ color: b.color }} />{b.name}</li>
-          ))}
-        </ul>
-      )}
+      {/* Legenda sopra il grafico: passando col dito/mouse mostra data e valori al posto di una finestrella che coprirebbe le linee. */}
+      <ul ref={legend} style={{ minHeight: legendH || undefined }} className={`chart-legend${hd ? ' reading' : ''}`} aria-label={hd ? `Valori del ${fmtDay(hd)}` : 'Legenda'} aria-live="polite">
+        {hd && <li className="chart-legend-date">{fmtDay(hd)}</li>}
+        {visible.map(s => {
+          const v = hd ? valueAt(s.points, hd) : undefined
+          return (
+            <li key={s.key}><span className={`key-line${s.dashed === 'dots' ? ' dotted' : s.dashed ? ' dashed' : ''}`} style={{ color: s.color, background: s.dashed ? undefined : s.color }} />{v !== undefined && <b>{format(v)}</b>}{s.name}</li>
+          )
+        })}
+        {bands.map(b => {
+          const u = hd ? valueAt(b.upper, hd) : undefined
+          const l = hd ? valueAt(b.lower, hd) : undefined
+          return (
+            <li key={b.key}><span className="key-band" style={{ color: b.color }} />{u !== undefined && l !== undefined && <b>{format(u - l)}</b>}{b.name}</li>
+          )
+        })}
+      </ul>
       <svg
         width={width}
         height={height}
@@ -178,24 +195,6 @@ export function LineChart({ series, format, tickFormat = format, height = 220, z
           </g>
         )}
       </svg>
-      {hd && (
-        <div className="chart-tip" style={{ left: Math.min(Math.max(x(hover!) / width, 0.15), 0.85) * 100 + '%' }} role="status">
-          <div className="muted small">{fmtDay(hd)}</div>
-          {visible.map(s => {
-            const v = valueAt(s.points, hd)
-            return v === undefined ? null : (
-              <div key={s.key} className="chart-tip-row"><span className="key-line" style={{ background: s.color }} /><b>{format(v)}</b> <span className="muted">{s.name}</span></div>
-            )
-          })}
-          {bands.map(b => {
-            const u = valueAt(b.upper, hd)
-            const l = valueAt(b.lower, hd)
-            return u === undefined || l === undefined ? null : (
-              <div key={b.key} className="chart-tip-row"><span className="key-band" style={{ color: b.color }} /><b>{format(u - l)}</b> <span className="muted">{b.name}</span></div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
