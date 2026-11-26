@@ -1,4 +1,5 @@
 // Codici invito: stesso formato accettato da database.rules.json (/^[A-Z0-9-]{8,32}$/).
+import { appUrl } from './site'
 
 export const INVITE_RE = /^[A-Z0-9-]{8,32}$/
 
@@ -27,7 +28,7 @@ export function newInviteCode(random: (n: number) => Uint8Array = n => crypto.ge
 }
 
 /** Indirizzo da mandare a chi è invitato: apre la registrazione con il codice già scritto. */
-export function inviteLink(code: string, base = 'https://andreakampa.github.io/portafoglio/v2/'): string {
+export function inviteLink(code: string, base = appUrl()): string {
   return `${base}?invito=${encodeURIComponent(code)}`
 }
 

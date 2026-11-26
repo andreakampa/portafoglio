@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:gruzzolo": "tsc -b && APP_BASE=/ vite build",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",

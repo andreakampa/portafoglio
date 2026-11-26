@@ -5,7 +5,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { buildCsp } from './src/security/csp.ts'
 
 // La nuova versione viene pubblicata accanto al sito attuale, in /portafoglio/v2/.
-const BASE = '/portafoglio/v2/'
+// Su Cloudflare Pages (gruzzolo.pages.dev) l'app sta alla radice: npm run build:gruzzolo.
+const BASE = process.env.APP_BASE ?? '/portafoglio/v2/'
 
 // Versione mostrata nelle Impostazioni: commit in CI, "locale" sul PC.
 const VERSION = process.env.GITHUB_SHA?.slice(0, 7) ?? 'locale'

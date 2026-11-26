@@ -7,7 +7,7 @@
 // Limite di richieste al minuto per indirizzo IP: binding RELAY_LIMIT in wrangler.jsonc.
 
 // Domini del sito autorizzati a usare il relay (aggiungi qui eventuali altri domini; niente localhost)
-const ALLOWED_ORIGINS = ['https://andreakampa.github.io'];
+const ALLOWED_ORIGINS = ['https://andreakampa.github.io', 'https://gruzzolo.pages.dev'];
 
 const IBKR_BASE = 'https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService';
 // Errori IBKR che significano "riprova tra poco" (non sono veri errori)

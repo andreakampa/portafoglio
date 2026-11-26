@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { useUser } from '../auth/context'
 import { exportFileName, exportPayload, type MemberInfo } from '../domain/accountLifecycle'
 import { db } from '../lib/firebase'
+import { appUrl } from '../lib/site'
 
-export const APP_URL = 'https://andreakampa.github.io/portafoglio/v2/'
+export const APP_URL = appUrl()
 
 export function useNode<T>(path: string | null): T | null {
   const [v, setV] = useState<T | null>(null)

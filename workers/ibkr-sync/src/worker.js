@@ -18,7 +18,8 @@ import { parseYahoo } from '../../../app/src/lib/prices.ts'
 import { sendPush } from '../../../app/src/lib/webpush.ts'
 
 const ALERTS_CRON = '*/15 * * * *'
-const APP_URL = 'https://andreakampa.github.io/portafoglio/v2/'
+// Indirizzo relativo: il service worker lo apre dentro l'app da cui ci si è iscritti (GitHub Pages o gruzzolo.pages.dev).
+const WATCHLIST_URL = '#/watchlist'
 
 const IBKR = 'https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService'
 const RETRIABLE = new Set(['1001', '1004', '1005', '1019', '1021'])
@@ -224,7 +225,7 @@ export async function runAlerts(env) {
       report.hits.push(`${h.symbol} ${h.kind}`)
       for (const [sid, sub] of subs) {
         if (!sub?.endpoint || !vapid.privateKey || !budget()) continue
-        const status = await sendPush(sub, { title: 'Avviso di prezzo', body: alertText(h), tag: `alert-${h.id}-${h.kind}`, url: `${APP_URL}#/watchlist` }, vapid).catch(() => 0)
+        const status = await sendPush(sub, { title: 'Avviso di prezzo', body: alertText(h), tag: `alert-${h.id}-${h.kind}`, url: WATCHLIST_URL }, vapid).catch(() => 0)
         used++
         if ((status === 404 || status === 410) && budget()) {
           await db.del(`users/${uid}/settings/push/${sid}`)
