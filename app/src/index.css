@@ -328,6 +328,8 @@ textarea {
 .chart-breakdown b { color: var(--text); }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 0 0 6px; padding: 0; font-size: .85rem; color: var(--muted); }
 .chart-legend li { display: flex; align-items: center; gap: 6px; }
+.chart-legend b { color: var(--text); font-variant-numeric: tabular-nums; }
+.chart-legend-date { font-weight: 600; color: var(--text); }
 .key-line { display: inline-block; width: 14px; height: 2px; border-radius: 1px; }
 .key-line.dashed { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px); }
 .key-line.dotted { background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px); }
@@ -343,8 +345,6 @@ textarea {
 .chart-toggle[aria-pressed="true"] .toggle-dot { background: var(--toggle-color); }
 .chart-headline { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 12px 0 0; }
 .chart-headline b { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
-.chart-tip { position: absolute; top: 28px; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; box-shadow: var(--shadow); pointer-events: none; font-size: .85rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.chart-tip-row { display: flex; align-items: center; gap: 6px; }
 .chart-table { margin-top: 6px; }
 .market-grid { display: grid; gap: 12px; align-items: center; }
 @media (min-width: 700px) { .market-grid { grid-template-columns: auto 1fr; } }
