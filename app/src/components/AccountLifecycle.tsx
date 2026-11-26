@@ -10,6 +10,7 @@ import {
 } from '../domain/accountLifecycle'
 import { APP_URL, downloadMyData, useMyMember, useNode } from '../data/accountData'
 import { db } from '../lib/firebase'
+import { forgetDeviceKeys } from '../lib/keyStore'
 import { toast } from '../lib/toast'
 
 /** In cima a ogni pagina, finché vale: sospensione dell'account e chiusura annunciata del sito. */
@@ -64,6 +65,7 @@ export function MyDataCard() {
     try {
       // Una sola scrittura: dati e iscrizione spariscono insieme. Poi l'account di accesso.
       await update(ref(db), { [`users/${user.uid}`]: null, [`members/${user.uid}`]: null })
+      await forgetDeviceKeys()
       await deleteUser(user)
     } catch {
       setError('Cancellazione non riuscita: riprova o scrivi ad Andrea.')

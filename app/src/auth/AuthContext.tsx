@@ -9,6 +9,7 @@ import { get, ref, serverTimestamp, update } from 'firebase/database'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { auth, db } from '../lib/firebase'
 import { isValidInvite, normalizeInvite } from '../lib/invites'
+import { forgetDeviceKeys, rememberPassword } from '../lib/keyStore'
 import { AuthContext, AuthError, type AuthState } from './context'
 
 // Il controllo vero lo fanno le regole del database: senza members/{uid} i dati
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     try {
+      rememberPassword(email, password)
       await signInWithEmailAndPassword(auth, email.trim(), password)
     } catch {
       throw new AuthError('Email o password errati.')
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       let user: User
       try {
+        rememberPassword(email, password)
         user = (await createUserWithEmailAndPassword(auth, email.trim(), password)).user
       } catch (e) {
         const code = (e as { code?: string }).code
@@ -99,7 +102,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(await readAccess(user))
   }, [])
 
-  const signOut = useCallback(() => fbSignOut(auth), [])
+  const signOut = useCallback(async () => {
+    await forgetDeviceKeys()
+    await fbSignOut(auth)
+  }, [])
 
   const api = useMemo(
     () => ({ state, signIn, register, claimInvite, signOut }),

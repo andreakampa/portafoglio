@@ -1,12 +1,17 @@
 // Impostazioni: cambio password e pulizia della cache dei dati di mercato (come il sito vecchio).
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth'
+import { get, ref, set } from 'firebase/database'
 import { useState, type FormEvent } from 'react'
 import { useUser } from '../auth/context'
+import { envelopePath, useDataKey } from '../auth/dataKey'
+import { rewrapPassword, unlockWithPassword, type KeyEnvelope } from '../lib/crypto'
+import { db } from '../lib/firebase'
 import { isMarketCacheKey, passwordError, validatePassword, type PasswordForm } from '../domain/account'
 import { toast } from '../lib/toast'
 
 export function PasswordCard() {
   const { user } = useUser()
+  const encrypted = useDataKey() !== null
   const [open, setOpen] = useState(false)
   const [f, setF] = useState<PasswordForm>({ current: '', next: '', repeat: '' })
   const [busy, setBusy] = useState(false)
@@ -22,7 +27,22 @@ export function PasswordCard() {
     try {
       // Firebase chiede di confermare la password attuale prima di cambiarla.
       await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, f.current))
-      await updatePassword(user, f.next)
+      if (encrypted) {
+        // Dati cifrati: la busta della chiave si richiude con la password nuova prima di cambiarla,
+        // e si rimette com'era se il cambio non riesce.
+        const path = envelopePath(user.uid)
+        const old = (await get(ref(db, path))).val() as KeyEnvelope
+        const key = await unlockWithPassword(old, f.current)
+        await set(ref(db, path), await rewrapPassword(old, key, f.next))
+        try {
+          await updatePassword(user, f.next)
+        } catch (err) {
+          await set(ref(db, path), old)
+          throw err
+        }
+      } else {
+        await updatePassword(user, f.next)
+      }
       setF({ current: '', next: '', repeat: '' })
       setOpen(false)
       toast('Password cambiata')

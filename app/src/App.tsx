@@ -1,5 +1,6 @@
 import { createHashRouter, RouterProvider } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
+import { CryptoGate } from './auth/CryptoGate'
 import { useAuth } from './auth/context'
 import { LoginScreen } from './auth/LoginScreen'
 import { AppShell } from './layout/AppShell'
@@ -47,7 +48,11 @@ function Gate() {
     case 'needsInvite':
       return <LoginScreen mode="claim" />
     case 'ready':
-      return <RouterProvider router={router} />
+      return (
+        <CryptoGate>
+          <RouterProvider router={router} />
+        </CryptoGate>
+      )
   }
 }
 
