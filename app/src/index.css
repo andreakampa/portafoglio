@@ -849,3 +849,10 @@ button.div-dot { cursor: pointer; font: inherit; color: inherit; }
 .watch-hint { margin: -4px 0 0; }
 /* Puntino accanto ai titoli della watchlist con una soglia di prezzo. */
 .watch-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+
+/* Chiave di recupero (cifratura): grande, leggibile, da ricopiare a mano. */
+.recovery-code { margin: 0; padding: 14px; border: 1px dashed var(--border); border-radius: 10px; text-align: center; }
+.recovery-code code { font-size: 1.05rem; letter-spacing: .04em; word-break: break-word; }
+@media print {
+  .auth-card > :not(h1):not(.recovery-code) { display: none !important; }
+}
