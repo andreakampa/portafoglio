@@ -36,6 +36,9 @@ async function expect(name, promise, allowed) {
     else { failed++; console.log(`  ✘ ${name} (status ${status}, atteso ${allowed ? 'consentito' : 'negato'})`); }
 }
 
+// Dato cifrato come lo scrive l'app (lib/vaultTree.ts).
+const S = { __s: { v: 1, iv: 'aXY=', ct: 'Y3Q=' } };
+
 const claim = (user, code, email = user.email) => req(user, 'PATCH', '', {
     [`members/${user.uid}`]: { invite: code, email, joinedAt: { '.sv': 'timestamp' } },
     [`invites/${code}/usedBy`]: user.uid
@@ -86,7 +89,7 @@ await expect('non segna l\'invito come usato senza creare members',
     req(anna, 'PUT', 'invites/K7PM-Q2XD-9RWA/usedBy', anna.uid), false);
 await expect('riscatta un invito valido', claim(anna, 'K7PM-Q2XD-9RWA'), true);
 await expect('ora legge i propri dati', req(anna, 'GET', `users/${anna.uid}`), true);
-await expect('ora scrive i propri dati', req(anna, 'PUT', `users/${anna.uid}/portfolio_state`, { activePortfolioId: 'a' }), true);
+await expect('ora scrive i propri dati (cifrati)', req(anna, 'PUT', `users/${anna.uid}/portfolio_state`, { activePortfolioId: S }), true);
 await expect('un altro non riusa lo stesso invito', claim(bruno, 'K7PM-Q2XD-9RWA'), false);
 await expect('chi è già membro non riscatta un altro invito', claim(anna, 'ZZZZ-YYYY-XXXX'), false);
 await expect('non cambia il proprio members', req(anna, 'PUT', `members/${anna.uid}`, { invite: 'ZZZZ-YYYY-XXXX', email: anna.email }), false);
@@ -101,6 +104,24 @@ await expect('anna non legge members di bruno', req(anna, 'GET', `members/${brun
 await expect('anna non legge la radice', req(anna, 'GET', ''), false);
 await expect('anna non è admin', req(anna, 'PUT', 'invites/AAAA-BBBB-CCCC', { createdBy: anna.uid }), false);
 await expect('carlo (senza invito) resta fuori', req(carlo, 'GET', `users/${carlo.uid}`), false);
+
+console.log('\nInvitati: solo dati cifrati (tranne busta, watchlist e notifiche)');
+await expect('portafoglio in chiaro: no', req(bruno, 'PUT', `users/${bruno.uid}/portfolio_state/portfolios/p1`, { name: 'Fineco' }), false);
+await expect('portafoglio cifrato: sì', req(bruno, 'PUT', `users/${bruno.uid}/portfolio_state/portfolios/p1`, S), true);
+await expect('un campo in chiaro dentro un portafoglio: no', req(bruno, 'PUT', `users/${bruno.uid}/portfolio_state/portfolios/p1/name`, 'x'), false);
+await expect('portafoglio attivo in chiaro: no', req(bruno, 'PUT', `users/${bruno.uid}/portfolio_state/activePortfolioId`, 'p1'), false);
+await expect('impostazione in chiaro: no', req(bruno, 'PUT', `users/${bruno.uid}/settings/maxLeverage`, 2), false);
+await expect('impostazione cifrata: sì', req(bruno, 'PUT', `users/${bruno.uid}/settings/maxLeverage`, S), true);
+await expect('nota in chiaro: no', req(bruno, 'PUT', `users/${bruno.uid}/notes/n1`, { text: 'segreto' }), false);
+await expect('nota cifrata: sì', req(bruno, 'PUT', `users/${bruno.uid}/notes/n1`, S), true);
+await expect('cifrato finto (senza ct): no', req(bruno, 'PUT', `users/${bruno.uid}/notes/n2`, { __s: { iv: 'x' } }), false);
+await expect('watchlist in chiaro: sì (serve alle notifiche)', req(bruno, 'PUT', `users/${bruno.uid}/settings/watchlist/aapl`, { symbol: 'AAPL', above: 200 }), true);
+await expect('iscrizione alle notifiche in chiaro: sì', req(bruno, 'PUT', `users/${bruno.uid}/settings/push/abc`, { endpoint: 'https://x' }), true);
+await expect('busta della chiave: sì', req(bruno, 'PUT', `users/${bruno.uid}/crypto`, { v: 1, password: { ct: 'x' } }), true);
+await expect('scrittura di tutto il ramo con una parte in chiaro: no', req(bruno, 'PATCH', `users/${bruno.uid}`, { 'settings/maxLeverage': S, 'notes/n3': { text: 'x' } }), false);
+await expect('cancellare un proprio dato: sì', req(bruno, 'DELETE', `users/${bruno.uid}/notes/n1`), true);
+await expect('admin: i suoi dati restano in chiaro', req(admin, 'PUT', `users/${admin.uid}/portfolio_state/portfolios/p1`, { name: 'IBKR' }), true);
+await expect('admin: impostazione in chiaro', req(admin, 'PUT', `users/${admin.uid}/settings/maxLeverage`, 2), true);
 
 console.log('\nAvviso di chiusura del sito');
 await expect('non autenticati non lo leggono', req(null, 'GET', 'notice'), false);
@@ -128,7 +149,7 @@ await expect('bruno resta fuori', req(bruno, 'GET', `users/${bruno.uid}`), false
 await expect('admin sospende anna', req(admin, 'PATCH', `members/${anna.uid}`, { suspendedAt: Date.now(), deleteAfter: Date.now() - 1000 }), true);
 await expect('admin riattiva anna', req(admin, 'PATCH', `members/${anna.uid}`, { suspendedAt: null, deleteAfter: null }), true);
 await expect('admin non cancella i dati di un membro non sospeso', req(admin, 'DELETE', `users/${anna.uid}`), false);
-await expect('anna riattivata riscrive', req(anna, 'PUT', `users/${anna.uid}/settings/x`, 1), true);
+await expect('anna riattivata riscrive', req(anna, 'PUT', `users/${anna.uid}/settings/x`, S), true);
 
 console.log('\nElimina il mio account');
 const dario = await signUp('dario@test.it');

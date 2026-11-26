@@ -5,6 +5,7 @@ import { readTheme, saveTheme, type ThemePref } from '../lib/theme'
 import { CacheCard, PasswordCard } from '../components/AccountCards'
 import { InvitesCard, PortfoliosCard } from '../components/PortfolioAdmin'
 import { MembersCard, MyDataCard } from '../components/AccountLifecycle'
+import { PrivacyText } from '../components/PrivacyText'
 
 export function Settings() {
   const { signOut } = useAuth()
@@ -40,6 +41,10 @@ export function Settings() {
       {isAdmin && <MembersCard />}
       <MyDataCard />
       <CacheCard />
+      <details className="card privacy-box">
+        <summary><h2 style={{ display: 'inline' }}>Privacy</h2> <span className="muted small">dove stanno i tuoi dati e chi può leggerli</span></summary>
+        <PrivacyText />
+      </details>
       <div className="card">
         <h2>Versione</h2>
         <p className="muted">
