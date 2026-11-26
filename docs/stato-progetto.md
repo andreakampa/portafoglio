@@ -45,7 +45,7 @@ le regole italiane, note, margine e grafici. Da passare in futuro ad amici e par
     (progetto `miogruzzolo`, comando `cd app && npm ci && npm run build:gruzzolo`, cartella `app/dist`). Inviti ed email usano l'indirizzo da cui si usa l'app (`lib/site.ts`).
     Worker: `miogruzzolo.pages.dev` tra le origini ammesse; le notifiche aprono `#/watchlist` relativo. Servono: progetto Pages, dominio autorizzato in Firebase Auth, ripubblicare i 3 Worker.
     Passo 5 (export decifrato) incluso nel 3. Passo 6 fatto: informativa `components/PrivacyText.tsx` alla registrazione e in Impostazioni → Privacy.
-- **v2 online** su https://miogruzzolo.pages.dev (dal 26/11/2026; `/portafoglio/v2/` rimanda lì e cancella il vecchio service worker)
+- **v2 online** su https://miogruzzolo.pages.dev (dal 26/11/2026; `/portafoglio/v2/` su GitHub Pages è stato tolto)
   - Login, registrazione con invito, PWA che si aggiorna da sola.
   - **Posizioni:** valore, PMC e risultato, con schede su telefono e tabella su PC.
   - **Fiscale:** plus e minus per anno, minus disponibili con scadenza, bollo e IVAFE stimati.
