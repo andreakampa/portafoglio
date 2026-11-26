@@ -18,7 +18,7 @@ import { parseYahoo } from '../../../app/src/lib/prices.ts'
 import { sendPush } from '../../../app/src/lib/webpush.ts'
 
 const ALERTS_CRON = '*/15 * * * *'
-// Indirizzo relativo: il service worker lo apre dentro l'app da cui ci si è iscritti (GitHub Pages o gruzzolo.pages.dev).
+// Indirizzo relativo: il service worker lo apre dentro l'app da cui ci si è iscritti (GitHub Pages o miogruzzolo.pages.dev).
 const WATCHLIST_URL = '#/watchlist'
 
 const IBKR = 'https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService'

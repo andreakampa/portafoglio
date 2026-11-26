@@ -3,7 +3,7 @@ import { appUrl, DEFAULT_APP_URL } from './site'
 
 describe('appUrl', () => {
   it('usa l\'indirizzo da cui si apre l\'app', () => {
-    expect(appUrl('https://gruzzolo.pages.dev', '/')).toBe('https://gruzzolo.pages.dev/')
+    expect(appUrl('https://miogruzzolo.pages.dev', '/')).toBe('https://miogruzzolo.pages.dev/')
     expect(appUrl('https://andreakampa.github.io', '/portafoglio/v2/')).toBe('https://andreakampa.github.io/portafoglio/v2/')
   })
   it('in locale usa quello pubblicato', () => {

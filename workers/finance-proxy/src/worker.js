@@ -6,7 +6,7 @@
 // richieste al minuto per indirizzo IP (binding PROXY_LIMIT e CHAT_LIMIT in wrangler.jsonc).
 // Nota: l'origine la può falsificare chiunque fuori dal browser; il limite è la difesa vera.
 
-const ALLOWED_ORIGINS = ['https://andreakampa.github.io', 'https://gruzzolo.pages.dev'];
+const ALLOWED_ORIGINS = ['https://andreakampa.github.io', 'https://miogruzzolo.pages.dev'];
 
 // Unici domini che il proxy può contattare (quelli usati dal sito)
 const ALLOWED_HOSTS = new Set([

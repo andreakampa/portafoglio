@@ -58,10 +58,10 @@ describe('finance-proxy: origini', () => {
     assert.equal(called.length, 1)
   })
 
-  it('accetta anche gruzzolo.pages.dev', async () => {
-    const r = await proxy.fetch(req(yahoo, { origin: 'https://gruzzolo.pages.dev' }), env())
+  it('accetta anche miogruzzolo.pages.dev', async () => {
+    const r = await proxy.fetch(req(yahoo, { origin: 'https://miogruzzolo.pages.dev' }), env())
     assert.equal(r.status, 200)
-    assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://gruzzolo.pages.dev')
+    assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://miogruzzolo.pages.dev')
   })
 
   for (const origin of ['http://localhost:5173', 'http://127.0.0.1:8080', 'https://evil.example', '']) {
