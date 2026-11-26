@@ -10,7 +10,7 @@ export function PrivacyText() {
 
       <h3>Chi gestisce il sito</h3>
       <p>
-        Portafoglio è un sito personale di Andrea, aperto gratis solo a chi riceve un suo invito. Non è un servizio commerciale,
+        Gruzzolo è un sito personale di Andrea, aperto gratis solo a chi riceve un suo invito. Non è un servizio commerciale,
         non c'è pubblicità e i dati non vengono venduti né usati per altro. Per qualsiasi domanda o richiesta scrivi direttamente ad Andrea.
       </p>
 

@@ -39,7 +39,7 @@ export function AppShell() {
       <nav className="sidenav" aria-label="Sezioni">
         <div className="brand">
           <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={28} height={28} />
-          <span>Portafoglio</span>
+          <span>Gruzzolo</span>
         </div>
         {GROUPS.map((g, i) => (
           <div key={i} className="nav-group">

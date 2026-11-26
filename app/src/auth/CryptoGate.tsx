@@ -105,7 +105,7 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       <div className="auth-card">
         <div className="auth-brand">
           <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={40} height={40} />
-          <span>Portafoglio</span>
+          <span>Gruzzolo</span>
         </div>
         <h1>{title}</h1>
         {children}
@@ -154,10 +154,10 @@ function ShowRecoveryCode({ code, onConfirm }: { code: string; onConfirm: () => 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const download = () => {
-    const blob = new Blob([`Portafoglio, chiave di recupero\n\n${code}\n\nServe solo se dimentichi la password. Conservala in un posto sicuro e non darla a nessuno.\n`], { type: 'text/plain' })
+    const blob = new Blob([`Gruzzolo, chiave di recupero\n\n${code}\n\nServe solo se dimentichi la password. Conservala in un posto sicuro e non darla a nessuno.\n`], { type: 'text/plain' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = 'portafoglio-chiave-di-recupero.txt'
+    a.download = 'gruzzolo-chiave-di-recupero.txt'
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
   }

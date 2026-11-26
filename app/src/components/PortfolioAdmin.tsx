@@ -134,9 +134,9 @@ export function InvitesCard() {
 
   const share = async (code: string) => {
     const link = inviteLink(code)
-    const text = `Ti invito su Portafoglio: apri ${link} e registrati (codice ${code}).`
+    const text = `Ti invito su Gruzzolo: apri ${link} e registrati (codice ${code}).`
     try {
-      if (navigator.share) await navigator.share({ title: 'Invito a Portafoglio', text, url: link })
+      if (navigator.share) await navigator.share({ title: 'Invito a Gruzzolo', text, url: link })
       else {
         await navigator.clipboard.writeText(text)
         setMsg('Messaggio con il link copiato: incollalo su WhatsApp o in una mail.')

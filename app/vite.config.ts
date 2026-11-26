@@ -48,8 +48,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Portafoglio Tracker Pro',
-        short_name: 'Portafoglio',
+        name: 'Gruzzolo',
+        short_name: 'Gruzzolo',
         description: 'Portafogli, PMC, simulazioni e cassetto fiscale',
         lang: 'it',
         start_url: BASE,
@@ -60,7 +60,7 @@ export default defineConfig({
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
