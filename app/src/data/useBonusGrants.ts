@@ -1,4 +1,4 @@
-import { onValue, ref, update } from 'firebase/database'
+import { onValue, ref, update } from '../lib/vault'
 import { useEffect, useMemo, useState } from 'react'
 import { useUser } from '../auth/context'
 import type { BonusGrant } from '../domain/bonusShares'

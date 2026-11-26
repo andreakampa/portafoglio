@@ -1,4 +1,4 @@
-import { onValue, ref } from 'firebase/database'
+import { onValue, ref } from '../lib/vault'
 import { useEffect, useState } from 'react'
 import { useUser } from '../auth/context'
 import { syncStatusFromDb, type SyncStatus } from '../domain/ibkrSync'

@@ -1,4 +1,4 @@
-import { ref, runTransaction, update } from 'firebase/database'
+import { ref, runTransaction, update } from '../lib/vault'
 import { useMemo } from 'react'
 import { useUser } from '../auth/context'
 import type { RawAsset, RawTx } from '../domain/engine/types'

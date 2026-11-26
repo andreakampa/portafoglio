@@ -1,4 +1,4 @@
-import { onValue, push, ref, remove, update } from 'firebase/database'
+import { onValue, push, ref, remove, update } from '../lib/vault'
 import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '../auth/context'
 import { notesFromDb, type Note } from '../domain/notes'

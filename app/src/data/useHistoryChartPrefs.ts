@@ -1,4 +1,4 @@
-import { onValue, ref, set } from 'firebase/database'
+import { onValue, ref, set } from '../lib/vault'
 import { useCallback, useEffect, useState } from 'react'
 import { useUser } from '../auth/context'
 import { DEFAULT_PREFS, reconcileChartPrefs, type HistoryChartPrefs } from '../domain/historyChart'

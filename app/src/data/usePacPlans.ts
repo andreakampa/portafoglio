@@ -1,4 +1,4 @@
-import { onValue, ref, remove, runTransaction, set } from 'firebase/database'
+import { onValue, ref, remove, runTransaction, set } from '../lib/vault'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useUser } from '../auth/context'
 import type { PacPlan } from '../domain/pac'

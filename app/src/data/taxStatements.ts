@@ -1,4 +1,4 @@
-import { onValue, ref, set } from 'firebase/database'
+import { onValue, ref, set } from '../lib/vault'
 import { useEffect, useState } from 'react'
 import { useUser } from '../auth/context'
 import type { SavedStatement, StatementCheck } from '../domain/ibkr/statement'

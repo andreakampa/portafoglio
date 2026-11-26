@@ -1,4 +1,4 @@
-import { onValue, ref, remove, serverTimestamp, set, update } from 'firebase/database'
+import { onValue, ref, remove, serverTimestamp, set, update } from '../lib/vault'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useUser } from '../auth/context'
 import { useIbkrSync } from '../data/useIbkrSync'

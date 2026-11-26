@@ -1,4 +1,4 @@
-import { onValue, ref, remove, update } from 'firebase/database'
+import { onValue, ref, remove, update } from '../lib/vault'
 import { useEffect, useMemo, useState } from 'react'
 import { useUser } from '../auth/context'
 import { watchId, type WatchItem } from '../domain/watchlist'
