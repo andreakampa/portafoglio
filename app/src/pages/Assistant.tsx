@@ -23,7 +23,12 @@ const ERRORS: Record<string, string> = {
   troppe_richieste: 'Troppe domande in poco tempo: aspetta un minuto e riprova.',
   quota_esaurita: 'Hai finito le richieste gratuite di Gemini per ora: riprova più tardi.',
   gemini_non_disponibile: 'Gemini non risponde in questo momento: riprova tra poco.',
+  risposta_vuota: 'Gemini ha mandato una risposta vuota: riprova.',
+  risposta_troppo_lunga: 'Gemini si è fermato prima di scrivere la risposta: riprova o fai una domanda più mirata.',
+  risposta_bloccata: 'Gemini non ha voluto rispondere a questa domanda: prova a riformularla.',
 }
+
+const TRUNCATED_NOTE = '\n\n*(Risposta interrotta perché troppo lunga: chiedi «continua» o fai una domanda più mirata.)*'
 
 const SUGGESTIONS = [
   'Quali posizioni pesano di più e quanto sono concentrato?',
@@ -86,10 +91,12 @@ export function Assistant() {
         body: JSON.stringify({ question: text, context, history }),
         signal: AbortSignal.timeout(60000),
       })
-      const j = (await r.json()) as { answer?: string; error?: string }
+      const j = (await r.json()) as { answer?: string; error?: string; truncated?: boolean }
       if (!r.ok || !j.answer) throw new Error(ERRORS[j.error ?? ''] ?? 'Risposta non arrivata: riprova.')
-      setChat(m => [...m, { role: 'model', text: j.answer! }])
-      if (saveAs) {
+      const answer = j.answer + (j.truncated ? TRUNCATED_NOTE : '')
+      setChat(m => [...m, { role: 'model', text: answer }])
+      // Un'analisi interrotta non si salva: la prossima volta "Analizza portafoglio" la rifà intera.
+      if (saveAs && !j.truncated) {
         try {
           localStorage.setItem(analysisKey(saveAs), JSON.stringify({ date: TODAY, text: j.answer }))
         } catch {

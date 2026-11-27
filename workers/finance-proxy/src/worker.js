@@ -100,12 +100,40 @@ Rispondi in italiano, in modo conciso, con numeri e tabelle quando utile.
 Per pesi, P/L, drawdown e prezzi usa SOLO i dati forniti nel contesto: se un dato manca, dillo.
 Non inventare prezzi o notizie. Evidenzia rischi e incertezze: la tua è analisi, non consulenza finanziaria.`;
 
-function callGemini(model, body, key) {
+// I modelli Gemini recenti "ragionano" prima di rispondere e quei token si contano dentro maxOutputTokens:
+// con un tetto basso il ragionamento lo consumava quasi tutto e la risposta arrivava vuota o tronca.
+// Quindi: tetto alto e ragionamento contenuto (parametro diverso tra Gemini 3 e 2.5).
+const MAX_OUTPUT_TOKENS = 8192;
+export function thinkingConfig(model) {
+  if (/^gemini-[3-9]/.test(model)) return { thinkingLevel: 'low' };
+  if (/^gemini-2\.5/.test(model)) return { thinkingBudget: 1024 };
+  return undefined;
+}
+
+function callGemini(model, body, key, withThinking = true) {
+  const thinking = withThinking && thinkingConfig(model);
+  const full = thinking ? { ...body, generationConfig: { ...body.generationConfig, thinkingConfig: thinking } } : body;
   return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify(body),
+    body: JSON.stringify(full),
   });
+}
+
+/** Testo della risposta di Gemini: unisce tutte le parti, salta i "pensieri" e segnala se è stata interrotta. */
+export function readAnswer(data) {
+  const cand = data?.candidates?.[0];
+  const answer = (cand?.content?.parts || [])
+    .filter((x) => !x.thought)
+    .map((x) => x.text || '')
+    .join('')
+    .trim();
+  const truncated = cand?.finishReason === 'MAX_TOKENS';
+  if (!answer) {
+    const blocked = data?.promptFeedback?.blockReason || ['SAFETY', 'RECITATION', 'PROHIBITED_CONTENT'].includes(cand?.finishReason);
+    return { answer: '', truncated, reason: blocked ? 'bloccata' : truncated ? 'troppo_lunga' : 'vuota' };
+  }
+  return { answer, truncated };
 }
 
 async function handleChat(request, env, origin) {
@@ -136,7 +164,7 @@ async function handleChat(request, env, origin) {
       ...history,
       { role: 'user', parts: [{ text: `DATI PORTAFOGLIO (JSON):\n${ctx}\n\nDOMANDA: ${question}` }] },
     ],
-    generationConfig: { maxOutputTokens: 1500, temperature: 0.4 },
+    generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS, temperature: 0.4 },
   };
 
   const models = [env.GEMINI_MODEL || 'gemini-3.5-flash', env.GEMINI_MODEL_FALLBACK].filter(Boolean);
@@ -148,10 +176,15 @@ async function handleChat(request, env, origin) {
       await new Promise((res) => setTimeout(res, 1500));
       r = await callGemini(model, body, key);
     }
+    // Se il modello non accetta il parametro sul ragionamento, si riprova senza (la chiave non c'entra).
+    if (r.status === 400 && thinkingConfig(model)) {
+      const retry = await callGemini(model, body, key, false);
+      if (retry.status !== 400) r = retry;
+    }
     if (r.ok) {
-      const data = await r.json();
-      const answer = (data.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join('').trim();
-      return json(origin, M, { answer: answer || 'Nessuna risposta dal modello.', model });
+      const { answer, truncated, reason } = readAnswer(await r.json().catch(() => null));
+      if (!answer) return json(origin, M, { error: `risposta_${reason}`, model }, 502);
+      return json(origin, M, { answer, truncated, model });
     }
     lastStatus = r.status;
     lastDetail = (await r.text().catch(() => '')).slice(0, 300);

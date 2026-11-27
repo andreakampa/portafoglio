@@ -2,7 +2,7 @@
 // Si lanciano dalla radice con: npm run test:workers  (Node puro, nessuna dipendenza)
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import proxy from '../finance-proxy/src/worker.js'
+import proxy, { readAnswer, thinkingConfig } from '../finance-proxy/src/worker.js'
 import relay from '../ibkr-relay/src/worker.js'
 
 const SITE = 'https://andreakampa.github.io'
@@ -157,5 +157,72 @@ describe('ibkr-relay', () => {
     assert.equal(r.headers.get('Access-Control-Allow-Origin'), SITE)
     assert.equal(called.length, 2)
     assert.ok(called.every(u => u.startsWith('https://ndcdyn.interactivebrokers.com/')))
+  })
+})
+
+describe('finance-proxy: risposte di Gemini', () => {
+  const env = () => ({ PROXY_LIMIT: fakeLimiter(100), CHAT_LIMIT: fakeLimiter(100) })
+  const ask = () =>
+    proxy.fetch(
+      req(`${PROXY}/chat`, { origin: SITE, method: 'POST', headers: { 'X-Gemini-Key': 'k'.repeat(30) }, body: '{"question":"Analizza"}' }),
+      env(),
+    )
+  const gemini = (data) => {
+    const sent = []
+    globalThis.fetch = async (url, init) => {
+      sent.push(JSON.parse(init.body))
+      return new Response(JSON.stringify(data), { status: 200 })
+    }
+    return sent
+  }
+
+  it('unisce tutte le parti e salta i pensieri', () => {
+    const r = readAnswer({
+      candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'ragiono…', thought: true }, { text: 'Prima parte, ' }, { text: 'seconda parte.' }] } }],
+    })
+    assert.deepEqual(r, { answer: 'Prima parte, seconda parte.', truncated: false })
+  })
+
+  it('segnala le risposte interrotte, vuote o bloccate', () => {
+    assert.equal(readAnswer({ candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: 'a metà' }] } }] }).truncated, true)
+    assert.equal(readAnswer({ candidates: [{ finishReason: 'MAX_TOKENS', content: {} }] }).reason, 'troppo_lunga')
+    assert.equal(readAnswer({ promptFeedback: { blockReason: 'SAFETY' } }).reason, 'bloccata')
+    assert.equal(readAnswer(null).reason, 'vuota')
+  })
+
+  it('ragionamento contenuto con il parametro giusto per ogni modello', () => {
+    assert.deepEqual(thinkingConfig('gemini-3.5-flash'), { thinkingLevel: 'low' })
+    assert.deepEqual(thinkingConfig('gemini-2.5-flash'), { thinkingBudget: 1024 })
+    assert.equal(thinkingConfig('gemini-2.0-flash'), undefined)
+  })
+
+  it('chiede a Gemini abbastanza spazio per rispondere per intero', async () => {
+    const sent = gemini({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'Ciao' }] } }] })
+    const r = await ask()
+    assert.equal(r.status, 200)
+    assert.deepEqual(await r.json(), { answer: 'Ciao', truncated: false, model: 'gemini-3.5-flash' })
+    assert.ok(sent[0].generationConfig.maxOutputTokens >= 8192)
+    assert.deepEqual(sent[0].generationConfig.thinkingConfig, { thinkingLevel: 'low' })
+  })
+
+  it('se il modello rifiuta il parametro sul ragionamento, riprova senza', async () => {
+    const sent = []
+    globalThis.fetch = async (url, init) => {
+      const b = JSON.parse(init.body)
+      sent.push(b)
+      if (b.generationConfig.thinkingConfig) return new Response('{"error":{"code":400}}', { status: 400 })
+      return new Response(JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'Ok' }] } }] }), { status: 200 })
+    }
+    const r = await ask()
+    assert.equal(r.status, 200)
+    assert.equal(sent.length, 2)
+    assert.equal(sent[1].generationConfig.thinkingConfig, undefined)
+  })
+
+  it('una risposta vuota diventa un errore chiaro, non un messaggio a metà', async () => {
+    gemini({ candidates: [{ finishReason: 'MAX_TOKENS', content: {} }] })
+    const r = await ask()
+    assert.equal(r.status, 502)
+    assert.equal((await r.json()).error, 'risposta_troppo_lunga')
   })
 })
